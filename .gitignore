@@ -1,1 +1,9 @@
 /target
+
+.env
+
+**/node_modules/
+
+docs/build/
+
+**/.DS_Store

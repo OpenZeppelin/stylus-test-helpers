@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "motsu"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "const-hex",
  "dashmap",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "motsu-proc"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
