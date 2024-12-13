@@ -1,0 +1,59 @@
+[workspace.package]
+authors = ["OpenZeppelin"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/OpenZeppelin/stylus-test-helpers"
+version = "0.1.0"
+
+[workspace]
+members = ["crates/motsu", "crates/motsu-proc"]
+
+default-members = ["crates/motsu", "crates/motsu-proc"]
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unreachable_pub = "warn"
+rust_2021_compatibility = { level = "warn", priority = -1 }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
+[workspace.lints.clippy]
+pedantic = "warn"
+all = "warn"
+
+[workspace.dependencies]
+const-hex = { version = "1.11.1", default-features = false }
+once_cell = "1.19.0"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+stylus-sdk = "0.6.0"
+dashmap = "6.1.0"
+syn = { version = "2.0.58", features = ["full"] }
+proc-macro2 = "1.0.79"
+quote = "1.0.35"
+alloy-primitives = { version = "=0.7.6", default-features = false }
+alloy-sol-types = { version = "=0.7.6", default-features = false }
+
+# members
+motsu = { path = "crates/motsu" }
+motsu-proc = { path = "crates/motsu-proc" }
+
+[profile.release]
+codegen-units = 1
+panic = "abort"
+opt-level = "z"
+strip = true
+lto = true
+debug = false
+rpath = false
+debug-assertions = false
+incremental = false
+
+[profile.dev]
+panic = "abort"
+
+[workspace.metadata.typos]
+default = { extend-ignore-identifiers-re = [
+  # ignore hex data samples.
+  "[0-9a-fA-F][0-9a-fA-F]",
+] }
+
+

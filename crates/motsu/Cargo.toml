@@ -1,0 +1,20 @@
+[package]
+name = "motsu"
+description = "Unit Testing for Stylus"
+edition.workspace = true
+categories = ["development-tools::testing", "cryptography::cryptocurrencies"]
+keywords = ["arbitrum", "ethereum", "stylus", "unit-tests", "tests"]
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+const-hex.workspace = true
+once_cell.workspace = true
+tiny-keccak.workspace = true
+stylus-sdk.workspace = true
+motsu-proc.workspace = true
+dashmap.workspace = true
+
+[lints]
+workspace = true
