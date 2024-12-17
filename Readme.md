@@ -15,7 +15,14 @@ Japanese -- we hold a stylus in our hand.
 
 ### Usage
 
-Annotate tests with `#[motsu::test]` instead of `#[test]` to get access to VM
+You can import `motsu` from crates.io by adding the following line to your `Cargo.toml`:
+
+```toml
+[dev-dependencies]
+motsu = "0.2.1"
+```
+
+Then, when writing tests, use `#[motsu::test]` instead of `#[test]` to get access to VM
 affordances.
 
 Note that we require contracts to implement `stylus_sdk::prelude::StorageType`.
