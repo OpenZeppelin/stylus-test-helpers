@@ -18,7 +18,7 @@ Japanese -- we hold a stylus in our hand.
 You can import `motsu` from crates.io by adding the following line to your `Cargo.toml` :
 
 ```toml
-[dependencies]
+[dev-dependencies]
 motsu = "0.2.1"
 ```
 
