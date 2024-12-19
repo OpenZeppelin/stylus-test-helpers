@@ -14,7 +14,7 @@
 //!
 //! Note that we require contracts to implement
 //! `stylus_sdk::prelude::StorageType`. This trait is typically implemented by
-//! default with `stylus_proc::sol_storage` or `stylus_proc::storage` macros.
+//! default with `stylus_proc::sol_storage` macro.
 //!
 //! ```rust
 //! #[cfg(test)]
@@ -44,7 +44,9 @@
 //!
 //! [test_attribute]: crate::test
 mod context;
+mod event;
 pub mod prelude;
 mod shims;
 
+pub use event::{clear_events, emits_event};
 pub use motsu_proc::test;
