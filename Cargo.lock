@@ -361,6 +361,7 @@ dependencies = [
 name = "motsu"
 version = "0.2.1"
 dependencies = [
+ "alloy-sol-types",
  "const-hex",
  "dashmap",
  "motsu-proc",
