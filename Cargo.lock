@@ -1441,8 +1441,8 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stylus-proc"
-version = "0.7.0-beta.1"
-source = "git+https://github.com/qalisander/stylus-sdk-rs?branch=fix-encoding-in-sol-interface#3025bcb2a803ad08dc0c077dfc81465a54d9fb29"
+version = "0.7.0-rc.1"
+source = "git+https://github.com/OffchainLabs/stylus-sdk-rs?branch=rel/0.7.0-rc.1#754c69be04c0017a1d2573f2aa5b0c5f2483288a"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -1461,8 +1461,8 @@ dependencies = [
 
 [[package]]
 name = "stylus-sdk"
-version = "0.7.0-beta.1"
-source = "git+https://github.com/qalisander/stylus-sdk-rs?branch=fix-encoding-in-sol-interface#3025bcb2a803ad08dc0c077dfc81465a54d9fb29"
+version = "0.7.0-rc.1"
+source = "git+https://github.com/OffchainLabs/stylus-sdk-rs?branch=rel/0.7.0-rc.1#754c69be04c0017a1d2573f2aa5b0c5f2483288a"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
