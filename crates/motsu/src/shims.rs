@@ -178,6 +178,7 @@ pub unsafe extern "C" fn msg_value(value: *mut u8) {
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
 pub unsafe extern "C" fn contract_address(address: *mut u8) {
+    // TODO#q: mock contract address. Rename msg_receiver -> contract_address.
     let addr =
         const_hex::const_decode_to_array::<20>(CONTRACT_ADDRESS).unwrap();
     std::ptr::copy(addr.as_ptr(), address, 20);

@@ -383,7 +383,15 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         Self { phantom: ::core::marker::PhantomData, address }
     }
 
-    // TODO#q: probably we need generic initializer
+    /// Initialize the contract with an `initializer` function, and on behalf of
+    /// the given `account`.
+    pub fn init(
+        &self,
+        account: Account,
+        initializer: impl FnOnce(ContractCall<ST>),
+    ) {
+        initializer(self.sender(account));
+    }
 
     /// Create a new contract with random address.
     pub fn random() -> Self {

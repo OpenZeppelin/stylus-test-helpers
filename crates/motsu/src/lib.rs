@@ -57,16 +57,16 @@ mod tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     extern crate alloc;
 
-    use crate::context::{Account, Contract};
     use alloy_primitives::uint;
-    use stylus_sdk::prelude::storage;
-    use stylus_sdk::storage::{StorageAddress, StorageU256};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
         msg,
-        prelude::{public, StorageType, TopLevelStorage},
+        prelude::{public, storage, StorageType, TopLevelStorage},
+        storage::{StorageAddress, StorageU256},
     };
+
+    use crate::context::{Account, Contract};
 
     #[storage]
     pub struct PingContract {
@@ -151,5 +151,60 @@ mod tests {
 
         assert_eq!(ping.sender(alice).pinged_from(), alice.address());
         assert_eq!(pong.sender(alice).ponged_from(), ping.address());
+    }
+
+    stylus_sdk::stylus_proc::sol_interface! {
+        interface IProxy {
+            #[allow(missing_docs)]
+            function callProxy(uint256 value) external returns (uint256);
+        }
+    }
+
+    #[storage]
+    pub struct Proxy {
+        pub _next_proxy: StorageAddress,
+    }
+
+    #[public]
+    impl Proxy {
+        pub fn call_proxy(&mut self, value: U256) -> U256 {
+            let next_proxy = self._next_proxy.get();
+
+            // If there is no next proxy, return the value.
+            if next_proxy.is_zero() {
+                value
+            } else {
+                // Otherwise, call the next proxy.
+                let proxy = IProxy::new(next_proxy);
+                let call = Call::new_in(self);
+                proxy.call_proxy(call, value).expect("should call proxy")
+            }
+        }
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[test]
+    fn test_three_proxies() {
+        let mut proxy1 = Contract::<Proxy>::default();
+        let mut proxy2 = Contract::<Proxy>::default();
+        let mut proxy3 = Contract::<Proxy>::default();
+
+        let alice = Account::random();
+
+        proxy1.init(alice, |mut proxy| {
+            proxy._next_proxy.set(proxy2.address());
+        });
+        proxy2.init(alice, |mut proxy| {
+            proxy._next_proxy.set(proxy3.address());
+        });
+        proxy3.init(alice, |mut proxy| {
+            proxy._next_proxy.set(Address::ZERO);
+        });
+
+        let value = uint!(10_U256);
+        let result = proxy1.sender(alice).call_proxy(value);
+
+        assert_eq!(result, value);
     }
 }
