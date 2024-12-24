@@ -388,9 +388,9 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     pub fn init(
         &self,
         account: Account,
-        initializer: impl FnOnce(ContractCall<ST>),
+        initializer: impl FnOnce(&mut ST),
     ) {
-        initializer(self.sender(account));
+        initializer(&mut self.sender(account));
     }
 
     /// Create a new contract with random address.

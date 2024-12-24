@@ -192,14 +192,14 @@ mod tests {
 
         let alice = Account::random();
 
-        proxy1.init(alice, |mut proxy| {
-            proxy._next_proxy.set(proxy2.address());
+        proxy1.init(alice, |storage| {
+            storage._next_proxy.set(proxy2.address());
         });
-        proxy2.init(alice, |mut proxy| {
-            proxy._next_proxy.set(proxy3.address());
+        proxy2.init(alice, |storage| {
+            storage._next_proxy.set(proxy3.address());
         });
-        proxy3.init(alice, |mut proxy| {
-            proxy._next_proxy.set(Address::ZERO);
+        proxy3.init(alice, |storage| {
+            storage._next_proxy.set(Address::ZERO);
         });
 
         let value = uint!(10_U256);
