@@ -49,6 +49,7 @@
 mod context;
 pub mod prelude;
 mod shims;
+mod call;
 
 pub use motsu_proc::test;
 
@@ -62,7 +63,7 @@ mod tests {
         alloy_primitives::{Address, U256},
         call::Call,
         msg,
-        prelude::{public, storage, StorageType, TopLevelStorage},
+        prelude::{public, storage, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
     };
 
@@ -134,8 +135,8 @@ mod tests {
 
     #[test]
     fn ping_pong_works() {
-        let mut ping = Contract::<PingContract>::default();
-        let mut pong = Contract::<PongContract>::default();
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
 
         let alice = Account::random();
 
@@ -185,10 +186,10 @@ mod tests {
     unsafe impl TopLevelStorage for Proxy {}
 
     #[test]
-    fn test_three_proxies() {
-        let mut proxy1 = Contract::<Proxy>::default();
-        let mut proxy2 = Contract::<Proxy>::default();
-        let mut proxy3 = Contract::<Proxy>::default();
+    fn three_proxies() {
+        let proxy1 = Contract::<Proxy>::default();
+        let proxy2 = Contract::<Proxy>::default();
+        let proxy3 = Contract::<Proxy>::default();
 
         let alice = Account::random();
 
@@ -207,4 +208,6 @@ mod tests {
 
         assert_eq!(result, value);
     }
+    
+    // TODO#q: add has code test
 }

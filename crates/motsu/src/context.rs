@@ -47,7 +47,7 @@ impl Context {
 
     /// Get the value at `key` in storage.
     fn get_bytes(self, key: &Bytes32) -> Bytes32 {
-        let storage = self.get_storage();
+        let storage = self.storage();
         let msg_receiver =
             storage.msg_receiver.expect("msg_receiver should be set");
         storage
@@ -67,7 +67,7 @@ impl Context {
 
     /// Set the value at `key` in storage to `value`.
     fn set_bytes(self, key: Bytes32, value: Bytes32) {
-        let mut storage = self.get_storage();
+        let mut storage = self.storage();
         let msg_receiver =
             storage.msg_receiver.expect("msg_receiver should be set");
         storage
@@ -85,22 +85,22 @@ impl Context {
 
     /// Set the message sender account address.
     fn set_msg_sender(&self, msg_sender: Address) -> Option<Address> {
-        self.get_storage().msg_sender.replace(msg_sender)
+        self.storage().msg_sender.replace(msg_sender)
     }
 
     /// Get the message sender account address.
     pub fn get_msg_sender(&self) -> Option<Address> {
-        self.get_storage().msg_sender
+        self.storage().msg_sender
     }
 
     /// Set the address of the contract, that should be called.
     fn set_msg_receiver(&self, msg_receiver: Address) -> Option<Address> {
-        self.get_storage().msg_receiver.replace(msg_receiver)
+        self.storage().msg_receiver.replace(msg_receiver)
     }
 
     /// Get the address of the contract, that should be called.
     fn get_msg_receiver(&self) -> Option<Address> {
-        self.get_storage().msg_receiver
+        self.storage().msg_receiver
     }
 
     /// Initialise contract storage for the current test thread and
@@ -120,12 +120,13 @@ impl Context {
         }
 
         if CALL_STORAGE
-            .entry(self.thread.id())
-            .or_default()
-            .contract_router
             .insert(
-                contract_address,
-                Mutex::new(Box::new(unsafe { ST::new(uint!(0_U256), 0) })),
+                (self.thread.id(), contract_address),
+                CallStorage {
+                    router: Mutex::new(Box::new(unsafe {
+                        ST::new(uint!(0_U256), 0)
+                    })),
+                },
             )
             .is_some()
         {
@@ -178,11 +179,7 @@ impl Context {
             .expect("msg_sender should be set");
 
         // Call external contract.
-        let call_storage = self.get_call_storage();
-        let router = call_storage
-            .contract_router
-            .get(&contract_address)
-            .expect("contract router should be set");
+        let router = &self.call_context(contract_address).storage().router;
         let mut router = router.lock().expect("should lock test router");
         let result = router.route(selector, input).unwrap_or_else(|| {
             panic!("selector not found - selector is {selector}")
@@ -196,7 +193,7 @@ impl Context {
     }
 
     fn set_return_data(&self, data: Vec<u8>) {
-        let mut call_storage = self.get_call_storage();
+        let mut call_storage = self.storage();
         let _ = call_storage.call_output_len.insert(data.len());
         let _ = call_storage.call_output.insert(data);
     }
@@ -212,17 +209,14 @@ impl Context {
     }
 
     pub(crate) fn get_return_data_size(&self) -> usize {
-        self.get_call_storage()
+        self.storage()
             .call_output_len
             .take()
             .expect("call_output_len should be set")
     }
 
     fn get_return_data(&self) -> Vec<u8> {
-        self.get_call_storage()
-            .call_output
-            .take()
-            .expect("call_output should be set")
+        self.storage().call_output.take().expect("call_output should be set")
     }
 
     /// Check if the contract at raw `address` has code.
@@ -235,22 +229,18 @@ impl Context {
     /// Check if the contract at `address` has code.
     #[must_use]
     fn has_code(&self, address: Address) -> bool {
-        let call_storage = self.get_call_storage();
-        call_storage.contract_router.contains_key(&address)
+        self.call_context(address).exists()
     }
 
     /// Get reference to the storage for the current test thread.
-    fn get_storage(&self) -> RefMut<'static, ThreadId, MockStorage> {
+    fn storage(&self) -> RefMut<'static, ThreadId, MockStorage> {
         STORAGE
             .get_mut(&self.thread.id())
             .expect("contract should be initialised first")
     }
 
-    /// Get reference to the call storage for the current test thread.
-    fn get_call_storage(&self) -> RefMut<'static, ThreadId, CallStorage> {
-        CALL_STORAGE
-            .get_mut(&self.thread.id())
-            .expect("contract should be initialised first")
+    fn call_context(&self, address: Address) -> CallContext {
+        CallContext { thread: self.thread.clone(), contract_address: address }
     }
 }
 
@@ -282,6 +272,10 @@ struct MockStorage {
     msg_receiver: Option<Address>,
     /// Contract's address to mock data storage mapping.
     contract_data: HashMap<Address, ContractStorage>,
+    // Output of a contract call.
+    call_output: Option<Vec<u8>>,
+    // Output length of a contract call.
+    call_output_len: Option<usize>,
 }
 
 type ContractStorage = HashMap<Bytes32, Bytes32>;
@@ -289,21 +283,40 @@ type ContractStorage = HashMap<Bytes32, Bytes32>;
 // TODO#q: use composite key, like: (ThreadId, Address)
 // TODO#q: move to call_context module
 
+struct CallContext {
+    thread: std::thread::Thread,
+    contract_address: Address,
+}
+
+impl CallContext {
+    /// Get reference to the call storage for the current test thread.
+    fn storage(&self) -> RefMut<'static, CallStorageKey, CallStorage> {
+        CALL_STORAGE
+            .get_mut(&self.storage_key())
+            .expect("contract should be initialised first")
+    }
+
+    fn exists(&self) -> bool {
+        CALL_STORAGE.contains_key(&self.storage_key())
+    }
+
+    fn storage_key(&self) -> CallStorageKey {
+        (self.thread.id(), self.contract_address)
+    }
+}
+
+type CallStorageKey = (ThreadId, Address);
+
 /// The key is the name of the test thread, and the value is external call
 /// metadata.
-static CALL_STORAGE: Lazy<DashMap<ThreadId, CallStorage>> =
+static CALL_STORAGE: Lazy<DashMap<CallStorageKey, CallStorage>> =
     Lazy::new(DashMap::new);
 
 /// Metadata related to call of an external contract.
-#[derive(Default)]
 struct CallStorage {
-    // Contract's address to router mapping.
+    // Contract's router.
     // NOTE: Mutex is important since contract type is not `Sync`.
-    contract_router: HashMap<Address, Mutex<Box<dyn TestRouter>>>,
-    // Output of a contract call.
-    call_output: Option<Vec<u8>>,
-    // Output length of a contract call.
-    call_output_len: Option<usize>,
+    router: Mutex<Box<dyn TestRouter>>,
 }
 
 /// A trait for routing messages to the appropriate selector in tests.
