@@ -105,7 +105,7 @@ impl Context {
             .insert(contract_address, HashMap::new())
             .is_some()
         {
-            panic!("contract storage already initialized - contract_address: {contract_address}");
+            panic!("contract storage already initialized - contract_address is {contract_address}");
         }
 
         if CALL_STORAGE
@@ -118,7 +118,7 @@ impl Context {
             )
             .is_some()
         {
-            panic!("contract storage already initialized - contract_address: {contract_address}");
+            panic!("contract storage already initialized - contract_address is {contract_address}");
         }
     }
 
@@ -174,7 +174,7 @@ impl Context {
             .expect("contract router should be set");
         let mut router = router.lock().expect("should lock test router");
         let result = router.route(selector, input).unwrap_or_else(|| {
-            panic!("selector not found - selector: {selector}")
+            panic!("selector not found - selector is {selector}")
         });
 
         // Set the previous message sender and receiver back.
@@ -296,7 +296,7 @@ type ContractStorage = HashMap<Bytes32, Bytes32>;
 static CALL_STORAGE: Lazy<DashMap<ThreadName, CallStorage>> =
     Lazy::new(DashMap::new);
 
-/// Metadata related to call of external contract.
+/// Metadata related to call of an external contract.
 #[derive(Default)]
 struct CallStorage {
     // Contract's address to router mapping.
@@ -330,6 +330,8 @@ impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
     }
 }
 
+/// Contract call entity, related to the contract type `ST` and the caller's
+/// account.
 pub struct ContractCall<ST: StorageType> {
     contract: ST,
     caller_address: Address,
@@ -362,12 +364,14 @@ impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<ST> {
     }
 }
 
+/// Contract deployed in the test environment.
 pub struct Contract<ST: StorageType> {
     phantom: ::core::marker::PhantomData<ST>,
     address: Address,
 }
 
 impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
+    /// Create a new contract with the given `address`.
     pub fn new(address: Address) -> Self {
         Context::current().init_contract::<ST>(address);
 
@@ -376,14 +380,17 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 
     // TODO#q: probably we need generic initializer
 
+    /// Create a new contract with random address.
     pub fn random() -> Self {
         Self::new(Address::random())
     }
 
+    /// Get contract's test address.
     pub fn address(&self) -> Address {
         self.address
     }
 
+    /// Call contract `self` with `account` as a sender.
     pub fn sender(&self, account: Account) -> ContractCall<ST> {
         ContractCall {
             contract: unsafe { ST::new(uint!(0_U256), 0) },
@@ -393,22 +400,26 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     }
 }
 
+/// Account used to call contracts.
 #[derive(Clone, Copy)]
 pub struct Account {
     address: Address,
 }
 
 impl Account {
+    /// Create a new account with the given `address`.
     #[must_use]
     pub const fn new(address: Address) -> Self {
         Self { address }
     }
 
+    /// Create a new account with random address.
     #[must_use]
     pub fn random() -> Self {
         Self::new(Address::random())
     }
 
+    /// Get account's address.
     #[must_use]
     pub fn address(&self) -> Address {
         self.address
