@@ -105,7 +105,7 @@ impl Context {
 
     /// Initialise contract storage for the current test thread and
     /// `contract_address`.
-    fn init_contract<ST: StorageType + TestRouter + 'static>(
+    fn init_storage<ST: StorageType + TestRouter + 'static>(
         self,
         contract_address: Address,
     ) {
@@ -119,19 +119,7 @@ impl Context {
             panic!("contract storage already initialized - contract_address is {contract_address}");
         }
 
-        if CALL_STORAGE
-            .insert(
-                (self.thread.id(), contract_address),
-                CallStorage {
-                    router: Mutex::new(Box::new(unsafe {
-                        ST::new(uint!(0_U256), 0)
-                    })),
-                },
-            )
-            .is_some()
-        {
-            panic!("contract storage already initialized - contract_address is {contract_address}");
-        }
+        self.router_for(contract_address).init_storage::<ST>();
     }
 
     /// Call the contract at raw `address` with the given raw `calldata`.
@@ -179,11 +167,12 @@ impl Context {
             .expect("msg_sender should be set");
 
         // Call external contract.
-        let router = &self.call_context(contract_address).storage().router;
-        let mut router = router.lock().expect("should lock test router");
-        let result = router.route(selector, input).unwrap_or_else(|| {
-            panic!("selector not found - selector is {selector}")
-        });
+        let result = self
+            .router_for(contract_address)
+            .route(selector, input)
+            .unwrap_or_else(|| {
+                panic!("selector not found - selector is {selector}")
+            });
 
         // Set the previous message sender and receiver back.
         let _ = self.set_msg_receiver(previous_receiver);
@@ -229,7 +218,7 @@ impl Context {
     /// Check if the contract at `address` has code.
     #[must_use]
     fn has_code(&self, address: Address) -> bool {
-        self.call_context(address).exists()
+        self.router_for(address).exists()
     }
 
     /// Get reference to the storage for the current test thread.
@@ -239,8 +228,9 @@ impl Context {
             .expect("contract should be initialised first")
     }
 
-    fn call_context(&self, address: Address) -> CallContext {
-        CallContext { thread: self.thread.clone(), contract_address: address }
+    /// Get router for the contract at `address`.
+    fn router_for(&self, address: Address) -> RouterContext {
+        RouterContext { thread: self.thread.clone(), contract_address: address }
     }
 }
 
@@ -280,40 +270,69 @@ struct MockStorage {
 
 type ContractStorage = HashMap<Bytes32, Bytes32>;
 
-// TODO#q: use composite key, like: (ThreadId, Address)
 // TODO#q: move to call_context module
 
-struct CallContext {
+struct RouterContext {
     thread: std::thread::Thread,
     contract_address: Address,
 }
 
-impl CallContext {
+impl RouterContext {
     /// Get reference to the call storage for the current test thread.
-    fn storage(&self) -> RefMut<'static, CallStorageKey, CallStorage> {
-        CALL_STORAGE
+    fn storage(&self) -> RefMut<'static, RouterStorageKey, RouterStorage> {
+        ROUTER_STORAGE
             .get_mut(&self.storage_key())
             .expect("contract should be initialised first")
     }
 
-    fn exists(&self) -> bool {
-        CALL_STORAGE.contains_key(&self.storage_key())
+    /// Check if the router exists for the contract.
+    pub(crate) fn exists(&self) -> bool {
+        ROUTER_STORAGE.contains_key(&self.storage_key())
     }
 
-    fn storage_key(&self) -> CallStorageKey {
+    fn storage_key(&self) -> RouterStorageKey {
         (self.thread.id(), self.contract_address)
+    }
+
+    pub(crate) fn route(
+        &self,
+        selector: u32,
+        input: &[u8],
+    ) -> Option<ArbResult> {
+        let router = &self.storage().router;
+        let mut router = router.lock().expect("should lock test router");
+        router.route(selector, input)
+    }
+
+    /// Initialise contract router for the current test thread and
+    /// `contract_address`.
+    fn init_storage<ST: StorageType + TestRouter + 'static>(self) {
+        let contract_address = self.contract_address;
+        if ROUTER_STORAGE
+            .insert(
+                (self.thread.id(), contract_address),
+                RouterStorage {
+                    router: Mutex::new(Box::new(unsafe {
+                        ST::new(uint!(0_U256), 0)
+                    })),
+                },
+            )
+            .is_some()
+        {
+            panic!("contract router is already initialized - contract_address is {contract_address}");
+        }
     }
 }
 
-type CallStorageKey = (ThreadId, Address);
+type RouterStorageKey = (ThreadId, Address);
 
-/// The key is the name of the test thread, and the value is external call
-/// metadata.
-static CALL_STORAGE: Lazy<DashMap<CallStorageKey, CallStorage>> =
+/// The key is the name of the test thread, and the value is contract's router
+/// data.
+static ROUTER_STORAGE: Lazy<DashMap<RouterStorageKey, RouterStorage>> =
     Lazy::new(DashMap::new);
 
-/// Metadata related to call of an external contract.
-struct CallStorage {
+/// Metadata related to the router of an external contract.
+struct RouterStorage {
     // Contract's router.
     // NOTE: Mutex is important since contract type is not `Sync`.
     router: Mutex<Box<dyn TestRouter>>,
@@ -388,8 +407,9 @@ pub struct Contract<ST: StorageType> {
 
 impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     /// Create a new contract with the given `address`.
+    #[must_use] 
     pub fn new(address: Address) -> Self {
-        Context::current().init_contract::<ST>(address);
+        Context::current().init_storage::<ST>(address);
 
         Self { phantom: ::core::marker::PhantomData, address }
     }
