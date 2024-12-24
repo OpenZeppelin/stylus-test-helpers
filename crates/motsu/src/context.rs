@@ -244,7 +244,7 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
 /// Storage mock: A global mutable key-value store.
 /// Allows concurrent access.
 ///
-/// The key is the name of the test thread, and the value is the storage of the
+/// The key is an id of the test thread, and the value is the storage of the
 /// test case.
 static STORAGE: Lazy<DashMap<ThreadId, MockStorage>> = Lazy::new(DashMap::new);
 

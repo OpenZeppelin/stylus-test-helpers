@@ -154,6 +154,10 @@ mod tests {
         assert_eq!(pong.sender(alice).ponged_from(), ping.address());
     }
 
+    // TODO#q: add has code test
+
+    // TODO#q: add contract::address test
+
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
             #[allow(missing_docs)]
@@ -208,6 +212,4 @@ mod tests {
 
         assert_eq!(result, value);
     }
-    
-    // TODO#q: add has code test
 }
