@@ -337,8 +337,15 @@ pub struct ContractCall<ST: StorageType> {
 }
 
 impl<ST: StorageType> ContractCall<ST> {
+    /// Get the contract's address.
     pub fn address(&self) -> Address {
         self.contract_address
+    }
+
+    /// Preset the call parameters.
+    fn set_call_params(&self) {
+        let _ = Context::current().set_msg_sender(self.caller_address);
+        let _ = Context::current().set_msg_receiver(self.contract_address);
     }
 }
 
@@ -347,9 +354,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        // TODO#q: move to separate function
-        let _ = Context::current().set_msg_sender(self.caller_address);
-        let _ = Context::current().set_msg_receiver(self.contract_address);
+        self.set_call_params();
         &self.contract
     }
 }
@@ -357,8 +362,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let _ = Context::current().set_msg_sender(self.caller_address);
-        let _ = Context::current().set_msg_receiver(self.contract_address);
+        self.set_call_params();
         &mut self.contract
     }
 }
