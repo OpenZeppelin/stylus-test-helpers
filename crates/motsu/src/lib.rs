@@ -19,11 +19,14 @@
 //! ```rust
 //! #[cfg(test)]
 //! mod tests {
-//!     use contracts::token::erc20::Erc20;
+//!     use openzeppelin_stylus::token::erc20::Erc20;
+//!     use motsu::prelude::{Account, Contract};
+//!     use stylus_sdk::alloy_primitives::{Address, U256};
 //!
 //!     #[motsu::test]
-//!     fn reads_balance(contract: Erc20) {
-//!         let balance = contract.balance_of(Address::ZERO); // Access storage.
+//!     fn reads_balance(contract: Contract<Erc20>) {
+//!         let alice = Account::random();
+//!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
 //! }
@@ -54,21 +57,21 @@ mod tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     extern crate alloc;
 
+    use crate::context::{Account, Contract};
     use alloy_primitives::uint;
+    use stylus_sdk::prelude::storage;
+    use stylus_sdk::storage::{StorageAddress, StorageU256};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
         msg,
-        prelude::{public, sol_storage, StorageType, TopLevelStorage},
+        prelude::{public, StorageType, TopLevelStorage},
     };
 
-    use crate::context::{Account, Contract};
-
-    sol_storage! {
-        pub struct PingContract {
-            uint256 _pings_count;
-            address _pinged_from;
-        }
+    #[storage]
+    pub struct PingContract {
+        pub _pings_count: StorageU256,
+        pub _pinged_from: StorageAddress,
     }
 
     #[public]
@@ -103,11 +106,10 @@ mod tests {
         }
     }
 
-    sol_storage! {
-        pub struct PongContract {
-            uint256 _pongs_count;
-            address _ponged_from;
-        }
+    #[storage]
+    pub struct PongContract {
+        pub _pongs_count: StorageU256,
+        pub _ponged_from: StorageAddress,
     }
 
     #[public]

@@ -291,6 +291,10 @@ struct MockStorage {
 
 type ContractStorage = HashMap<Bytes32, Bytes32>;
 
+// TODO#q: use thread id, instead of thread name
+// TODO#q: use composite key, like: (ThreadId, Address)
+// TODO#q: move to call_context module
+
 /// The key is the name of the test thread, and the value is external call
 /// metadata.
 static CALL_STORAGE: Lazy<DashMap<ThreadName, CallStorage>> =
@@ -349,6 +353,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        // TODO#q: move to separate function
         let _ = Context::current().set_msg_sender(self.caller_address);
         let _ = Context::current().set_msg_receiver(self.contract_address);
         &self.contract
