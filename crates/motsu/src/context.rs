@@ -1,6 +1,9 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{borrow::BorrowMut, collections::HashMap, ptr, slice, sync::Mutex};
+use std::{
+    borrow::BorrowMut, collections::HashMap, ptr, slice, sync::Mutex,
+    thread::ThreadId,
+};
 
 use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
@@ -17,14 +20,22 @@ use crate::prelude::{Bytes32, WORD_BYTES};
 /// Context of stylus unit tests associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
 pub struct Context {
-    thread_name: ThreadName,
+    thread: std::thread::Thread,
 }
 
 impl Context {
     /// Get test context associated with the current test thread.
     #[must_use]
     pub fn current() -> Self {
-        Self { thread_name: ThreadName::current() }
+        Self { thread: std::thread::current() }
+    }
+
+    /// Get the name of the current test thread.
+    pub fn thread_name(&self) -> String {
+        self.thread
+            .name()
+            .expect("should retrieve current thread name")
+            .to_string()
     }
 
     /// Get the raw value at `key` in storage and write it to `value`.
@@ -69,7 +80,7 @@ impl Context {
     /// Clears storage, removing all key-value pairs associated with the current
     /// test thread.
     pub fn reset_storage(self) {
-        STORAGE.remove(&self.thread_name);
+        STORAGE.remove(&self.thread.id());
     }
 
     /// Set the message sender account address.
@@ -99,7 +110,7 @@ impl Context {
         contract_address: Address,
     ) {
         if STORAGE
-            .entry(self.thread_name.clone())
+            .entry(self.thread.id())
             .or_default()
             .contract_data
             .insert(contract_address, HashMap::new())
@@ -109,7 +120,7 @@ impl Context {
         }
 
         if CALL_STORAGE
-            .entry(self.thread_name)
+            .entry(self.thread.id())
             .or_default()
             .contract_router
             .insert(
@@ -229,16 +240,16 @@ impl Context {
     }
 
     /// Get reference to the storage for the current test thread.
-    fn get_storage(&self) -> RefMut<'static, ThreadName, MockStorage> {
+    fn get_storage(&self) -> RefMut<'static, ThreadId, MockStorage> {
         STORAGE
-            .get_mut(&self.thread_name)
+            .get_mut(&self.thread.id())
             .expect("contract should be initialised first")
     }
 
     /// Get reference to the call storage for the current test thread.
-    fn get_call_storage(&self) -> RefMut<'static, ThreadName, CallStorage> {
+    fn get_call_storage(&self) -> RefMut<'static, ThreadId, CallStorage> {
         CALL_STORAGE
-            .get_mut(&self.thread_name.clone())
+            .get_mut(&self.thread.id())
             .expect("contract should be initialised first")
     }
 }
@@ -260,23 +271,7 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
 ///
 /// The key is the name of the test thread, and the value is the storage of the
 /// test case.
-static STORAGE: Lazy<DashMap<ThreadName, MockStorage>> =
-    Lazy::new(DashMap::new);
-
-/// Test thread name metadata.
-#[derive(Clone, Eq, PartialEq, Hash)]
-struct ThreadName(String);
-
-impl ThreadName {
-    /// Get the name of the current test thread.
-    fn current() -> Self {
-        let current_thread_name = std::thread::current()
-            .name()
-            .expect("should retrieve current thread name")
-            .to_string();
-        Self(current_thread_name)
-    }
-}
+static STORAGE: Lazy<DashMap<ThreadId, MockStorage>> = Lazy::new(DashMap::new);
 
 /// Storage for unit test's mock data.
 #[derive(Default)]
@@ -291,13 +286,12 @@ struct MockStorage {
 
 type ContractStorage = HashMap<Bytes32, Bytes32>;
 
-// TODO#q: use thread id, instead of thread name
 // TODO#q: use composite key, like: (ThreadId, Address)
 // TODO#q: move to call_context module
 
 /// The key is the name of the test thread, and the value is external call
 /// metadata.
-static CALL_STORAGE: Lazy<DashMap<ThreadName, CallStorage>> =
+static CALL_STORAGE: Lazy<DashMap<ThreadId, CallStorage>> =
     Lazy::new(DashMap::new);
 
 /// Metadata related to call of an external contract.
@@ -385,11 +379,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 
     /// Initialize the contract with an `initializer` function, and on behalf of
     /// the given `account`.
-    pub fn init(
-        &self,
-        account: Account,
-        initializer: impl FnOnce(&mut ST),
-    ) {
+    pub fn init(&self, account: Account, initializer: impl FnOnce(&mut ST)) {
         initializer(&mut self.sender(account));
     }
 
