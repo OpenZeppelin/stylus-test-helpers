@@ -1,21 +1,16 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{
-    borrow::BorrowMut, collections::HashMap, ptr, slice, sync::Mutex,
-    thread::ThreadId,
-};
+use std::{collections::HashMap, ptr, slice, thread::ThreadId};
 
 use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{
-    abi::Router,
-    alloy_primitives::uint,
-    prelude::{StorageType, TopLevelStorage},
-    ArbResult,
-};
+use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
-use crate::prelude::{Bytes32, WORD_BYTES};
+use crate::{
+    prelude::{Bytes32, WORD_BYTES},
+    router::{RouterContext, TestRouter},
+};
 
 /// Context of stylus unit tests associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
@@ -103,7 +98,7 @@ impl Context {
         self.storage().msg_receiver
     }
 
-    /// Initialise contract storage for the current test thread and
+    /// Initialise contract's storage for the current test thread and
     /// `contract_address`.
     fn init_storage<ST: StorageType + TestRouter + 'static>(
         self,
@@ -230,7 +225,7 @@ impl Context {
 
     /// Get router for the contract at `address`.
     fn router_for(&self, address: Address) -> RouterContext {
-        RouterContext { thread: self.thread.clone(), contract_address: address }
+        RouterContext::new(self.thread.clone(), address)
     }
 }
 
@@ -269,96 +264,6 @@ struct MockStorage {
 }
 
 type ContractStorage = HashMap<Bytes32, Bytes32>;
-
-// TODO#q: move to call_context module
-
-struct RouterContext {
-    thread: std::thread::Thread,
-    contract_address: Address,
-}
-
-impl RouterContext {
-    /// Get reference to the call storage for the current test thread.
-    fn storage(&self) -> RefMut<'static, RouterStorageKey, RouterStorage> {
-        ROUTER_STORAGE
-            .get_mut(&self.storage_key())
-            .expect("contract should be initialised first")
-    }
-
-    /// Check if the router exists for the contract.
-    pub(crate) fn exists(&self) -> bool {
-        ROUTER_STORAGE.contains_key(&self.storage_key())
-    }
-
-    fn storage_key(&self) -> RouterStorageKey {
-        (self.thread.id(), self.contract_address)
-    }
-
-    pub(crate) fn route(
-        &self,
-        selector: u32,
-        input: &[u8],
-    ) -> Option<ArbResult> {
-        let router = &self.storage().router;
-        let mut router = router.lock().expect("should lock test router");
-        router.route(selector, input)
-    }
-
-    /// Initialise contract router for the current test thread and
-    /// `contract_address`.
-    fn init_storage<ST: StorageType + TestRouter + 'static>(self) {
-        let contract_address = self.contract_address;
-        if ROUTER_STORAGE
-            .insert(
-                (self.thread.id(), contract_address),
-                RouterStorage {
-                    router: Mutex::new(Box::new(unsafe {
-                        ST::new(uint!(0_U256), 0)
-                    })),
-                },
-            )
-            .is_some()
-        {
-            panic!("contract router is already initialized - contract_address is {contract_address}");
-        }
-    }
-}
-
-type RouterStorageKey = (ThreadId, Address);
-
-/// The key is the name of the test thread, and the value is contract's router
-/// data.
-static ROUTER_STORAGE: Lazy<DashMap<RouterStorageKey, RouterStorage>> =
-    Lazy::new(DashMap::new);
-
-/// Metadata related to the router of an external contract.
-struct RouterStorage {
-    // Contract's router.
-    // NOTE: Mutex is important since contract type is not `Sync`.
-    router: Mutex<Box<dyn TestRouter>>,
-}
-
-/// A trait for routing messages to the appropriate selector in tests.
-pub trait TestRouter: Send {
-    /// Tries to find and execute a method for the given selector, returning
-    /// `None` if none is found.
-    fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
-}
-
-impl<R> TestRouter for R
-where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + Send,
-{
-    fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult> {
-        <Self as Router<R>>::route(self, selector, input)
-    }
-}
-
-impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
-    fn default() -> Self {
-        Contract::random()
-    }
-}
 
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
@@ -405,9 +310,15 @@ pub struct Contract<ST: StorageType> {
     address: Address,
 }
 
+impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
+    fn default() -> Self {
+        Contract::random()
+    }
+}
+
 impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     /// Create a new contract with the given `address`.
-    #[must_use] 
+    #[must_use]
     pub fn new(address: Address) -> Self {
         Context::current().init_storage::<ST>(address);
 
