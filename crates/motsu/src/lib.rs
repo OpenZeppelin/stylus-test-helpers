@@ -62,7 +62,7 @@ mod tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
-        msg,
+        contract, msg,
         prelude::{public, storage, AddressVM, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
     };
@@ -73,6 +73,7 @@ mod tests {
     struct PingContract {
         pings_count: StorageU256,
         pinged_from: StorageAddress,
+        contract_address: StorageAddress,
     }
 
     #[public]
@@ -85,16 +86,11 @@ mod tests {
 
             let pings_count = self.pings_count.get();
             self.pings_count.set(pings_count + uint!(1_U256));
+
             self.pinged_from.set(msg::sender());
+            self.contract_address.set(contract::address());
+
             Ok(value)
-        }
-
-        fn ping_count(&self) -> U256 {
-            self.pings_count.get()
-        }
-
-        fn pinged_from(&self) -> Address {
-            self.pinged_from.get()
         }
 
         fn has_pong(&self, to: Address) -> bool {
@@ -115,6 +111,7 @@ mod tests {
     struct PongContract {
         pongs_count: StorageU256,
         ponged_from: StorageAddress,
+        contract_address: StorageAddress,
     }
 
     #[public]
@@ -122,23 +119,18 @@ mod tests {
         pub fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + uint!(1_U256));
+
             self.ponged_from.set(msg::sender());
+            self.contract_address.set(contract::address());
+
             Ok(value + uint!(1_U256))
-        }
-
-        fn pong_count(&self) -> U256 {
-            self.pongs_count.get()
-        }
-
-        fn ponged_from(&self) -> Address {
-            self.ponged_from.get()
         }
     }
 
     unsafe impl TopLevelStorage for PongContract {}
 
     #[test]
-    fn ping_pong_msg_sender() {
+    fn ping_pong_works() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -151,11 +143,27 @@ mod tests {
             .expect("should ping successfully");
 
         assert_eq!(ponged_value, value + uint!(1_U256));
-        assert_eq!(ping.sender(alice).ping_count(), uint!(1_U256));
-        assert_eq!(pong.sender(alice).pong_count(), uint!(1_U256));
+        assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
+        assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
+    }
+    
+    #[test]
+    fn ping_pong_msg_sender() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
 
-        assert_eq!(ping.sender(alice).pinged_from(), alice.address());
-        assert_eq!(pong.sender(alice).ponged_from(), ping.address());
+        let alice = Account::random();
+
+        assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
+        assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
+
+        let ponged_value = ping
+            .sender(alice)
+            .ping(pong.address(), uint!(10_U256))
+            .expect("should ping successfully");
+
+        assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
+        assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
     }
 
     #[test]
@@ -168,7 +176,24 @@ mod tests {
         assert!(ping.sender(alice).has_pong(pong.address()));
     }
 
-    // TODO#q: add contract::address test
+    #[test]
+    fn ping_pong_contract_address() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
+        assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
+
+        let _ = ping
+            .sender(alice)
+            .ping(pong.address(), uint!(10_U256))
+            .expect("should ping successfully");
+
+        assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
+        assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
+    }
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
@@ -178,14 +203,14 @@ mod tests {
     }
 
     #[storage]
-    pub struct Proxy {
-        pub _next_proxy: StorageAddress,
+    struct Proxy {
+        next_proxy: StorageAddress,
     }
 
     #[public]
     impl Proxy {
-        pub fn call_proxy(&mut self, value: U256) -> U256 {
-            let next_proxy = self._next_proxy.get();
+        fn call_proxy(&mut self, value: U256) -> U256 {
+            let next_proxy = self.next_proxy.get();
 
             // If there is no next proxy, return the value.
             if next_proxy.is_zero() {
@@ -210,13 +235,13 @@ mod tests {
         let alice = Account::random();
 
         proxy1.init(alice, |storage| {
-            storage._next_proxy.set(proxy2.address());
+            storage.next_proxy.set(proxy2.address());
         });
         proxy2.init(alice, |storage| {
-            storage._next_proxy.set(proxy3.address());
+            storage.next_proxy.set(proxy3.address());
         });
         proxy3.init(alice, |storage| {
-            storage._next_proxy.set(Address::ZERO);
+            storage.next_proxy.set(Address::ZERO);
         });
 
         let value = uint!(10_U256);

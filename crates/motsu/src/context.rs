@@ -44,7 +44,7 @@ impl Context {
     fn get_bytes(self, key: &Bytes32) -> Bytes32 {
         let storage = self.storage();
         let msg_receiver =
-            storage.msg_receiver.expect("msg_receiver should be set");
+            storage.contract_address.expect("msg_receiver should be set");
         storage
             .contract_data
             .get(&msg_receiver)
@@ -64,7 +64,7 @@ impl Context {
     fn set_bytes(self, key: Bytes32, value: Bytes32) {
         let mut storage = self.storage();
         let msg_receiver =
-            storage.msg_receiver.expect("msg_receiver should be set");
+            storage.contract_address.expect("msg_receiver should be set");
         storage
             .contract_data
             .get_mut(&msg_receiver)
@@ -88,14 +88,14 @@ impl Context {
         self.storage().msg_sender
     }
 
-    /// Set the address of the contract, that should be called.
-    fn set_msg_receiver(&self, msg_receiver: Address) -> Option<Address> {
-        self.storage().msg_receiver.replace(msg_receiver)
+    /// Set the address of the contract, that is called.
+    fn set_contract_address(&self, msg_receiver: Address) -> Option<Address> {
+        self.storage().contract_address.replace(msg_receiver)
     }
 
-    /// Get the address of the contract, that should be called.
-    fn get_msg_receiver(&self) -> Option<Address> {
-        self.storage().msg_receiver
+    /// Get the address of the contract, that is called.
+    pub(crate) fn get_contract_address(&self) -> Option<Address> {
+        self.storage().contract_address
     }
 
     /// Initialise contract's storage for the current test thread and
@@ -152,13 +152,13 @@ impl Context {
         selector: u32,
         input: &[u8],
     ) -> ArbResult {
-        // Set the current contract as message sender and callee contract as
-        // receiver.
-        let previous_receiver = self
-            .set_msg_receiver(contract_address)
+        // Set the caller contract as message sender and callee contract as
+        // a receiver (`contract_address`).
+        let previous_contract_address = self
+            .set_contract_address(contract_address)
             .expect("msg_receiver should be set");
         let previous_msg_sender = self
-            .set_msg_sender(previous_receiver)
+            .set_msg_sender(previous_contract_address)
             .expect("msg_sender should be set");
 
         // Call external contract.
@@ -170,7 +170,7 @@ impl Context {
             });
 
         // Set the previous message sender and receiver back.
-        let _ = self.set_msg_receiver(previous_receiver);
+        let _ = self.set_contract_address(previous_contract_address);
         let _ = self.set_msg_sender(previous_msg_sender);
 
         result
@@ -254,7 +254,7 @@ struct MockStorage {
     /// Address of the message sender.
     msg_sender: Option<Address>,
     /// Address of the contract that is currently receiving the message.
-    msg_receiver: Option<Address>,
+    contract_address: Option<Address>,
     /// Contract's address to mock data storage mapping.
     contract_data: HashMap<Address, ContractStorage>,
     // Output of a contract call.
@@ -282,7 +282,7 @@ impl<ST: StorageType> ContractCall<ST> {
     /// Preset the call parameters.
     fn set_call_params(&self) {
         let _ = Context::current().set_msg_sender(self.caller_address);
-        let _ = Context::current().set_msg_receiver(self.contract_address);
+        let _ = Context::current().set_contract_address(self.contract_address);
     }
 }
 

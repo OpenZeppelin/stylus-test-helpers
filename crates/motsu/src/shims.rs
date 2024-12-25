@@ -116,13 +116,6 @@ pub fn storage_flush_cache(_: bool) {
     // No-op: we don't use the cache in our unit-tests.
 }
 
-/// Dummy msg sender set for tests.
-pub const MSG_SENDER: &[u8; 42] = b"0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF";
-
-/// Dummy contract address set for tests.
-pub const CONTRACT_ADDRESS: &[u8; 42] =
-    b"0xdCE82b5f92C98F27F116F70491a487EFFDb6a2a9";
-
 /// Arbitrum's CHAID ID.
 pub const CHAIN_ID: u64 = 42161;
 
@@ -178,10 +171,10 @@ pub unsafe extern "C" fn msg_value(value: *mut u8) {
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
 pub unsafe extern "C" fn contract_address(address: *mut u8) {
-    // TODO#q: mock contract address. Rename msg_receiver -> contract_address.
-    let addr =
-        const_hex::const_decode_to_array::<20>(CONTRACT_ADDRESS).unwrap();
-    std::ptr::copy(addr.as_ptr(), address, 20);
+    let contract_address = Context::current()
+        .get_contract_address()
+        .expect("contract_address should be set");
+    std::ptr::copy(contract_address.as_ptr(), address, 20);
 }
 
 /// Gets the chain ID of the current chain. The semantics are equivalent to
