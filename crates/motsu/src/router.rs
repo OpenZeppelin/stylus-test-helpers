@@ -14,6 +14,8 @@ use stylus_sdk::{
     ArbResult,
 };
 
+// TODO#q: use RouterContext as a key for the storage.
+
 /// Context for the router of a test contract for current test thread and
 /// contract's address.
 pub(crate) struct RouterContext {

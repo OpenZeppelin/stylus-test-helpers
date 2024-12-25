@@ -48,12 +48,12 @@
 //! [test_attribute]: crate::test
 mod context;
 pub mod prelude;
-mod shims;
 mod router;
+mod shims;
 
 pub use motsu_proc::test;
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     extern crate alloc;
@@ -63,16 +63,16 @@ mod tests {
         alloy_primitives::{Address, U256},
         call::Call,
         msg,
-        prelude::{public, storage, TopLevelStorage},
+        prelude::{public, storage, AddressVM, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
     };
 
     use crate::context::{Account, Contract};
 
     #[storage]
-    pub struct PingContract {
-        pub _pings_count: StorageU256,
-        pub _pinged_from: StorageAddress,
+    struct PingContract {
+        pings_count: StorageU256,
+        pinged_from: StorageAddress,
     }
 
     #[public]
@@ -83,18 +83,22 @@ mod tests {
             let value =
                 receiver.pong(call, value).expect("should pong successfully");
 
-            let pings_count = self._pings_count.get();
-            self._pings_count.set(pings_count + uint!(1_U256));
-            self._pinged_from.set(msg::sender());
+            let pings_count = self.pings_count.get();
+            self.pings_count.set(pings_count + uint!(1_U256));
+            self.pinged_from.set(msg::sender());
             Ok(value)
         }
 
         fn ping_count(&self) -> U256 {
-            self._pings_count.get()
+            self.pings_count.get()
         }
 
         fn pinged_from(&self) -> Address {
-            self._pinged_from.get()
+            self.pinged_from.get()
+        }
+
+        fn has_pong(&self, to: Address) -> bool {
+            to.has_code()
         }
     }
 
@@ -108,33 +112,33 @@ mod tests {
     }
 
     #[storage]
-    pub struct PongContract {
-        pub _pongs_count: StorageU256,
-        pub _ponged_from: StorageAddress,
+    struct PongContract {
+        pongs_count: StorageU256,
+        ponged_from: StorageAddress,
     }
 
     #[public]
     impl PongContract {
         pub fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
-            let pongs_count = self._pongs_count.get();
-            self._pongs_count.set(pongs_count + uint!(1_U256));
-            self._ponged_from.set(msg::sender());
+            let pongs_count = self.pongs_count.get();
+            self.pongs_count.set(pongs_count + uint!(1_U256));
+            self.ponged_from.set(msg::sender());
             Ok(value + uint!(1_U256))
         }
 
         fn pong_count(&self) -> U256 {
-            self._pongs_count.get()
+            self.pongs_count.get()
         }
 
         fn ponged_from(&self) -> Address {
-            self._ponged_from.get()
+            self.ponged_from.get()
         }
     }
 
     unsafe impl TopLevelStorage for PongContract {}
 
     #[test]
-    fn ping_pong_works() {
+    fn ping_pong_msg_sender() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -154,7 +158,15 @@ mod tests {
         assert_eq!(pong.sender(alice).ponged_from(), ping.address());
     }
 
-    // TODO#q: add has code test
+    #[test]
+    fn ping_pong_has_code() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        assert!(ping.sender(alice).has_pong(pong.address()));
+    }
 
     // TODO#q: add contract::address test
 
