@@ -54,10 +54,11 @@ mod shims;
 pub use motsu_proc::test;
 
 #[cfg(test)]
-mod tests {
-    #![deny(rustdoc::broken_intra_doc_links)]
-    extern crate alloc;
+extern crate alloc;
 
+#[cfg(test)]
+mod ping_pong_tests {
+    #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
@@ -130,7 +131,7 @@ mod tests {
     unsafe impl TopLevelStorage for PongContract {}
 
     #[test]
-    fn ping_pong_works() {
+    fn external_call() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -146,9 +147,9 @@ mod tests {
         assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
         assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
     }
-    
+
     #[test]
-    fn ping_pong_msg_sender() {
+    fn msg_sender() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -167,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn ping_pong_has_code() {
+    fn has_code() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -177,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn ping_pong_contract_address() {
+    fn contract_address() {
         let ping = Contract::<PingContract>::default();
         let pong = Contract::<PongContract>::default();
 
@@ -194,6 +195,18 @@ mod tests {
         assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
         assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
     }
+}
+
+#[cfg(test)]
+mod proxies_tests {
+    use alloy_primitives::{uint, Address, U256};
+    use stylus_sdk::{
+        call::Call,
+        prelude::{public, storage, TopLevelStorage},
+        storage::StorageAddress,
+    };
+
+    use crate::context::{Account, Contract};
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
