@@ -310,6 +310,8 @@ pub struct Contract<ST: StorageType> {
     address: Address,
 }
 
+// TODO#q: add contract drop
+
 impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
     fn default() -> Self {
         Contract::random()

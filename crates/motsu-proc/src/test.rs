@@ -32,18 +32,17 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
+    // Collect contract argument definitions.
     let contract_arg_defs =
         arg_binding_and_ty.iter().map(|(arg_binding, contract_ty)| {
-            // Test case assumes, that contract's variable has `&mut` reference
-            // to contract's type.
             quote! {
                 #arg_binding: #contract_ty
             }
         });
 
+    // Collect contract argument initializations.
     let contract_args =
         arg_binding_and_ty.iter().map(|(_arg_binding, contract_ty)| {
-            // Pass mutable reference to the contract.
             quote! {
                 <#contract_ty>::default()
             }
