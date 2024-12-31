@@ -44,11 +44,11 @@ impl Context {
     /// Get the value at `key` in storage.
     fn get_bytes(self, key: &Bytes32) -> Bytes32 {
         let storage = self.storage();
-        let msg_receiver =
-            storage.contract_address.expect("msg_receiver should be set");
+        let contract_address =
+            storage.contract_address.expect("contract_address should be set");
         storage
             .contract_data
-            .get(&msg_receiver)
+            .get(&contract_address)
             .expect("contract receiver should have a storage initialised")
             .get(key)
             .copied()
@@ -64,11 +64,11 @@ impl Context {
     /// Set the value at `key` in storage to `value`.
     fn set_bytes(self, key: Bytes32, value: Bytes32) {
         let mut storage = self.storage();
-        let msg_receiver =
-            storage.contract_address.expect("msg_receiver should be set");
+        let contract_address =
+            storage.contract_address.expect("contract_address should be set");
         storage
             .contract_data
-            .get_mut(&msg_receiver)
+            .get_mut(&contract_address)
             .expect("contract receiver should have a storage initialised")
             .insert(key, value);
     }
@@ -85,8 +85,8 @@ impl Context {
     }
 
     /// Set the address of the contract, that is called.
-    fn set_contract_address(self, msg_receiver: Address) -> Option<Address> {
-        self.storage().contract_address.replace(msg_receiver)
+    fn set_contract_address(self, address: Address) -> Option<Address> {
+        self.storage().contract_address.replace(address)
     }
 
     /// Get the address of the contract, that is called.
@@ -173,7 +173,7 @@ impl Context {
         // a receiver (`contract_address`).
         let previous_contract_address = self
             .set_contract_address(contract_address)
-            .expect("msg_receiver should be set");
+            .expect("contract_address should be set");
         let previous_msg_sender = self
             .set_msg_sender(previous_contract_address)
             .expect("msg_sender should be set");
