@@ -364,10 +364,10 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 
     /// Call contract `self` with `account` as a sender.
     #[must_use]
-    pub fn sender(&self, account: Account) -> ContractCall<ST> {
+    pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
             contract: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address: account.address,
+            caller_address: account.into(),
             contract_address: self.address,
         }
     }
@@ -377,6 +377,12 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 #[derive(Clone, Copy)]
 pub struct Account {
     address: Address,
+}
+
+impl From<Account> for Address {
+    fn from(value: Account) -> Self {
+        value.address
+    }
 }
 
 impl Account {
