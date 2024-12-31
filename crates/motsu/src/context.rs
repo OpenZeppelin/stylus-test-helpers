@@ -12,25 +12,25 @@ use crate::{
     router::{RouterContext, TestRouter},
 };
 
+/// Storage mock: A global mutable key-value store.
+/// Allows concurrent access.
+///
+/// The key is the test [`Context`], an id of the test thread, and the value is
+/// the [`MockStorage`], a storage of the test case.
+static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
+
 /// Context of stylus unit tests associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
+#[derive(Hash, Eq, PartialEq, Copy, Clone)]
 pub struct Context {
-    thread: std::thread::Thread,
+    thread_id: ThreadId,
 }
 
 impl Context {
     /// Get test context associated with the current test thread.
     #[must_use]
     pub fn current() -> Self {
-        Self { thread: std::thread::current() }
-    }
-
-    /// Get the name of the current test thread.
-    pub fn thread_name(&self) -> String {
-        self.thread
-            .name()
-            .expect("should retrieve current thread name")
-            .to_string()
+        Self { thread_id: std::thread::current().id() }
     }
 
     /// Get the raw value at `key` in storage and write it to `value`.
@@ -75,26 +75,27 @@ impl Context {
     /// Clears storage, removing all key-value pairs associated with the current
     /// test thread.
     pub fn reset_storage(self) {
-        STORAGE.remove(&self.thread.id());
+        STORAGE.remove(&self);
     }
 
     /// Set the message sender account address.
-    fn set_msg_sender(&self, msg_sender: Address) -> Option<Address> {
+    fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
 
     /// Get the message sender account address.
-    pub fn get_msg_sender(&self) -> Option<Address> {
+    #[must_use] 
+    pub fn get_msg_sender(self) -> Option<Address> {
         self.storage().msg_sender
     }
 
     /// Set the address of the contract, that is called.
-    fn set_contract_address(&self, msg_receiver: Address) -> Option<Address> {
+    fn set_contract_address(self, msg_receiver: Address) -> Option<Address> {
         self.storage().contract_address.replace(msg_receiver)
     }
 
     /// Get the address of the contract, that is called.
-    pub(crate) fn get_contract_address(&self) -> Option<Address> {
+    pub(crate) fn get_contract_address(self) -> Option<Address> {
         self.storage().contract_address
     }
 
@@ -105,7 +106,7 @@ impl Context {
         contract_address: Address,
     ) {
         if STORAGE
-            .entry(self.thread.id())
+            .entry(self)
             .or_default()
             .contract_data
             .insert(contract_address, HashMap::new())
@@ -147,7 +148,7 @@ impl Context {
     }
 
     fn call_contract(
-        &self,
+        self,
         contract_address: Address,
         selector: u32,
         input: &[u8],
@@ -176,7 +177,7 @@ impl Context {
         result
     }
 
-    fn set_return_data(&self, data: Vec<u8>) {
+    fn set_return_data(self, data: Vec<u8>) {
         let mut call_storage = self.storage();
         let _ = call_storage.call_output_len.insert(data.len());
         let _ = call_storage.call_output.insert(data);
@@ -192,14 +193,14 @@ impl Context {
         data.len()
     }
 
-    pub(crate) fn get_return_data_size(&self) -> usize {
+    pub(crate) fn get_return_data_size(self) -> usize {
         self.storage()
             .call_output_len
             .take()
             .expect("call_output_len should be set")
     }
 
-    fn get_return_data(&self) -> Vec<u8> {
+    fn get_return_data(self) -> Vec<u8> {
         self.storage().call_output.take().expect("call_output should be set")
     }
 
@@ -212,20 +213,18 @@ impl Context {
 
     /// Check if the contract at `address` has code.
     #[must_use]
-    fn has_code(&self, address: Address) -> bool {
+    fn has_code(self, address: Address) -> bool {
         self.router_for(address).exists()
     }
 
     /// Get reference to the storage for the current test thread.
-    fn storage(&self) -> RefMut<'static, ThreadId, MockStorage> {
-        STORAGE
-            .get_mut(&self.thread.id())
-            .expect("contract should be initialised first")
+    fn storage(self) -> RefMut<'static, Context, MockStorage> {
+        STORAGE.get_mut(&self).expect("contract should be initialised first")
     }
 
     /// Get router for the contract at `address`.
-    fn router_for(&self, address: Address) -> RouterContext {
-        RouterContext::new(self.thread.clone(), address)
+    fn router_for(self, address: Address) -> RouterContext {
+        RouterContext::new(self.thread_id, address)
     }
 }
 
@@ -240,13 +239,6 @@ unsafe fn read_bytes32(ptr: *const u8) -> Bytes32 {
 unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
     ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
 }
-
-/// Storage mock: A global mutable key-value store.
-/// Allows concurrent access.
-///
-/// The key is an id of the test thread, and the value is the storage of the
-/// test case.
-static STORAGE: Lazy<DashMap<ThreadId, MockStorage>> = Lazy::new(DashMap::new);
 
 /// Storage for unit test's mock data.
 #[derive(Default)]
@@ -334,16 +326,19 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     }
 
     /// Create a new contract with random address.
+    #[must_use]
     pub fn random() -> Self {
         Self::new(Address::random())
     }
 
     /// Get contract's test address.
+    #[must_use]
     pub fn address(&self) -> Address {
         self.address
     }
 
     /// Call contract `self` with `account` as a sender.
+    #[must_use]
     pub fn sender(&self, account: Account) -> ContractCall<ST> {
         ContractCall {
             contract: unsafe { ST::new(uint!(0_U256), 0) },
