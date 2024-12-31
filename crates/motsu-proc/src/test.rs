@@ -56,9 +56,7 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         #[test]
         fn #fn_name() #fn_return_type {
             let test = | #( #contract_arg_defs ),* | #fn_block;
-            let res = test( #( #contract_args ),* );
-            ::motsu::prelude::Context::current().reset_storage();
-            res
+            test( #( #contract_args ),* )
         }
     }
     .into()

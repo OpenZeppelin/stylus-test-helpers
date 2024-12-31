@@ -80,6 +80,11 @@ impl RouterContext {
             panic!("contract's router is already initialized - contract_address is {contract_address}");
         }
     }
+
+    /// Reset router storage for the current [`RouterContext`].
+    pub(crate) fn reset_storage(self) {
+        ROUTER_STORAGE.remove(&self);
+    }
 }
 
 /// Metadata related to the router of an external contract.

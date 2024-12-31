@@ -15,8 +15,9 @@ use crate::{
 /// Storage mock: A global mutable key-value store.
 /// Allows concurrent access.
 ///
-/// The key is the test [`Context`], an id of the test thread, and the value is
-/// the [`MockStorage`], a storage of the test case.
+/// The key is the test [`Context`], an id of the test thread.
+///
+/// The value is the [`MockStorage`], a storage of the test case.
 static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
 
 /// Context of stylus unit tests associated with the current test thread.
@@ -72,19 +73,13 @@ impl Context {
             .insert(key, value);
     }
 
-    /// Clears storage, removing all key-value pairs associated with the current
-    /// test thread.
-    pub fn reset_storage(self) {
-        STORAGE.remove(&self);
-    }
-
     /// Set the message sender account address.
     fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
 
     /// Get the message sender account address.
-    #[must_use] 
+    #[must_use]
     pub fn get_msg_sender(self) -> Option<Address> {
         self.storage().msg_sender
     }
@@ -112,10 +107,29 @@ impl Context {
             .insert(contract_address, HashMap::new())
             .is_some()
         {
-            panic!("contract storage already initialized - contract_address is {contract_address}");
+            panic!("contract storage already initialized for contract_address `{contract_address}`");
         }
 
-        self.router_for(contract_address).init_storage::<ST>();
+        self.router(contract_address).init_storage::<ST>();
+    }
+
+    /// Reset storage for the current [`Context`] and `contract_address`.
+    ///
+    /// If all test contracts are removed, flush storage for the current
+    /// test [`Context`].
+    fn reset_storage(self, contract_address: Address) {
+        let mut storage = self.storage();
+        storage.contract_data.remove(&contract_address);
+
+        // if no more contracts left,
+        if storage.contract_data.is_empty() {
+            // drop guard to a concurrent hash map to avoid a deadlock,
+            drop(storage);
+            // and erase the test context.
+            let _ = STORAGE.remove(&self);
+        }
+
+        self.router(contract_address).reset_storage();
     }
 
     /// Call the contract at raw `address` with the given raw `calldata`.
@@ -147,6 +161,8 @@ impl Context {
         }
     }
 
+    /// Call the function associated with the given `selector` and pass `input`
+    /// to it, at the given `contract_address`.
     fn call_contract(
         self,
         contract_address: Address,
@@ -164,25 +180,28 @@ impl Context {
 
         // Call external contract.
         let result = self
-            .router_for(contract_address)
+            .router(contract_address)
             .route(selector, input)
             .unwrap_or_else(|| {
                 panic!("selector not found - selector is {selector}")
             });
 
-        // Set the previous message sender and receiver back.
+        // Set the previous message sender and contract address back.
         let _ = self.set_contract_address(previous_contract_address);
         let _ = self.set_msg_sender(previous_msg_sender);
 
         result
     }
 
+    /// Set return data as bytes.
     fn set_return_data(self, data: Vec<u8>) {
         let mut call_storage = self.storage();
         let _ = call_storage.call_output_len.insert(data.len());
         let _ = call_storage.call_output.insert(data);
     }
 
+    /// Read the return data (with a given `size`) from the last contract call
+    /// to the `dest` pointer.
     pub(crate) unsafe fn read_return_data_raw(
         self,
         dest: *mut u8,
@@ -193,6 +212,7 @@ impl Context {
         data.len()
     }
 
+    /// Get return data's size in bytes.
     pub(crate) fn get_return_data_size(self) -> usize {
         self.storage()
             .call_output_len
@@ -200,6 +220,7 @@ impl Context {
             .expect("call_output_len should be set")
     }
 
+    /// Get return data's bytes.
     fn get_return_data(self) -> Vec<u8> {
         self.storage().call_output.take().expect("call_output should be set")
     }
@@ -214,7 +235,7 @@ impl Context {
     /// Check if the contract at `address` has code.
     #[must_use]
     fn has_code(self, address: Address) -> bool {
-        self.router_for(address).exists()
+        self.router(address).exists()
     }
 
     /// Get reference to the storage for the current test thread.
@@ -223,7 +244,7 @@ impl Context {
     }
 
     /// Get router for the contract at `address`.
-    fn router_for(self, address: Address) -> RouterContext {
+    fn router(self, address: Address) -> RouterContext {
         RouterContext::new(self.thread_id, address)
     }
 }
@@ -302,7 +323,11 @@ pub struct Contract<ST: StorageType> {
     address: Address,
 }
 
-// TODO#q: add contract drop
+impl<ST: StorageType> Drop for Contract<ST> {
+    fn drop(&mut self) {
+        Context::current().reset_storage(self.address);
+    }
+}
 
 impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
     fn default() -> Self {

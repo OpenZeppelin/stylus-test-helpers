@@ -123,18 +123,15 @@ pub const CHAIN_ID: u64 = 42161;
 pub const EOA_CODEHASH: &[u8; 66] =
     b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 
-/// Gets the address of the account that called the program.
-///
-/// For normal L2-to-L2 transactions the semantics are equivalent to that of the
-/// EVM's [`CALLER`] opcode, including in cases arising from [`DELEGATE_CALL`].
 /// Contract Account (CA) code hash (smart contract code).
 /// NOTE: can be any 256-bit value to pass `has_code` check.
 pub const CA_CODEHASH: &[u8; 66] =
     b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
-/// Gets the address of the account that called the program. For normal
-/// L2-to-L2 transactions the semantics are equivalent to that of the EVM's
-/// [`CALLER`] opcode, including in cases arising from [`DELEGATE_CALL`].
+/// Gets the address of the account that called the program.
+///
+/// For normal L2-to-L2 transactions the semantics are equivalent to that of the
+/// EVM's [`CALLER`] opcode, including in cases arising from [`DELEGATE_CALL`].
 ///
 /// For L1-to-L2 retryable ticket transactions, the top-level sender's address
 /// will be aliased. See [`Retryable Ticket Address Aliasing`][aliasing] for
@@ -252,11 +249,11 @@ pub unsafe extern "C" fn return_data_size() -> usize {
 /// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
 #[no_mangle]
 pub unsafe extern "C" fn read_return_data(
-    _dest: *mut u8,
+    dest: *mut u8,
     _offset: usize,
-    _size: usize,
+    size: usize,
 ) -> usize {
-    Context::current().read_return_data_raw(_dest, _size)
+    Context::current().read_return_data_raw(dest, size)
 }
 
 /// Calls the contract at the given address with options for passing value and
@@ -275,18 +272,18 @@ pub unsafe extern "C" fn read_return_data(
 /// [`CALL`]: https://www.evm.codes/#f1
 #[no_mangle]
 pub unsafe extern "C" fn call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _value: *const u8,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
     Context::current().call_contract_raw(
-        _contract,
-        _calldata,
-        _calldata_len,
-        _return_data_len,
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
     )
 }
 
