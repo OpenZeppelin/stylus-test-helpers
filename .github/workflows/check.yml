@@ -103,4 +103,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check spelling of files in the workspace
-        uses: crate-ci/typos@v1.29.3
+        uses: crate-ci/typos@v1.29.4
