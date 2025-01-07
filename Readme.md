@@ -59,8 +59,8 @@ mod tests {
 
 If you're interested in contributing please check our [contribution guidelines].
 
-[contribution guidelines]: ../../CONTRIBUTING.md
+[contribution guidelines]: ./CONTRIBUTING.md
 
 ## Security
 
-Refer to our [Security Policy](../../SECURITY.md) for more details.
+Refer to our [Security Policy](./SECURITY.md) for more details.
