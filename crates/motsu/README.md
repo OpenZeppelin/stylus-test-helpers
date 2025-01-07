@@ -45,7 +45,7 @@ mod tests {
 ### Notice
 
 We maintain this crate on a best-effort basis. We use it extensively on our own
-tests, so we will add here any features and utilities we need for testing our library. 
+tests, so we will add here any features and utilities we need for testing our library.
 
 That being said, please do open an issue to start a discussion, keeping in mind
 our [code of conduct] and [contribution guidelines].

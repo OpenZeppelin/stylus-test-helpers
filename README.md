@@ -1,6 +1,6 @@
 # Stylus Test Helpers
 
-Testing in Stylus is limited today. While developing [OpenZeppelin Contracts for Stylus](https://github.com/OpenZeppelin/rust-stylus-contracts) we created a few helpers to test our contracts, and we've decided to open source them and publish them as a separate crate for the community, at least until a more comprehensive testing framework is available.
+Testing in Stylus is limited today. While developing [OpenZeppelin Contracts for Stylus](https://github.com/OpenZeppelin/rust-contracts-stylus) we created a few helpers to test our contracts, and we've decided to open source them and publish them as a separate crate for the community, at least until a more comprehensive testing framework is available.
 
 This crate is a work in progress, and we'll be adding more features and improving the ergonomics as we go. We encourage projects that find this useful to contribute by opening issues and pull requests.
 
@@ -19,7 +19,7 @@ You can import `motsu` from crates.io by adding the following line to your `Carg
 
 ```toml
 [dev-dependencies]
-motsu = "0.2.1"
+motsu = "0.3.0"
 ```
 
 Then, when writing tests, use `#[motsu::test]` instead of `#[test]` to get access to VM
@@ -59,8 +59,8 @@ mod tests {
 
 If you're interested in contributing please check our [contribution guidelines].
 
-[contribution guidelines]: ../../CONTRIBUTING.md
+[contribution guidelines]: ./CONTRIBUTING.md
 
 ## Security
 
-Refer to our [Security Policy](../../SECURITY.md) for more details.
+Refer to our [Security Policy](./SECURITY.md) for more details.
