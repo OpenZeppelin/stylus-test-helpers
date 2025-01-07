@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2024-12-17
+### Changed (Breaking)
+
+- Bump Stylus SDK to v0.7.0. #17
+
+## [0.2.1] - 2024-12-17
 
 ### Added
 
