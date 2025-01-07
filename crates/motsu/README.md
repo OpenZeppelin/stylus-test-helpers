@@ -42,9 +42,6 @@ mod tests {
 }
 ```
 
-Note that currently, test suites using `motsu::test` will run serially because
-of global access to storage.
-
 ### Notice
 
 We maintain this crate on a best-effort basis. We use it extensively on our own
