@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
+- Bump `motsu-proc` to v0.3.0. #20
+- Bump `alloy-primitives` and `alloy-sol-types` to v0.8.14. #20
 - Bump Stylus SDK to v0.7.0. #17
 
 ## [0.2.1] - 2024-12-17
