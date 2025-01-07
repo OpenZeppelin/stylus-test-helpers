@@ -1,13 +1,18 @@
+[workspace]
+members = ["crates/motsu", "crates/motsu-proc"]
+
+default-members = ["crates/motsu", "crates/motsu-proc"]
+
+# Explicitly set the resolver to version 2, which is the default for packages
+# with edition >= 2021.
+# https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
+resolver = "2"
+
 [workspace.package]
 authors = ["OpenZeppelin"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/OpenZeppelin/stylus-test-helpers"
-
-[workspace]
-members = ["crates/motsu", "crates/motsu-proc"]
-
-default-members = ["crates/motsu", "crates/motsu-proc"]
 
 [workspace.lints.rust]
 missing_docs = "warn"
@@ -28,12 +33,12 @@ dashmap = "6.1.0"
 syn = { version = "2.0.58", features = ["full"] }
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
-alloy-primitives = { version = "=0.7.6", default-features = false }
-alloy-sol-types = { version = "=0.7.6", default-features = false }
+alloy-primitives = { version = "=0.8.14", default-features = false }
+alloy-sol-types = { version = "=0.8.14", default-features = false }
 
 # members
 motsu = { path = "crates/motsu" }
-motsu-proc = { path = "crates/motsu-proc", version = "0.2.1" }
+motsu-proc = { path = "crates/motsu-proc", version = ">=0.2.1, <=0.3.0" }
 
 [profile.release]
 codegen-units = 1
