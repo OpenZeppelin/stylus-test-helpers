@@ -13,7 +13,8 @@ Annotate tests with `#[motsu::test]` instead of `#[test]` to get access to VM
 affordances.
 
 Note that we require contracts to implement `stylus_sdk::prelude::StorageType`.
-This trait is typically implemented by default with `stylus_proc::sol_storage` macro.
+This trait is typically implemented by default with `stylus_proc::sol_storage`
+or `stylus_proc::storage` macros.
 
 ```rust
 #[cfg(test)]
@@ -41,14 +42,10 @@ mod tests {
 }
 ```
 
-Note that currently, test suites using `motsu::test` will run serially because
-of global access to storage.
-
 ### Notice
 
 We maintain this crate on a best-effort basis. We use it extensively on our own
-tests, so we will add here any symbols we may need. However, since we expect
-this to be a temporary solution, don't expect us to address all requests.
+tests, so we will add here any features and utilities we need for testing our library.
 
 That being said, please do open an issue to start a discussion, keeping in mind
 our [code of conduct] and [contribution guidelines].
