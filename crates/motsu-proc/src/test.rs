@@ -15,11 +15,6 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
     let fn_block = &item_fn.block;
     let fn_args = &sig.inputs;
 
-    // Currently, more than one contract per unit test is not supported.
-    if fn_args.len() > 1 {
-        error!(fn_args, "expected at most one contract in test signature");
-    }
-
     // Whether 1 or none contracts will be declared.
     let arg_binding_and_ty = match fn_args
         .into_iter()
@@ -37,20 +32,19 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
+    // Collect contract argument definitions.
     let contract_arg_defs =
         arg_binding_and_ty.iter().map(|(arg_binding, contract_ty)| {
-            // Test case assumes, that contract's variable has `&mut` reference
-            // to contract's type.
             quote! {
-                #arg_binding: &mut #contract_ty
+                #arg_binding: #contract_ty
             }
         });
 
+    // Collect contract argument initializations.
     let contract_args =
         arg_binding_and_ty.iter().map(|(_arg_binding, contract_ty)| {
-            // Pass mutable reference to the contract.
             quote! {
-                &mut <#contract_ty>::default()
+                <#contract_ty>::default()
             }
         });
 
@@ -61,11 +55,8 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         #( #attrs )*
         #[test]
         fn #fn_name() #fn_return_type {
-            use ::motsu::prelude::DefaultStorage;
             let test = | #( #contract_arg_defs ),* | #fn_block;
-            let res = test( #( #contract_args ),* );
-            ::motsu::prelude::Context::current().reset_storage();
-            res
+            test( #( #contract_args ),* )
         }
     }
     .into()

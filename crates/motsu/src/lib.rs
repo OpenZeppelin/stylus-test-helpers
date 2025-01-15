@@ -19,11 +19,14 @@
 //! ```rust
 //! #[cfg(test)]
 //! mod tests {
-//!     use contracts::token::erc20::Erc20;
+//!     use openzeppelin_stylus::token::erc20::Erc20;
+//!     use motsu::prelude::{Account, Contract};
+//!     use stylus_sdk::alloy_primitives::{Address, U256};
 //!
 //!     #[motsu::test]
-//!     fn reads_balance(contract: Erc20) {
-//!         let balance = contract.balance_of(Address::ZERO); // Access storage.
+//!     fn reads_balance(contract: Contract<Erc20>) {
+//!         let alice = Account::random();
+//!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
 //! }
@@ -45,6 +48,218 @@
 //! [test_attribute]: crate::test
 mod context;
 pub mod prelude;
+mod router;
 mod shims;
 
 pub use motsu_proc::test;
+
+#[cfg(test)]
+extern crate alloc;
+
+#[cfg(test)]
+mod ping_pong_tests {
+    #![deny(rustdoc::broken_intra_doc_links)]
+    use alloy_primitives::uint;
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::Call,
+        contract, msg,
+        prelude::{public, storage, AddressVM, TopLevelStorage},
+        storage::{StorageAddress, StorageU256},
+    };
+
+    use crate::context::{Account, Contract};
+
+    #[storage]
+    struct PingContract {
+        pings_count: StorageU256,
+        pinged_from: StorageAddress,
+        contract_address: StorageAddress,
+    }
+
+    #[public]
+    impl PingContract {
+        fn ping(&mut self, to: Address, value: U256) -> Result<U256, Vec<u8>> {
+            let receiver = IPongContract::new(to);
+            let call = Call::new_in(self);
+            let value =
+                receiver.pong(call, value).expect("should pong successfully");
+
+            let pings_count = self.pings_count.get();
+            self.pings_count.set(pings_count + uint!(1_U256));
+
+            self.pinged_from.set(msg::sender());
+            self.contract_address.set(contract::address());
+
+            Ok(value)
+        }
+
+        fn has_pong(&self, to: Address) -> bool {
+            to.has_code()
+        }
+    }
+
+    unsafe impl TopLevelStorage for PingContract {}
+
+    stylus_sdk::stylus_proc::sol_interface! {
+        interface IPongContract {
+            #[allow(missing_docs)]
+            function pong(uint256 value) external returns (uint256);
+        }
+    }
+
+    #[storage]
+    struct PongContract {
+        pongs_count: StorageU256,
+        ponged_from: StorageAddress,
+        contract_address: StorageAddress,
+    }
+
+    #[public]
+    impl PongContract {
+        pub fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
+            let pongs_count = self.pongs_count.get();
+            self.pongs_count.set(pongs_count + uint!(1_U256));
+
+            self.ponged_from.set(msg::sender());
+            self.contract_address.set(contract::address());
+
+            Ok(value + uint!(1_U256))
+        }
+    }
+
+    unsafe impl TopLevelStorage for PongContract {}
+
+    #[test]
+    fn external_call() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        let value = uint!(10_U256);
+        let ponged_value = ping
+            .sender(alice)
+            .ping(pong.address(), value)
+            .expect("should ping successfully");
+
+        assert_eq!(ponged_value, value + uint!(1_U256));
+        assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
+        assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
+    }
+
+    #[test]
+    fn msg_sender() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
+        assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
+
+        let ponged_value = ping
+            .sender(alice)
+            .ping(pong.address(), uint!(10_U256))
+            .expect("should ping successfully");
+
+        assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
+        assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
+    }
+
+    #[test]
+    fn has_code() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        assert!(ping.sender(alice).has_pong(pong.address()));
+    }
+
+    #[test]
+    fn contract_address() {
+        let ping = Contract::<PingContract>::default();
+        let pong = Contract::<PongContract>::default();
+
+        let alice = Account::random();
+
+        assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
+        assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
+
+        let _ = ping
+            .sender(alice)
+            .ping(pong.address(), uint!(10_U256))
+            .expect("should ping successfully");
+
+        assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
+        assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
+    }
+}
+
+#[cfg(test)]
+mod proxies_tests {
+    use alloy_primitives::{uint, Address, U256};
+    use stylus_sdk::{
+        call::Call,
+        prelude::{public, storage, TopLevelStorage},
+        storage::StorageAddress,
+    };
+
+    use crate::context::{Account, Contract};
+
+    stylus_sdk::stylus_proc::sol_interface! {
+        interface IProxy {
+            #[allow(missing_docs)]
+            function callProxy(uint256 value) external returns (uint256);
+        }
+    }
+
+    #[storage]
+    struct Proxy {
+        next_proxy: StorageAddress,
+    }
+
+    #[public]
+    impl Proxy {
+        fn call_proxy(&mut self, value: U256) -> U256 {
+            let next_proxy = self.next_proxy.get();
+
+            // If there is no next proxy, return the value.
+            if next_proxy.is_zero() {
+                value
+            } else {
+                // Otherwise, call the next proxy.
+                let proxy = IProxy::new(next_proxy);
+                let call = Call::new_in(self);
+                proxy.call_proxy(call, value).expect("should call proxy")
+            }
+        }
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[test]
+    fn three_proxies() {
+        let proxy1 = Contract::<Proxy>::default();
+        let proxy2 = Contract::<Proxy>::default();
+        let proxy3 = Contract::<Proxy>::default();
+
+        let alice = Account::random();
+
+        proxy1.init(alice, |storage| {
+            storage.next_proxy.set(proxy2.address());
+        });
+        proxy2.init(alice, |storage| {
+            storage.next_proxy.set(proxy3.address());
+        });
+        proxy3.init(alice, |storage| {
+            storage.next_proxy.set(Address::ZERO);
+        });
+
+        let value = uint!(10_U256);
+        let result = proxy1.sender(alice).call_proxy(value);
+
+        assert_eq!(result, value);
+    }
+}
