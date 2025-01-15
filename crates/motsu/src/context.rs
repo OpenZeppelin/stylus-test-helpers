@@ -346,7 +346,11 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 
     /// Initialize the contract with an `initializer` function, and on behalf of
     /// the given `account`.
-    pub fn init<A: Into<Address>>(&self, account: A, initializer: impl FnOnce(&mut ST)) {
+    pub fn init<A: Into<Address>>(
+        &self,
+        account: A,
+        initializer: impl FnOnce(&mut ST),
+    ) {
         initializer(&mut self.sender(account.into()));
     }
 
