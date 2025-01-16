@@ -22,9 +22,9 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
             let FnArg::Typed(arg) = arg else {
                 error!(@arg, "unexpected receiver argument in test signature");
             };
-            let contract_arg_binding = &arg.pat;
-            let contract_ty = &arg.ty;
-            Ok((contract_arg_binding, contract_ty))
+            let arg_binding = &arg.pat;
+            let arg_ty = &arg.ty;
+            Ok((arg_binding, arg_ty))
         })
         .collect::<Result<Vec<_>, _>>()
     {
@@ -32,31 +32,28 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
-    // Collect contract argument definitions.
-    let contract_arg_defs =
-        arg_binding_and_ty.iter().map(|(arg_binding, contract_ty)| {
-            quote! {
-                #arg_binding: #contract_ty
-            }
-        });
+    // Collect argument definitions.
+    let arg_defs = arg_binding_and_ty.iter().map(|(arg_binding, arg_ty)| {
+        quote! {
+            #arg_binding: #arg_ty
+        }
+    });
 
-    // Collect contract argument initializations.
-    let contract_args =
-        arg_binding_and_ty.iter().map(|(_arg_binding, contract_ty)| {
-            quote! {
-                <#contract_ty>::default()
-            }
-        });
+    // Collect argument initializations.
+    let arg_inits = arg_binding_and_ty.iter().map(|(_arg_binding, arg_ty)| {
+        quote! {
+            <#arg_ty>::random()
+        }
+    });
 
     // Declare test case closure.
-    // Pass mut ref to the test closure and call it.
-    // Reset storage for the test context and return test's output.
+    // Pass arguments to the test closure and call it.
     quote! {
         #( #attrs )*
         #[test]
         fn #fn_name() #fn_return_type {
-            let test = | #( #contract_arg_defs ),* | #fn_block;
-            test( #( #contract_args ),* )
+            let test = | #( #arg_defs ),* | #fn_block;
+            test( #( #arg_inits ),* )
         }
     }
     .into()
