@@ -24,8 +24,10 @@
 //!     use stylus_sdk::alloy_primitives::{Address, U256};
 //!
 //!     #[motsu::test]
-//!     fn reads_balance(contract: Contract<Erc20>) {
-//!         let alice = Account::random();
+//!     fn reads_balance(
+//!         contract: Contract<Erc20>,
+//!         alice: Account,
+//!     ) {  
 //!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
