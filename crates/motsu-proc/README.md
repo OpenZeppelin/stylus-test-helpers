@@ -1,11 +1,10 @@
-
 # Motsu's Procedural Macros
 
-This crate contains procedural macros used in [`motsu`]. These macros are designed to simplify testing and error handling for projects built on the `Stylus`.
+This crate contains the `#[motsu::test]` attribute definition used in [`motsu`]. This macro is designed to simplify testing for projects built on Arbitrum Stylus.
 
 [motsu]: ../motsu/README.md
 
-## Included Macros
+## Usage
 
 ### `#[motsu::test]`
 The `#[motsu::test]` macro is an enhanced version of Rust's built-in `#[test]` attribute. It is specifically designed for testing within the `Stylus` execution environment.
