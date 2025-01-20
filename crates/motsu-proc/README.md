@@ -1,6 +1,6 @@
 # Motsu's Procedural Macros
 
-This crate contains the `#[motsu::test]` attribute definition used in [`motsu`]. This macro is designed to simplify testing for projects built on Arbitrum Stylus.
+This crate contains the `#[motsu::test]` attribute definition used in [`motsu`]. This macro is designed to simplify testing for smart contracts built with the (Stylus SDK)[https://docs.rs/stylus-sdk/latest/stylus_sdk/]. 
 
 [motsu]: ../motsu/README.md
 
