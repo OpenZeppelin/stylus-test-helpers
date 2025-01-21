@@ -134,8 +134,8 @@ mod ping_pong_tests {
 
     #[test]
     fn external_call() {
-        let ping = Contract::<PingContract>::default();
-        let pong = Contract::<PongContract>::default();
+        let ping = Contract::<PingContract>::new();
+        let pong = Contract::<PongContract>::new();
 
         let alice = Account::random();
 
@@ -152,8 +152,8 @@ mod ping_pong_tests {
 
     #[test]
     fn msg_sender() {
-        let ping = Contract::<PingContract>::default();
-        let pong = Contract::<PongContract>::default();
+        let ping = Contract::<PingContract>::new();
+        let pong = Contract::<PongContract>::new();
 
         let alice = Account::random();
 
@@ -171,8 +171,8 @@ mod ping_pong_tests {
 
     #[test]
     fn has_code() {
-        let ping = Contract::<PingContract>::default();
-        let pong = Contract::<PongContract>::default();
+        let ping = Contract::<PingContract>::new();
+        let pong = Contract::<PongContract>::new();
 
         let alice = Account::random();
 
@@ -181,8 +181,8 @@ mod ping_pong_tests {
 
     #[test]
     fn contract_address() {
-        let ping = Contract::<PingContract>::default();
-        let pong = Contract::<PongContract>::default();
+        let ping = Contract::<PingContract>::new();
+        let pong = Contract::<PongContract>::new();
 
         let alice = Account::random();
 
@@ -243,9 +243,9 @@ mod proxies_tests {
 
     #[test]
     fn three_proxies() {
-        let proxy1 = Contract::<Proxy>::default();
-        let proxy2 = Contract::<Proxy>::default();
-        let proxy3 = Contract::<Proxy>::default();
+        let proxy1 = Contract::<Proxy>::new();
+        let proxy2 = Contract::<Proxy>::new();
+        let proxy3 = Contract::<Proxy>::new();
 
         let alice = Account::random();
 

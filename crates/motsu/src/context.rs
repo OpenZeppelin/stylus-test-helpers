@@ -331,14 +331,20 @@ impl<ST: StorageType> Drop for Contract<ST> {
 
 impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
     fn default() -> Self {
-        Contract::random()
+        Contract::new_at(Address::default())
     }
 }
 
 impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
+    /// Create a new contract with default storage on the random address.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::random()
+    }
+
     /// Create a new contract with the given `address`.
     #[must_use]
-    pub fn new(address: Address) -> Self {
+    pub fn new_at(address: Address) -> Self {
         Context::current().init_storage::<ST>(address);
 
         Self { phantom: ::core::marker::PhantomData, address }
@@ -354,10 +360,10 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         initializer(&mut self.sender(account.into()))
     }
 
-    /// Create a new contract with random address.
+    /// Create a new contract with default storage on the random address.
     #[must_use]
     pub fn random() -> Self {
-        Self::new(Address::random())
+        Self::new_at(Address::random())
     }
 
     /// Get contract's test address.
@@ -392,14 +398,14 @@ impl From<Account> for Address {
 impl Account {
     /// Create a new account with the given `address`.
     #[must_use]
-    pub const fn new(address: Address) -> Self {
+    pub const fn new_at(address: Address) -> Self {
         Self { address }
     }
 
     /// Create a new account with random address.
     #[must_use]
     pub fn random() -> Self {
-        Self::new(Address::random())
+        Self::new_at(Address::random())
     }
 
     /// Get account's address.
