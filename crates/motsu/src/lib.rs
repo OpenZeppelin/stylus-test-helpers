@@ -226,6 +226,9 @@ mod proxies_tests {
     impl Proxy {
         fn call_proxy(&mut self, value: U256) -> U256 {
             let next_proxy = self.next_proxy.get();
+            
+            // Add one to the value.
+            let value = value + uint!(1_U256);
 
             // If there is no next proxy, return the value.
             if next_proxy.is_zero() {
@@ -262,6 +265,7 @@ mod proxies_tests {
         let value = uint!(10_U256);
         let result = proxy1.sender(alice).call_proxy(value);
 
-        assert_eq!(result, value);
+        // The value is incremented by 1 for each proxy.
+        assert_eq!(result, value + uint!(3_U256));
     }
 }
