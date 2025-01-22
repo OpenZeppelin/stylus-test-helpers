@@ -132,13 +132,12 @@ mod ping_pong_tests {
 
     unsafe impl TopLevelStorage for PongContract {}
 
-    #[test]
-    fn external_call() {
-        let ping = Contract::<PingContract>::new();
-        let pong = Contract::<PongContract>::new();
-
-        let alice = Account::random();
-
+    #[motsu_proc::test]
+    fn external_call(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
         let value = uint!(10_U256);
         let ponged_value = ping
             .sender(alice)
@@ -150,17 +149,16 @@ mod ping_pong_tests {
         assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
     }
 
-    #[test]
-    fn msg_sender() {
-        let ping = Contract::<PingContract>::new();
-        let pong = Contract::<PongContract>::new();
-
-        let alice = Account::random();
-
+    #[motsu_proc::test]
+    fn msg_sender(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
         assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
 
-        let ponged_value = ping
+        let _ = ping
             .sender(alice)
             .ping(pong.address(), uint!(10_U256))
             .expect("should ping successfully");
@@ -169,23 +167,21 @@ mod ping_pong_tests {
         assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
     }
 
-    #[test]
-    fn has_code() {
-        let ping = Contract::<PingContract>::new();
-        let pong = Contract::<PongContract>::new();
-
-        let alice = Account::random();
-
+    #[motsu_proc::test]
+    fn has_code(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
         assert!(ping.sender(alice).has_pong(pong.address()));
     }
 
-    #[test]
-    fn contract_address() {
-        let ping = Contract::<PingContract>::new();
-        let pong = Contract::<PongContract>::new();
-
-        let alice = Account::random();
-
+    #[motsu_proc::test]
+    fn contract_address(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
         assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
 
@@ -226,7 +222,7 @@ mod proxies_tests {
     impl Proxy {
         fn call_proxy(&mut self, value: U256) -> U256 {
             let next_proxy = self.next_proxy.get();
-            
+
             // Add one to the value.
             let value = value + uint!(1_U256);
 
@@ -244,14 +240,15 @@ mod proxies_tests {
 
     unsafe impl TopLevelStorage for Proxy {}
 
-    #[test]
-    fn three_proxies() {
-        let proxy1 = Contract::<Proxy>::new();
-        let proxy2 = Contract::<Proxy>::new();
-        let proxy3 = Contract::<Proxy>::new();
-
-        let alice = Account::random();
-
+    #[motsu_proc::test]
+    fn three_proxies(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
         proxy1.init(alice, |storage| {
             storage.next_proxy.set(proxy2.address());
         });
@@ -262,6 +259,7 @@ mod proxies_tests {
             storage.next_proxy.set(Address::ZERO);
         });
 
+        // Call the first proxy.
         let value = uint!(10_U256);
         let result = proxy1.sender(alice).call_proxy(value);
 
