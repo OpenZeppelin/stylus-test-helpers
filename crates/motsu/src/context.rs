@@ -20,8 +20,8 @@ use crate::{
 ///
 /// The value is the [`MockStorage`], a storage of the test case.
 ///
-/// NOTE: The [`DashMap`] will deadlock execution, when the same bucket is
-/// accessed  twice from the same thread.
+/// NOTE: The [`DashMap`] will deadlock execution, when the same key is
+/// accessed twice from the same thread.
 static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
 
 /// Context of stylus unit tests associated with the current test thread.
