@@ -80,7 +80,7 @@ impl Context {
 
     /// Get the message sender account address.
     #[must_use]
-    pub fn get_msg_sender(self) -> Option<Address> {
+    pub fn msg_sender(self) -> Option<Address> {
         self.storage().msg_sender
     }
 
@@ -90,7 +90,7 @@ impl Context {
     }
 
     /// Get the address of the contract, that is called.
-    pub(crate) fn get_contract_address(self) -> Option<Address> {
+    pub(crate) fn contract_address(self) -> Option<Address> {
         self.storage().contract_address
     }
 
@@ -207,21 +207,21 @@ impl Context {
         dest: *mut u8,
         size: usize,
     ) -> usize {
-        let data = self.get_return_data();
+        let data = self.return_data();
         ptr::copy(data.as_ptr(), dest, size);
         data.len()
     }
 
-    /// Get return data's size in bytes.
-    pub(crate) fn get_return_data_size(self) -> usize {
+    /// Return data's size in bytes from the last contract call.
+    pub(crate) fn return_data_size(self) -> usize {
         self.storage()
             .call_output_len
             .take()
             .expect("call_output_len should be set")
     }
 
-    /// Get return data's bytes.
-    fn get_return_data(self) -> Vec<u8> {
+    /// Return data's bytes from the last contract call.
+    fn return_data(self) -> Vec<u8> {
         self.storage().call_output.take().expect("call_output should be set")
     }
 

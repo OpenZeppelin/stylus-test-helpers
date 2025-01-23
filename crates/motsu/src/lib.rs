@@ -119,7 +119,7 @@ mod ping_pong_tests {
 
     #[public]
     impl PongContract {
-        pub fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
+        fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + uint!(1_U256));
 

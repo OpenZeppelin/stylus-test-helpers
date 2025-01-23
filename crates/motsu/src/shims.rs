@@ -148,7 +148,7 @@ pub const CA_CODEHASH: &[u8; 66] =
 #[no_mangle]
 pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
-        Context::current().get_msg_sender().expect("msg_sender should be set");
+        Context::current().msg_sender().expect("msg_sender should be set");
     std::ptr::copy(msg_sender.as_ptr(), sender, 20);
 }
 
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn msg_value(value: *mut u8) {
 #[no_mangle]
 pub unsafe extern "C" fn contract_address(address: *mut u8) {
     let contract_address = Context::current()
-        .get_contract_address()
+        .contract_address()
         .expect("contract_address should be set");
     std::ptr::copy(contract_address.as_ptr(), address, 20);
 }
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
 /// [`RETURN_DATA_SIZE`]: https://www.evm.codes/#3d
 #[no_mangle]
 pub unsafe extern "C" fn return_data_size() -> usize {
-    Context::current().get_return_data_size()
+    Context::current().return_data_size()
 }
 
 /// Copies the bytes of the last EVM call or deployment return result.
