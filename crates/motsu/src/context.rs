@@ -12,12 +12,16 @@ use crate::{
     router::{RouterContext, TestRouter},
 };
 
-/// Storage mock: A global mutable key-value store.
-/// Allows concurrent access.
+/// Storage mock.
+///
+/// A global mutable key-value store that allows concurrent access.
 ///
 /// The key is the test [`Context`], an id of the test thread.
 ///
 /// The value is the [`MockStorage`], a storage of the test case.
+///
+/// NOTE: The [`DashMap`] will deadlock execution, when the same bucket is accessed
+///  twice from the same thread.
 static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
 
 /// Context of stylus unit tests associated with the current test thread.
@@ -73,12 +77,12 @@ impl Context {
             .insert(key, value);
     }
 
-    /// Set the message sender account address.
+    /// Set the message sender address.
     fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
 
-    /// Get the message sender account address.
+    /// Get the message sender address.
     #[must_use]
     pub fn msg_sender(self) -> Option<Address> {
         self.storage().msg_sender
