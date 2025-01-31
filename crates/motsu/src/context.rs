@@ -285,7 +285,7 @@ type ContractStorage = HashMap<Bytes32, Bytes32>;
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
 pub struct ContractCall<ST: StorageType> {
-    contract: ST,
+    storage: ST,
     caller_address: Address,
     contract_address: Address,
 }
@@ -309,7 +309,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.set_call_params();
-        &self.contract
+        &self.storage
     }
 }
 
@@ -317,7 +317,7 @@ impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
-        &mut self.contract
+        &mut self.storage
     }
 }
 
@@ -380,7 +380,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     #[must_use]
     pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
-            contract: unsafe { ST::new(uint!(0_U256), 0) },
+            storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address: account.into(),
             contract_address: self.address,
         }
