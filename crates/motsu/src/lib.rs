@@ -96,6 +96,12 @@ mod ping_pong_tests {
             Ok(value)
         }
 
+        fn can_ping(&mut self, to: Address) -> bool {
+            let receiver = IPongContract::new(to);
+            let call = Call::new_in(self);
+            receiver.can_pong(call).expect("should pong successfully")
+        }
+
         fn has_pong(&self, to: Address) -> bool {
             to.has_code()
         }
@@ -107,6 +113,9 @@ mod ping_pong_tests {
         interface IPongContract {
             #[allow(missing_docs)]
             function pong(uint256 value) external returns (uint256);
+
+            #[allow(missing_docs)]
+            function canPong() external view returns (bool);
         }
     }
 
@@ -117,6 +126,7 @@ mod ping_pong_tests {
         contract_address: StorageAddress,
     }
 
+    // TODO#q: test error and panic with magic value
     #[public]
     impl PongContract {
         fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
@@ -127,6 +137,10 @@ mod ping_pong_tests {
             self.contract_address.set(contract::address());
 
             Ok(value + uint!(1_U256))
+        }
+
+        fn can_pong(&self) -> bool {
+            true
         }
     }
 
@@ -147,6 +161,15 @@ mod ping_pong_tests {
         assert_eq!(ponged_value, value + uint!(1_U256));
         assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
         assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
+    }
+
+    #[motsu_proc::test]
+    fn external_static_call(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        assert!(ping.sender(alice).can_ping(pong.address()));
     }
 
     #[motsu_proc::test]

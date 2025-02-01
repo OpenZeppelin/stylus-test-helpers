@@ -304,16 +304,18 @@ pub unsafe extern "C" fn call_contract(
 /// [`STATIC_CALL`]: https://www.evm.codes/#FA
 #[no_mangle]
 pub unsafe extern "C" fn static_call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().call_contract_raw(
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
+    )
 }
 
 /// Delegate calls the contract at the given address, with the option to limit
@@ -332,16 +334,18 @@ pub unsafe extern "C" fn static_call_contract(
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#F4
 #[no_mangle]
 pub unsafe extern "C" fn delegate_call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().call_contract_raw(
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
+    )
 }
 
 /// Gets a bounded estimate of the Unix timestamp at which the Sequencer
