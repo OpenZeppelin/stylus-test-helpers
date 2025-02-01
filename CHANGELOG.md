@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Mocks for the `msg::sender()` #14
+- Mocks for the external contract calls. 
+  Two and more contracts can be injected into test #14
+- Option to inject `Account` or `Address` in the test #14
+
+### Changed (Breaking)
+
+- `Contract<..>` wrapper is mandatory for the contract's argument #14
+- To call contract's function it is mandatory to explicitly indicate the sender,
+  through `Contract::<..>::sender(..)` function #14
+- `Contract<T>`'s `T` type should implement `TopLevelStorage` #14
+
 ## [0.3.0] - 2025-01-07
 
 ### Changed (Breaking)
