@@ -284,26 +284,32 @@ type ContractStorage = HashMap<Bytes32, Bytes32>;
 
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
-pub struct ContractCall<ST: StorageType> {
+pub struct ContractCall<'a, ST: StorageType> {
     storage: ST,
     caller_address: Address,
-    contract_address: Address,
+    /// We need to hold a reference to [`Contract<ST>`], because
+    /// `Contract::<ST>::new().sender(alice)` can accidentally drop
+    /// [`Contract<ST>`].
+    /// 
+    /// With `contract_ref` code like: `Contract::<ST>::new().sender(alice)`
+    /// will not compile.
+    contract_ref: &'a Contract<ST>,
 }
 
-impl<ST: StorageType> ContractCall<ST> {
+impl<'a, ST: StorageType> ContractCall<'a, ST> {
     /// Get the contract's address.
     pub fn address(&self) -> Address {
-        self.contract_address
+        self.contract_ref.address
     }
 
     /// Preset the call parameters.
     fn set_call_params(&self) {
         let _ = Context::current().set_msg_sender(self.caller_address);
-        let _ = Context::current().set_contract_address(self.contract_address);
+        let _ = Context::current().set_contract_address(self.address());
     }
 }
 
-impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
+impl<'a, ST: StorageType> ::core::ops::Deref for ContractCall<'a, ST> {
     type Target = ST;
 
     #[inline]
@@ -313,7 +319,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<ST> {
     }
 }
 
-impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<ST> {
+impl<'a, ST: StorageType> ::core::ops::DerefMut for ContractCall<'a, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
@@ -382,7 +388,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address: account.into(),
-            contract_address: self.address,
+            contract_ref: self,
         }
     }
 }

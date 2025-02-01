@@ -193,6 +193,19 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
         assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
     }
+
+    #[motsu_proc::test]
+    fn contract_should_not_drop() {
+        let alice = Account::random();
+        let ping = Contract::<PingContract>::new();
+        let mut ping = ping.sender(alice);
+        let pong = Contract::<PongContract>::new();
+        let pong = pong.sender(alice);
+
+        let _ = ping
+            .ping(pong.address(), uint!(10_U256))
+            .expect("contract ping should not drop");
+    }
 }
 
 #[cfg(test)]
