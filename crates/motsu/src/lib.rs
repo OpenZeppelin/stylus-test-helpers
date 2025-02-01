@@ -62,14 +62,9 @@ extern crate alloc;
 mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
-    use stylus_sdk::{
-        alloy_primitives::{Address, U256},
-        call::Call,
-        contract, msg,
-        prelude::{public, storage, AddressVM, TopLevelStorage},
-        storage::{StorageAddress, StorageU256},
-    };
-
+    use alloy_sol_types::{sol, SolError};
+    use stylus_sdk::{alloy_primitives::{Address, U256}, call, call::Call, contract, msg, prelude::{public, storage, AddressVM, TopLevelStorage}, storage::{StorageAddress, StorageU256}};
+    use stylus_sdk::prelude::SolidityError;
     use crate::context::{Account, Contract};
 
     #[storage]
@@ -84,8 +79,7 @@ mod ping_pong_tests {
         fn ping(&mut self, to: Address, value: U256) -> Result<U256, Vec<u8>> {
             let receiver = IPongContract::new(to);
             let call = Call::new_in(self);
-            let value =
-                receiver.pong(call, value).expect("should pong successfully");
+            let value = receiver.pong(call, value)?;
 
             let pings_count = self.pings_count.get();
             self.pings_count.set(pings_count + uint!(1_U256));
@@ -96,10 +90,10 @@ mod ping_pong_tests {
             Ok(value)
         }
 
-        fn can_ping(&mut self, to: Address) -> bool {
+        fn can_ping(&mut self, to: Address) -> Result<bool, Vec<u8>> {
             let receiver = IPongContract::new(to);
             let call = Call::new_in(self);
-            receiver.can_pong(call).expect("should pong successfully")
+            Ok(receiver.can_pong(call)?)
         }
 
         fn has_pong(&self, to: Address) -> bool {
@@ -119,6 +113,19 @@ mod ping_pong_tests {
         }
     }
 
+    sol! {
+        #[derive(Debug)]
+        #[allow(missing_docs)]
+        error MagicError(uint256 value);
+    }
+
+    #[derive(SolidityError, Debug)]
+    pub enum PongError {
+        MagicError(MagicError),
+    }
+
+    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
+
     #[storage]
     struct PongContract {
         pongs_count: StorageU256,
@@ -126,10 +133,13 @@ mod ping_pong_tests {
         contract_address: StorageAddress,
     }
 
-    // TODO#q: test error and panic with magic value
     #[public]
     impl PongContract {
-        fn pong(&mut self, value: U256) -> Result<U256, Vec<u8>> {
+        fn pong(&mut self, value: U256) -> Result<U256, PongError> {
+            if value == MAGIC_ERROR_VALUE {
+                return Err(PongError::MagicError(MagicError { value }));
+            }
+            
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + uint!(1_U256));
 
@@ -162,6 +172,21 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
         assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
     }
+    
+    #[motsu_proc::test]
+    fn external_call_error(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        let value = MAGIC_ERROR_VALUE;
+        let err = ping
+            .sender(alice)
+            .ping(pong.address(), value)
+            .expect_err("should fail to ping");
+        
+        assert_eq!(err, MagicError { value }.abi_encode());
+    }
 
     #[motsu_proc::test]
     fn external_static_call(
@@ -169,7 +194,11 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        assert!(ping.sender(alice).can_ping(pong.address()));
+        let can_ping = ping
+            .sender(alice)
+            .can_ping(pong.address())
+            .expect("should ping successfully");
+        assert!(can_ping);
     }
 
     #[motsu_proc::test]
