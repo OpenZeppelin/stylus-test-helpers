@@ -296,7 +296,7 @@ pub struct ContractCall<'a, ST: StorageType> {
     contract_ref: &'a Contract<ST>,
 }
 
-impl<'a, ST: StorageType> ContractCall<'a, ST> {
+impl<ST: StorageType> ContractCall<'_, ST> {
     /// Get the contract's address.
     pub fn address(&self) -> Address {
         self.contract_ref.address
@@ -309,7 +309,7 @@ impl<'a, ST: StorageType> ContractCall<'a, ST> {
     }
 }
 
-impl<'a, ST: StorageType> ::core::ops::Deref for ContractCall<'a, ST> {
+impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
     type Target = ST;
 
     #[inline]
@@ -319,7 +319,7 @@ impl<'a, ST: StorageType> ::core::ops::Deref for ContractCall<'a, ST> {
     }
 }
 
-impl<'a, ST: StorageType> ::core::ops::DerefMut for ContractCall<'a, ST> {
+impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
