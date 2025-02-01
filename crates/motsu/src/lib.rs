@@ -48,6 +48,8 @@
 //! ```
 //!
 //! [test_attribute]: crate::test
+#[cfg(test)]
+extern crate alloc;
 mod context;
 pub mod prelude;
 mod router;
@@ -56,15 +58,18 @@ mod shims;
 pub use motsu_proc::test;
 
 #[cfg(test)]
-extern crate alloc;
-
-#[cfg(test)]
 mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
     use alloy_sol_types::{sol, SolError};
-    use stylus_sdk::{alloy_primitives::{Address, U256}, call, call::Call, contract, msg, prelude::{public, storage, AddressVM, TopLevelStorage}, storage::{StorageAddress, StorageU256}};
-    use stylus_sdk::prelude::SolidityError;
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::Call,
+        contract, msg,
+        prelude::{public, storage, AddressVM, SolidityError, TopLevelStorage},
+        storage::{StorageAddress, StorageU256},
+    };
+
     use crate::context::{Account, Contract};
 
     #[storage]
@@ -139,7 +144,7 @@ mod ping_pong_tests {
             if value == MAGIC_ERROR_VALUE {
                 return Err(PongError::MagicError(MagicError { value }));
             }
-            
+
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + uint!(1_U256));
 
@@ -172,7 +177,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
         assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
     }
-    
+
     #[motsu_proc::test]
     fn external_call_error(
         ping: Contract<PingContract>,
@@ -184,7 +189,7 @@ mod ping_pong_tests {
             .sender(alice)
             .ping(pong.address(), value)
             .expect_err("should fail to ping");
-        
+
         assert_eq!(err, MagicError { value }.abi_encode());
     }
 

@@ -290,7 +290,7 @@ pub struct ContractCall<'a, ST: StorageType> {
     /// We need to hold a reference to [`Contract<ST>`], because
     /// `Contract::<ST>::new().sender(alice)` can accidentally drop
     /// [`Contract<ST>`].
-    /// 
+    ///
     /// With `contract_ref` code like: `Contract::<ST>::new().sender(alice)`
     /// will not compile.
     contract_ref: &'a Contract<ST>,
