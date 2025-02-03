@@ -270,16 +270,19 @@ mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
     use stylus_sdk::{
         call::Call,
+        msg,
         prelude::{public, storage, TopLevelStorage},
         storage::StorageAddress,
     };
 
-    use crate::context::{Account, Contract};
+    use crate::prelude::*;
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
             #[allow(missing_docs)]
             function callProxy(uint256 value) external returns (uint256);
+            #[allow(missing_docs)]
+            function payProxy() external payable;
         }
     }
 
@@ -306,12 +309,31 @@ mod proxies_tests {
                 proxy.call_proxy(call, value).expect("should call proxy")
             }
         }
+
+        #[payable]
+        fn pay_proxy(&mut self) {
+            let next_proxy = self.next_proxy.get();
+
+            // If there is a next proxy.
+            if !next_proxy.is_zero() {
+                // Add one to the message value.
+                let value = msg::value() + uint!(1_U256);
+
+                // Pay the next proxy.
+                let proxy = IProxy::new(next_proxy);
+                let call = Call::new_in(self).value(value);
+                proxy.pay_proxy(call).expect("should pay proxy");
+            }
+        }
     }
 
     unsafe impl TopLevelStorage for Proxy {}
 
+    const ONE: U256 = uint!(1_U256);
+    const TEN: U256 = uint!(10_U256);
+
     #[motsu_proc::test]
-    fn three_proxies(
+    fn call_three_proxies(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -330,10 +352,44 @@ mod proxies_tests {
         });
 
         // Call the first proxy.
-        let value = uint!(10_U256);
-        let result = proxy1.sender(alice).call_proxy(value);
+        let result = proxy1.sender(alice).call_proxy(TEN);
 
         // The value is incremented by 1 for each proxy.
-        assert_eq!(result, value + uint!(3_U256));
+        assert_eq!(result, TEN + ONE + ONE + ONE);
+    }
+
+    #[motsu_proc::test]
+    fn pay_three_proxies(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
+        proxy1.init(alice, |storage| {
+            storage.next_proxy.set(proxy2.address());
+        });
+        proxy2.init(alice, |storage| {
+            storage.next_proxy.set(proxy3.address());
+        });
+        proxy3.init(alice, |storage| {
+            storage.next_proxy.set(Address::ZERO);
+        });
+
+        // Fund accounts.
+        alice.fund(TEN);
+        proxy1.fund(TEN);
+        proxy2.fund(TEN);
+        proxy3.fund(TEN);
+
+        // Call the first proxy.
+        proxy1.sender_and_value(alice, ONE).pay_proxy();
+
+        // By the end, each actor will lose `ONE`, except last proxy.
+        assert_eq!(alice.balance(), TEN - ONE);
+        assert_eq!(proxy1.balance(), TEN - ONE);
+        assert_eq!(proxy2.balance(), TEN - ONE);
+        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
     }
 }

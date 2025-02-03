@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, ptr, slice, thread::ThreadId};
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, B256, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
@@ -212,6 +212,8 @@ impl Context {
         let previous_msg_value =
             value.and_then(|value| self.set_msg_value(value));
 
+        // TODO#q: add check if sender has enough funds
+
         // Call external contract.
         let result = self
             .router(contract_address)
@@ -222,16 +224,9 @@ impl Context {
 
         // If the call was successful,
         if result.is_ok() {
-            // and there is a `value` to pay,
-            if let Some(value) = value {
-                // transfer it to the callee contract.
-                self.checked_transfer(
-                    previous_contract_address,
-                    contract_address,
-                    value,
-                )
-                    .expect("should have enough funds for transfer");
-            }
+            // transfer value that wasn't transferred yet.
+            self.try_transfer_value()
+                .expect("should have enough funds for transfer");
         }
 
         // Set the previous message sender and contract address back.
@@ -307,7 +302,7 @@ impl Context {
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
         let value: U256 = self.msg_value();
-        std::ptr::copy(value.as_le_slice().as_ptr(), output, 32);
+        write_u256(value, output);
     }
 
     /// Get the value sent to the contract as [`U256`].
@@ -315,6 +310,33 @@ impl Context {
         self.storage().msg_value.unwrap_or_default()
     }
 
+    /// Transfer unsent value from the message sender to the contract.
+    ///
+    /// Returns `None` if there is not enough funds to transfer.
+    fn try_transfer_value(self) -> Option<()> {
+        let mut storage = self.storage();
+        let Some(msg_sender) = storage.msg_sender else {
+            return Some(());
+        };
+        let Some(contract_address) = storage.contract_address else {
+            return Some(());
+        };
+
+        // We should transfer the value only if it is set.
+        // And we should transfer the value only once, despite this function
+        // being called multiple times.
+        if let Some(msg_value) = storage.msg_value.take() {
+            // Drop storage to avoid deadlock.
+            drop(storage);
+            self.checked_transfer(msg_sender, contract_address, msg_value)
+        } else {
+            Some(())
+        }
+    }
+
+    /// Transfer `value` from `from` to `to`.
+    /// 
+    /// Returns `None` if there is not enough funds to transfer.
     fn checked_transfer(
         self,
         from: Address,
@@ -326,6 +348,9 @@ impl Context {
         Some(())
     }
 
+    /// Subtract `value` from the balance of `address`.
+    /// 
+    /// Returns `None` if there is not enough of funds.
     fn checked_sub_assign_balance(
         self,
         address: Address,
@@ -340,6 +365,7 @@ impl Context {
         Some(*balance)
     }
 
+    /// Add `value` to the balance of `address`.
     fn add_assign_balance(self, address: Address, value: U256) -> U256 {
         *self
             .storage()
@@ -372,16 +398,25 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
     ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
 }
 
-/// Decode the [`Address`] from the raw pointer.
+// TODO#q: add write_address
+
+/// Read the [`Address`] from the raw pointer.
 unsafe fn read_address(ptr: *const u8) -> Address {
     let address_bytes = slice::from_raw_parts(ptr, 20);
     Address::from_slice(address_bytes)
 }
 
-/// Decode the [`U256`] from the raw pointer.
+/// Read the [`U256`] from the raw pointer.
 unsafe fn read_u256(ptr: *const u8) -> U256 {
-    let address_bytes = slice::from_raw_parts(ptr, 32);
-    U256::from_le_slice(address_bytes)
+    let mut data = B256::ZERO;
+    ptr::copy(ptr, data.as_mut_ptr(), 32);
+    data.into()
+}
+
+/// Write the [`U256`] `value` to the location pointed by `ptr`.
+unsafe fn write_u256(value: U256, ptr: *mut u8) {
+    let bytes: B256 = value.into();
+    ptr::copy(bytes.as_ptr(), ptr, 32);
 }
 
 /// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
@@ -439,6 +474,13 @@ impl<ST: StorageType> ContractCall<'_, ST> {
         self.contract_ref.address
     }
 
+    /// Apply previously not reverted transactions.
+    fn apply_not_reverted_transactions(&self) {
+        Context::current()
+            .try_transfer_value()
+            .expect("should have enough funds for transfer");
+    }
+
     /// Preset the call parameters.
     fn set_call_params(&self) {
         if let Some(value) = self.value {
@@ -454,6 +496,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        self.apply_not_reverted_transactions();
         self.set_call_params();
         &self.storage
     }
@@ -462,6 +505,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        self.apply_not_reverted_transactions();
         self.set_call_params();
         &mut self.storage
     }
@@ -540,6 +584,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         account: A,
         value: V,
     ) -> ContractCall<ST> {
+        // TODO#q: add check if sender has enough funds
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address: account.into(),
@@ -579,10 +624,49 @@ impl Account {
     pub fn address(&self) -> Address {
         self.address
     }
+}
 
-    /// Get account's balance.
-    #[must_use]
-    pub fn balance(&self) -> U256 {
-        Context::current().balance(self.address)
+/// Fund the account.
+pub trait Funding {
+    /// Fund the account with the given `value`.
+    fn fund(&self, value: U256);
+
+    /// Get the balance of the account.
+    fn balance(&self) -> U256;
+}
+
+impl Funding for Address {
+    fn fund(&self, value: U256) {
+        Context::current().add_assign_balance(*self, value);
+    }
+
+    fn balance(&self) -> U256 {
+        // Before querying the balance, we should ensure all msg values been
+        // transferred.
+        // TODO#q: move error message inside `try_transfer_value`
+        Context::current()
+            .try_transfer_value()
+            .expect("should have enough funds for transfer");
+        Context::current().balance(*self)
+    }
+}
+
+impl Funding for Account {
+    fn fund(&self, value: U256) {
+        self.address().fund(value);
+    }
+
+    fn balance(&self) -> U256 {
+        self.address().balance()
+    }
+}
+
+impl<ST: StorageType + TestRouter + 'static> Funding for Contract<ST> {
+    fn fund(&self, value: U256) {
+        self.address().fund(value);
+    }
+
+    fn balance(&self) -> U256 {
+        self.address().balance()
     }
 }
