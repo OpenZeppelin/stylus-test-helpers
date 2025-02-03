@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, ptr, slice, thread::ThreadId};
 
-use alloy_primitives::Address;
+use alloy_primitives::{Address, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
@@ -144,14 +144,40 @@ impl Context {
         calldata_len: usize,
         return_data_len: *mut usize,
     ) -> u8 {
-        let address_bytes = slice::from_raw_parts(address, 20);
-        let address = Address::from_slice(address_bytes);
+        let address = decode_address(address);
+        let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let input = slice::from_raw_parts(calldata, calldata_len);
-        let selector =
-            u32::from_be_bytes(TryInto::try_into(&input[..4]).unwrap());
+        let result = self.call_contract(address, selector, &input);
+        self.process_arb_result_raw(result, return_data_len)
+    }
 
-        match self.call_contract(address, selector, &input[4..]) {
+    /// Call the contract at raw `address` with the given raw `calldata` and
+    /// `value`.
+    pub(crate) unsafe fn call_contract_with_value_raw(
+        self,
+        address: *const u8,
+        calldata: *const u8,
+        calldata_len: usize,
+        value: *const u8,
+        return_data_len: *mut usize,
+    ) -> u8 {
+        let address = decode_address(address);
+        let value = decode_u256(value);
+        let (selector, input) = decode_calldata(calldata, calldata_len);
+
+        let result =
+            self.call_contract_with_value(address, selector, &input, value);
+        self.process_arb_result_raw(result, return_data_len)
+    }
+
+    /// Based on `result`, set the return data.
+    /// Return 0 if `result` is `Ok`, otherwise return 1.
+    unsafe fn process_arb_result_raw(
+        self,
+        result: ArbResult,
+        return_data_len: *mut usize,
+    ) -> u8 {
+        match result {
             Ok(res) => {
                 return_data_len.write(res.len());
                 self.set_return_data(res);
@@ -165,8 +191,30 @@ impl Context {
         }
     }
 
-    /// Call the function associated with the given `selector` and pass `input`
-    /// to it, at the given `contract_address`.
+    /// Call the function associated with the given `selector` at the given
+    /// `contract_address`. Pass `input` and `value` to it.
+    fn call_contract_with_value(
+        self,
+        contract_address: Address,
+        selector: u32,
+        input: &[u8],
+        value: U256,
+    ) -> ArbResult {
+        // Set new msg_value, and store the previous one.
+        let previous_msg_value = self.set_msg_value(value);
+
+        let result = self.call_contract(contract_address, selector, input);
+
+        // Set the previous msg_value if there is any.
+        if let Some(previous) = previous_msg_value {
+            let _ = self.set_msg_value(previous);
+        }
+
+        result
+    }
+
+    /// Call the function associated with the given `selector` at the given
+    /// `contract_address`. Pass `input` to it.
     fn call_contract(
         self,
         contract_address: Address,
@@ -231,8 +279,7 @@ impl Context {
 
     /// Check if the contract at raw `address` has code.
     pub(crate) unsafe fn has_code_raw(self, address: *const u8) -> bool {
-        let address_bytes = slice::from_raw_parts(address, 20);
-        let address = Address::from_slice(address_bytes);
+        let address = decode_address(address);
         self.has_code(address)
     }
 
@@ -240,6 +287,71 @@ impl Context {
     #[must_use]
     fn has_code(self, address: Address) -> bool {
         self.router(address).exists()
+    }
+
+    pub(crate) unsafe fn balance_raw(self, address: *const u8) -> U256 {
+        // TODO#q: write to destination here
+        let address = decode_address(address);
+        self.balance(address)
+    }
+
+    fn balance(self, address: Address) -> U256 {
+        self.storage().balances.get(&address).copied().unwrap_or_default()
+    }
+
+    pub(crate) fn set_msg_value(self, value: U256) -> Option<U256> {
+        self.storage().msg_value.replace(value)
+    }
+
+    /// Write the value sent to the contract to `output`.
+    pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
+        let value: U256 = self.msg_value();
+        std::ptr::copy(value.as_le_slice().as_ptr(), output, 32);
+    }
+
+    /// Get the value sent to the contract as [`U256`].
+    pub(crate) fn msg_value(self) -> U256 {
+        self.storage().msg_value.unwrap_or_default()
+    }
+
+    fn transfer_funds_from_caller(self) {
+        let sender = self.msg_sender().expect("msg_sender should be set");
+        let value = self.msg_value();
+        self.add_assign_balance(sender, value);
+    }
+
+    fn checked_transfer(
+        self,
+        from: Address,
+        to: Address,
+        value: U256,
+    ) -> Option<()> {
+        let _ = self.checked_sub_assign_balance(from, value)?;
+        self.add_assign_balance(to, value);
+        Some(())
+    }
+
+    fn checked_sub_assign_balance(
+        self,
+        address: Address,
+        value: U256,
+    ) -> Option<U256> {
+        let mut storage = self.storage();
+        let balance = storage.balances.entry(address).or_default();
+        if *balance < value {
+            return None;
+        }
+        *balance -= value;
+        Some(*balance)
+    }
+
+    fn add_assign_balance(self, address: Address, value: U256) -> U256 {
+        *self
+            .storage()
+            .balances
+            .entry(address)
+            .and_modify(|v| *v += value)
+            .or_insert(value)
     }
 
     /// Get reference to the storage for the current test thread.
@@ -265,15 +377,44 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
     ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
 }
 
+/// Decode the [`Address`] from the raw pointer.
+unsafe fn decode_address(ptr: *const u8) -> Address {
+    let address_bytes = slice::from_raw_parts(ptr, 20);
+    Address::from_slice(address_bytes)
+}
+
+/// Decode the [`U256`] from the raw pointer.
+unsafe fn decode_u256(ptr: *const u8) -> U256 {
+    let address_bytes = slice::from_raw_parts(ptr, 32);
+    U256::from_le_slice(address_bytes)
+}
+
+/// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
+/// raw pointer.
+unsafe fn decode_calldata(
+    calldata: *const u8,
+    calldata_len: usize,
+) -> (u32, Vec<u8>) {
+    let calldata = slice::from_raw_parts(calldata, calldata_len);
+    let selector =
+        u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
+    let input = calldata[4..].to_vec();
+    (selector, input)
+}
+
 /// Storage for unit test's mock data.
 #[derive(Default)]
 struct MockStorage {
     /// Address of the message sender.
     msg_sender: Option<Address>,
+    /// The ETH value in wei sent to the program.
+    msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
     /// Contract's address to mock data storage mapping.
     contract_data: HashMap<Address, ContractStorage>,
+    /// Account's address to balance mapping.
+    balances: HashMap<Address, U256>,
     // Output of a contract call.
     call_output: Option<Vec<u8>>,
     // Output length of a contract call.
@@ -287,6 +428,7 @@ type ContractStorage = HashMap<Bytes32, Bytes32>;
 pub struct ContractCall<'a, ST: StorageType> {
     storage: ST,
     caller_address: Address,
+    value: Option<U256>,
     /// We need to hold a reference to [`Contract<ST>`], because
     /// `Contract::<ST>::new().sender(alice)` can accidentally drop
     /// [`Contract<ST>`].
@@ -304,6 +446,9 @@ impl<ST: StorageType> ContractCall<'_, ST> {
 
     /// Preset the call parameters.
     fn set_call_params(&self) {
+        if let Some(value) = self.value {
+            let _ = Context::current().set_msg_value(value);
+        }
         let _ = Context::current().set_msg_sender(self.caller_address);
         let _ = Context::current().set_contract_address(self.address());
     }
@@ -388,6 +533,22 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address: account.into(),
+            value: None,
+            contract_ref: self,
+        }
+    }
+
+    /// Call contract `self` with `account` as a sender and `value`.
+    #[must_use]
+    pub fn sender_and_value<A: Into<Address>, V: Into<U256>>(
+        &self,
+        account: A,
+        value: V,
+    ) -> ContractCall<ST> {
+        ContractCall {
+            storage: unsafe { ST::new(uint!(0_U256), 0) },
+            caller_address: account.into(),
+            value: Some(value.into()),
             contract_ref: self,
         }
     }
@@ -422,5 +583,11 @@ impl Account {
     #[must_use]
     pub fn address(&self) -> Address {
         self.address
+    }
+
+    /// Get account's balance.
+    #[must_use]
+    pub fn balance(&self) -> U256 {
+        Context::current().balance(self.address)
     }
 }

@@ -155,8 +155,7 @@ pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
 /// Get the ETH value (U256) in wei sent to the program.
 #[no_mangle]
 pub unsafe extern "C" fn msg_value(value: *mut u8) {
-    let dummy_msg_value: Bytes32 = Bytes32::default();
-    std::ptr::copy(dummy_msg_value.as_ptr(), value, 32);
+    Context::current().msg_value_raw(value);
 }
 
 /// Gets the address of the current program. The semantics are equivalent to
@@ -227,6 +226,17 @@ pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     std::ptr::copy(account_codehash.as_ptr(), dest, 32);
 }
 
+/// Gets the ETH balance in wei of the account at the given address.
+/// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
+///
+/// [`BALANCE`]: https://www.evm.codes/#31
+pub unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
+    let balance = Context::current().balance_raw(address);
+    let balance_bytes = balance.as_le_slice();
+
+    std::ptr::copy(balance_bytes.as_ptr(), dest, 32);
+}
+
 /// Returns the length of the last EVM call or deployment return result, or `0`
 /// if neither have happened during the program's execution.
 ///
@@ -276,14 +286,15 @@ pub unsafe extern "C" fn call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
-    _value: *const u8,
+    value: *const u8,
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    Context::current().call_contract_raw(
+    Context::current().call_contract_with_value_raw(
         contract,
         calldata,
         calldata_len,
+        value,
         return_data_len,
     )
 }
