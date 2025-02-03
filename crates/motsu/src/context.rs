@@ -144,10 +144,10 @@ impl Context {
         calldata_len: usize,
         return_data_len: *mut usize,
     ) -> u8 {
-        let address = decode_address(address);
+        let address = read_address(address);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input);
+        let result = self.call_contract(address, selector, &input, None);
         self.process_arb_result_raw(result, return_data_len)
     }
 
@@ -161,12 +161,11 @@ impl Context {
         value: *const u8,
         return_data_len: *mut usize,
     ) -> u8 {
-        let address = decode_address(address);
-        let value = decode_u256(value);
+        let address = read_address(address);
+        let value = read_u256(value);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result =
-            self.call_contract_with_value(address, selector, &input, value);
+        let result = self.call_contract(address, selector, &input, Some(value));
         self.process_arb_result_raw(result, return_data_len)
     }
 
@@ -192,34 +191,13 @@ impl Context {
     }
 
     /// Call the function associated with the given `selector` at the given
-    /// `contract_address`. Pass `input` and `value` to it.
-    fn call_contract_with_value(
-        self,
-        contract_address: Address,
-        selector: u32,
-        input: &[u8],
-        value: U256,
-    ) -> ArbResult {
-        // Set new msg_value, and store the previous one.
-        let previous_msg_value = self.set_msg_value(value);
-
-        let result = self.call_contract(contract_address, selector, input);
-
-        // Set the previous msg_value if there is any.
-        if let Some(previous) = previous_msg_value {
-            let _ = self.set_msg_value(previous);
-        }
-
-        result
-    }
-
-    /// Call the function associated with the given `selector` at the given
-    /// `contract_address`. Pass `input` to it.
+    /// `contract_address`. Pass `input` and optional `value` to it.
     fn call_contract(
         self,
         contract_address: Address,
         selector: u32,
         input: &[u8],
+        value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
         // a receiver (`contract_address`).
@@ -230,6 +208,10 @@ impl Context {
             .set_msg_sender(previous_contract_address)
             .expect("msg_sender should be set");
 
+        // Set new msg_value, and store the previous one.
+        let previous_msg_value =
+            value.and_then(|value| self.set_msg_value(value));
+
         // Call external contract.
         let result = self
             .router(contract_address)
@@ -238,9 +220,28 @@ impl Context {
                 panic!("selector not found - selector is {selector}")
             });
 
+        // If the call was successful,
+        if result.is_ok() {
+            // and there is a `value` to pay,
+            if let Some(value) = value {
+                // transfer it to the callee contract.
+                self.checked_transfer(
+                    previous_contract_address,
+                    contract_address,
+                    value,
+                )
+                    .expect("should have enough funds for transfer");
+            }
+        }
+
         // Set the previous message sender and contract address back.
         let _ = self.set_contract_address(previous_contract_address);
         let _ = self.set_msg_sender(previous_msg_sender);
+
+        // Set the previous msg_value if there is any.
+        if let Some(previous) = previous_msg_value {
+            let _ = self.set_msg_value(previous);
+        }
 
         result
     }
@@ -279,7 +280,7 @@ impl Context {
 
     /// Check if the contract at raw `address` has code.
     pub(crate) unsafe fn has_code_raw(self, address: *const u8) -> bool {
-        let address = decode_address(address);
+        let address = read_address(address);
         self.has_code(address)
     }
 
@@ -291,7 +292,7 @@ impl Context {
 
     pub(crate) unsafe fn balance_raw(self, address: *const u8) -> U256 {
         // TODO#q: write to destination here
-        let address = decode_address(address);
+        let address = read_address(address);
         self.balance(address)
     }
 
@@ -312,12 +313,6 @@ impl Context {
     /// Get the value sent to the contract as [`U256`].
     pub(crate) fn msg_value(self) -> U256 {
         self.storage().msg_value.unwrap_or_default()
-    }
-
-    fn transfer_funds_from_caller(self) {
-        let sender = self.msg_sender().expect("msg_sender should be set");
-        let value = self.msg_value();
-        self.add_assign_balance(sender, value);
     }
 
     fn checked_transfer(
@@ -378,13 +373,13 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
 }
 
 /// Decode the [`Address`] from the raw pointer.
-unsafe fn decode_address(ptr: *const u8) -> Address {
+unsafe fn read_address(ptr: *const u8) -> Address {
     let address_bytes = slice::from_raw_parts(ptr, 20);
     Address::from_slice(address_bytes)
 }
 
 /// Decode the [`U256`] from the raw pointer.
-unsafe fn decode_u256(ptr: *const u8) -> U256 {
+unsafe fn read_u256(ptr: *const u8) -> U256 {
     let address_bytes = slice::from_raw_parts(ptr, 32);
     U256::from_le_slice(address_bytes)
 }
