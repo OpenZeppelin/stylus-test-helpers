@@ -112,23 +112,22 @@ pub unsafe extern "C" fn storage_cache_bytes32(
 /// of [`SSTORE`].
 ///
 /// [`SSTORE`]: https://www.evm.codes/#55
-pub fn storage_flush_cache(_: bool) {
+#[no_mangle]
+pub unsafe extern "C" fn storage_flush_cache(_: bool) {
     // No-op: we don't use the cache in our unit-tests.
 }
-
-/// Dummy msg sender set for tests.
-pub const MSG_SENDER: &[u8; 42] = b"0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF";
-
-/// Dummy contract address set for tests.
-pub const CONTRACT_ADDRESS: &[u8; 42] =
-    b"0xdCE82b5f92C98F27F116F70491a487EFFDb6a2a9";
 
 /// Arbitrum's CHAID ID.
 pub const CHAIN_ID: u64 = 42161;
 
-/// Externally Owned Account (EOA) code hash.
+/// Externally Owned Account (EOA) code hash (wallet account).
 pub const EOA_CODEHASH: &[u8; 66] =
     b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+
+/// Contract Account (CA) code hash (smart contract code).
+/// NOTE: can be any 256-bit value to pass `has_code` check.
+pub const CA_CODEHASH: &[u8; 66] =
+    b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
 /// Gets the address of the account that called the program.
 ///
@@ -148,8 +147,16 @@ pub const EOA_CODEHASH: &[u8; 66] =
 /// May panic if fails to parse `MSG_SENDER` as an address.
 #[no_mangle]
 pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
-    let addr = const_hex::const_decode_to_array::<20>(MSG_SENDER).unwrap();
-    std::ptr::copy(addr.as_ptr(), sender, 20);
+    let msg_sender =
+        Context::current().msg_sender().expect("msg_sender should be set");
+    std::ptr::copy(msg_sender.as_ptr(), sender, 20);
+}
+
+/// Get the ETH value (U256) in wei sent to the program.
+#[no_mangle]
+pub unsafe extern "C" fn msg_value(value: *mut u8) {
+    let dummy_msg_value: Bytes32 = Bytes32::default();
+    std::ptr::copy(dummy_msg_value.as_ptr(), value, 32);
 }
 
 /// Gets the address of the current program. The semantics are equivalent to
@@ -162,9 +169,10 @@ pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
 pub unsafe extern "C" fn contract_address(address: *mut u8) {
-    let addr =
-        const_hex::const_decode_to_array::<20>(CONTRACT_ADDRESS).unwrap();
-    std::ptr::copy(addr.as_ptr(), address, 20);
+    let contract_address = Context::current()
+        .contract_address()
+        .expect("contract_address should be set");
+    std::ptr::copy(contract_address.as_ptr(), address, 20);
 }
 
 /// Gets the chain ID of the current chain. The semantics are equivalent to
@@ -206,9 +214,15 @@ pub unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
 ///
 /// May panic if fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
 #[no_mangle]
-pub unsafe extern "C" fn account_codehash(_address: *const u8, dest: *mut u8) {
+pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
+    let code_hash = if Context::current().has_code_raw(address) {
+        CA_CODEHASH
+    } else {
+        EOA_CODEHASH
+    };
+
     let account_codehash =
-        const_hex::const_decode_to_array::<32>(EOA_CODEHASH).unwrap();
+        const_hex::const_decode_to_array::<32>(code_hash).unwrap();
 
     std::ptr::copy(account_codehash.as_ptr(), dest, 32);
 }
@@ -222,10 +236,7 @@ pub unsafe extern "C" fn account_codehash(_address: *const u8, dest: *mut u8) {
 /// [`RETURN_DATA_SIZE`]: https://www.evm.codes/#3d
 #[no_mangle]
 pub unsafe extern "C" fn return_data_size() -> usize {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().return_data_size()
 }
 
 /// Copies the bytes of the last EVM call or deployment return result.
@@ -239,14 +250,11 @@ pub unsafe extern "C" fn return_data_size() -> usize {
 /// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
 #[no_mangle]
 pub unsafe extern "C" fn read_return_data(
-    _dest: *mut u8,
+    dest: *mut u8,
     _offset: usize,
-    _size: usize,
+    size: usize,
 ) -> usize {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().read_return_data_raw(dest, size)
 }
 
 /// Calls the contract at the given address with options for passing value and
@@ -265,17 +273,19 @@ pub unsafe extern "C" fn read_return_data(
 /// [`CALL`]: https://www.evm.codes/#f1
 #[no_mangle]
 pub unsafe extern "C" fn call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _value: *const u8,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().call_contract_raw(
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
+    )
 }
 
 /// Static calls the contract at the given address, with the option to limit the
@@ -294,16 +304,18 @@ pub unsafe extern "C" fn call_contract(
 /// [`STATIC_CALL`]: https://www.evm.codes/#FA
 #[no_mangle]
 pub unsafe extern "C" fn static_call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().call_contract_raw(
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
+    )
 }
 
 /// Delegate calls the contract at the given address, with the option to limit
@@ -322,16 +334,18 @@ pub unsafe extern "C" fn static_call_contract(
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#F4
 #[no_mangle]
 pub unsafe extern "C" fn delegate_call_contract(
-    _contract: *const u8,
-    _calldata: *const u8,
-    _calldata_len: usize,
+    contract: *const u8,
+    calldata: *const u8,
+    calldata_len: usize,
     _gas: u64,
-    _return_data_len: *mut usize,
+    return_data_len: *mut usize,
 ) -> u8 {
-    // TODO: #156
-    // No-op: we do not use this function in our unit-tests,
-    // but the binary does include it.
-    0
+    Context::current().call_contract_raw(
+        contract,
+        calldata,
+        calldata_len,
+        return_data_len,
+    )
 }
 
 /// Gets a bounded estimate of the Unix timestamp at which the Sequencer
