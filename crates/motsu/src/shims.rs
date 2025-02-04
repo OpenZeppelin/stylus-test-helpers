@@ -8,34 +8,13 @@
 //!
 //! ## Motivation
 //!
-//! Without these shims we can't currently run unit tests for stylus contracts,
+//! Without these shims, we can't currently run unit tests for stylus contracts,
 //! since the symbols the compiled binaries expect to find are not there.
 //!
 //! If you run `cargo test` on a fresh Stylus project, it will error with:
 //!
 //! ```terminal
 //! dyld[97792]: missing symbol called
-//! ```
-//!
-//! This crate is a temporary solution until the Stylus team provides us with a
-//! different and more stable mechanism for unit-testing our contracts.
-//!
-//! ## Usage
-//!
-//! Import these shims in your test modules as `motsu::prelude::*` to populate
-//! the namespace with the appropriate symbols.
-//!
-//! ```rust,ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     use contracts::token::erc20::Erc20;
-//!
-//!     #[motsu::test]
-//!     fn reads_balance(contract: Erc20) {
-//!         let balance = contract.balance_of(Address::ZERO); // Access storage.
-//!         assert_eq!(balance, U256::ZERO);
-//!     }
-//! }
 //! ```
 #![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
@@ -234,7 +213,7 @@ unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
 }
 
 /// Returns the length of the last EVM call or deployment return result, or `0`
-/// if neither have happened during the program's execution.
+/// if neither has happened during the program's execution.
 ///
 /// The semantics are equivalent to that of the EVM's [`RETURN_DATA_SIZE`]
 /// opcode.
@@ -265,9 +244,9 @@ unsafe extern "C" fn read_return_data(
 
 /// Calls the contract at the given address with options for passing value and
 /// to limit the amount of gas supplied. The return status indicates whether the
-/// call succeeded, and is nonzero on failure.
+/// call succeeded and is nonzero on failure.
 ///
-/// In both cases `return_data_len` will store the length of the result, the
+/// In both cases, `return_data_len` will store the length of the result, the
 /// bytes of which can be read via the `read_return_data` hostio. The bytes are
 /// not returned directly so that the programmer can potentially save gas by
 /// choosing which subset of the return result they'd like to copy.
