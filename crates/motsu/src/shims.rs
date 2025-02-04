@@ -107,8 +107,9 @@ unsafe extern "C" fn storage_flush_cache(_: bool) {
 
 /// Gets the address of the account that called the program.
 ///
-/// For normal L2-to-L2 transactions, the semantics are equivalent to that of the
-/// EVM's [`CALLER`] opcode, including in cases arising from [`DELEGATE_CALL`].
+/// For normal L2-to-L2 transactions, the semantics are equivalent to that of
+/// the EVM's [`CALLER`] opcode, including in cases arising from
+/// [`DELEGATE_CALL`].
 ///
 /// For L1-to-L2 retryable ticket transactions, the top-level sender's address
 /// will be aliased. See [`Retryable Ticket Address Aliasing`][aliasing] for
