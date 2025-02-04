@@ -173,8 +173,8 @@ unsafe extern "C" fn chainid() -> u64 {
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
 #[no_mangle]
-unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
-    // No-op: we don't check for events in our unit-tests.
+unsafe extern "C" fn emit_log(data: *const u8, len: usize, topics: usize){
+    Context::current().store_log_raw(data, len, topics);
 }
 
 /// Gets the code hash of the account at the given address.

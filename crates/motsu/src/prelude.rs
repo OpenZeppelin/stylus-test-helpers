@@ -1,2 +1,2 @@
 //! Common imports for `motsu` tests.
-pub use crate::context::{Account, Context, Contract, ContractCall, Funding};
+pub use crate::context::{Account, Context, Contract, ContractCall, Funding, EventLogExt};
