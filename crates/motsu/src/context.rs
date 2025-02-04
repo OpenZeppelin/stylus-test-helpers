@@ -74,7 +74,7 @@ impl Context {
             .insert(key, value);
     }
 
-    /// Set the message sender address.
+    /// Set the message sender address and return the previous sender if any.
     fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
@@ -88,6 +88,22 @@ impl Context {
     /// Set the address of the contract, that is called.
     fn set_contract_address(self, address: Address) -> Option<Address> {
         self.storage().contract_address.replace(address)
+    }
+
+    /// Set message value to `value` and return the previous value if any.
+    pub(crate) fn set_msg_value(self, value: U256) -> Option<U256> {
+        self.storage().msg_value.replace(value)
+    }
+
+    /// Write the value sent to the contract to `output`.
+    pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
+        let value: U256 = self.msg_value();
+        write_u256(output, value);
+    }
+
+    /// Get the value sent to the contract as [`U256`].
+    pub(crate) fn msg_value(self) -> U256 {
+        self.storage().msg_value.unwrap_or_default()
     }
 
     /// Get the address of the contract, that is called.
@@ -282,23 +298,9 @@ impl Context {
         self.router(address).exists()
     }
 
+    /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
-    }
-
-    pub(crate) fn set_msg_value(self, value: U256) -> Option<U256> {
-        self.storage().msg_value.replace(value)
-    }
-
-    /// Write the value sent to the contract to `output`.
-    pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
-        let value: U256 = self.msg_value();
-        write_u256(output, value);
-    }
-
-    /// Get the value sent to the contract as [`U256`].
-    pub(crate) fn msg_value(self) -> U256 {
-        self.storage().msg_value.unwrap_or_default()
     }
 
     /// Transfer unsent value from the message sender to the contract.
