@@ -215,7 +215,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
 
-        let _ = ping
+        _ = ping
             .sender(alice)
             .ping(pong.address(), uint!(10_U256))
             .expect("should ping successfully");
@@ -242,7 +242,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
 
-        let _ = ping
+        _ = ping
             .sender(alice)
             .ping(pong.address(), uint!(10_U256))
             .expect("should ping successfully");
@@ -259,7 +259,7 @@ mod ping_pong_tests {
         let pong = Contract::<PongContract>::new();
         let pong = pong.sender(alice);
 
-        let _ = ping
+        _ = ping
             .ping(pong.address(), uint!(10_U256))
             .expect("contract ping should not drop");
     }
