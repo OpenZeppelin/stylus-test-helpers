@@ -238,8 +238,7 @@ impl Context {
         // If the call was successful,
         if result.is_ok() {
             // transfer value that wasn't transferred yet.
-            self.try_transfer_value()
-                .expect("should have enough funds for transfer");
+            self.try_transfer_value();
         }
 
         // Set the previous message sender and contract address back.
@@ -305,25 +304,26 @@ impl Context {
 
     /// Transfer unsent value from the message sender to the contract.
     ///
-    /// Returns `None` if there is not enough funds to transfer.
-    fn try_transfer_value(self) -> Option<()> {
+    /// # Panics
+    ///
+    /// If there is not enough funds to transfer.
+    fn try_transfer_value(self) {
         let mut storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
-            return Some(());
+            return;
         };
         let Some(contract_address) = storage.contract_address else {
-            return Some(());
+            return;
         };
 
         // We should transfer the value only if it is set.
         // And we should transfer the value only once, despite this function
-        // being called multiple times.
+        // being called multiple times (using `Option::take(..)`).
         if let Some(msg_value) = storage.msg_value.take() {
-            // Drop storage to avoid deadlock.
+            // Drop storage to avoid a deadlock.
             drop(storage);
             self.checked_transfer(msg_sender, contract_address, msg_value)
-        } else {
-            Some(())
+                .unwrap_or_else(|| panic!("should have enough funds for transfer - value is {msg_value}"));
         }
     }
 
@@ -475,9 +475,7 @@ impl<ST: StorageType> ContractCall<'_, ST> {
 
     /// Apply previously not reverted transactions.
     fn apply_not_reverted_transactions(&self) {
-        Context::current()
-            .try_transfer_value()
-            .expect("should have enough funds for transfer");
+        Context::current().try_transfer_value();
     }
 
     /// Preset the call parameters.
@@ -642,10 +640,7 @@ impl Funding for Address {
     fn balance(&self) -> U256 {
         // Before querying the balance, we should ensure all msg values been
         // transferred.
-        // TODO#q: move error message inside `try_transfer_value`
-        Context::current()
-            .try_transfer_value()
-            .expect("should have enough funds for transfer");
+        Context::current().try_transfer_value();
         Context::current().balance(*self)
     }
 }
