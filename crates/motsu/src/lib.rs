@@ -87,7 +87,7 @@ mod ping_pong_tests {
             let value = receiver.pong(call, value)?;
 
             let pings_count = self.pings_count.get();
-            self.pings_count.set(pings_count + uint!(1_U256));
+            self.pings_count.set(pings_count + ONE);
 
             self.pinged_from.set(msg::sender());
             self.contract_address.set(contract::address());
@@ -131,6 +131,9 @@ mod ping_pong_tests {
 
     const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
 
+    const ONE: U256 = uint!(1_U256);
+    const TEN: U256 = uint!(10_U256);
+
     #[storage]
     struct PongContract {
         pongs_count: StorageU256,
@@ -146,12 +149,12 @@ mod ping_pong_tests {
             }
 
             let pongs_count = self.pongs_count.get();
-            self.pongs_count.set(pongs_count + uint!(1_U256));
+            self.pongs_count.set(pongs_count + ONE);
 
             self.ponged_from.set(msg::sender());
             self.contract_address.set(contract::address());
 
-            Ok(value + uint!(1_U256))
+            Ok(value + ONE)
         }
 
         fn can_pong(&self) -> bool {
@@ -167,15 +170,15 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        let value = uint!(10_U256);
+        let value = TEN;
         let ponged_value = ping
             .sender(alice)
             .ping(pong.address(), value)
             .expect("should ping successfully");
 
-        assert_eq!(ponged_value, value + uint!(1_U256));
-        assert_eq!(ping.sender(alice).pings_count.get(), uint!(1_U256));
-        assert_eq!(pong.sender(alice).pongs_count.get(), uint!(1_U256));
+        assert_eq!(ponged_value, value + ONE);
+        assert_eq!(ping.sender(alice).pings_count.get(), ONE);
+        assert_eq!(pong.sender(alice).pongs_count.get(), ONE);
     }
 
     #[motsu_proc::test]
@@ -217,7 +220,7 @@ mod ping_pong_tests {
 
         _ = ping
             .sender(alice)
-            .ping(pong.address(), uint!(10_U256))
+            .ping(pong.address(), TEN)
             .expect("should ping successfully");
 
         assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
@@ -244,7 +247,7 @@ mod ping_pong_tests {
 
         _ = ping
             .sender(alice)
-            .ping(pong.address(), uint!(10_U256))
+            .ping(pong.address(), TEN)
             .expect("should ping successfully");
 
         assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
@@ -260,7 +263,7 @@ mod ping_pong_tests {
         let pong = pong.sender(alice);
 
         _ = ping
-            .ping(pong.address(), uint!(10_U256))
+            .ping(pong.address(), TEN)
             .expect("contract ping should not drop");
     }
 }
@@ -297,7 +300,7 @@ mod proxies_tests {
             let next_proxy = self.next_proxy.get();
 
             // Add one to the value.
-            let value = value + uint!(1_U256);
+            let value = value + ONE;
 
             // If there is no next proxy, return the value.
             if next_proxy.is_zero() {
@@ -317,7 +320,7 @@ mod proxies_tests {
             // If there is a next proxy.
             if !next_proxy.is_zero() {
                 // Add one to the message value.
-                let value = msg::value() + uint!(1_U256);
+                let value = msg::value() + ONE;
 
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
