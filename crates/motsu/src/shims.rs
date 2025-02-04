@@ -206,6 +206,7 @@ unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
 /// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
 ///
 /// [`BALANCE`]: https://www.evm.codes/#31
+#[no_mangle]
 unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
     let address = read_address(address);
     let balance = Context::current().balance(address);
