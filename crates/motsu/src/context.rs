@@ -344,7 +344,7 @@ impl Context {
         }
     }
 
-    /// Transfer `value` from `from` to `to`.
+    /// Transfer `value` from `from` account to `to` account.
     ///
     /// Returns `None` if there is not enough funds to transfer.
     fn checked_transfer(
@@ -358,7 +358,7 @@ impl Context {
         Some(())
     }
 
-    /// Subtract `value` from the balance of `address`.
+    /// Subtract `value` from the balance of `address` account.
     ///
     /// Returns `None` if there is not enough of funds.
     fn checked_sub_assign_balance(
@@ -375,7 +375,7 @@ impl Context {
         Some(*balance)
     }
 
-    /// Add `value` to the balance of `address`.
+    /// Add `value` to the balance of `address` account.
     fn add_assign_balance(self, address: Address, value: U256) -> U256 {
         *self
             .storage()
@@ -491,7 +491,7 @@ impl<ST: StorageType> ContractCall<'_, ST> {
     }
 
     /// Apply previously not reverted transactions.
-    fn apply_not_reverted_transactions(&self) {
+    fn apply_not_reverted_transactions() {
         Context::current().try_transfer_value();
     }
 
@@ -510,7 +510,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.apply_not_reverted_transactions();
+        Self::apply_not_reverted_transactions();
         self.set_call_params();
         &self.storage
     }
@@ -519,7 +519,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.apply_not_reverted_transactions();
+        Self::apply_not_reverted_transactions();
         self.set_call_params();
         &mut self.storage
     }

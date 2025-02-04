@@ -37,6 +37,7 @@
 //!     }
 //! }
 //! ```
+#![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
 use std::slice;
 
