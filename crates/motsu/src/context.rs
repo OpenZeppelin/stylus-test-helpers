@@ -302,7 +302,7 @@ impl Context {
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
         let value: U256 = self.msg_value();
-        write_u256(value, output);
+        write_u256(output, value);
     }
 
     /// Get the value sent to the contract as [`U256`].
@@ -398,12 +398,15 @@ unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
     ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
 }
 
-// TODO#q: add write_address
-
 /// Read the [`Address`] from the raw pointer.
 unsafe fn read_address(ptr: *const u8) -> Address {
     let address_bytes = slice::from_raw_parts(ptr, 20);
     Address::from_slice(address_bytes)
+}
+
+/// Write the [`Address`] `address` to the location pointed by `ptr`.
+pub(crate) unsafe fn write_address(ptr: *mut u8, address: Address){
+    ptr::copy(address.as_ptr(), ptr, 20);
 }
 
 /// Read the [`U256`] from the raw pointer.
@@ -414,7 +417,7 @@ unsafe fn read_u256(ptr: *const u8) -> U256 {
 }
 
 /// Write the [`U256`] `value` to the location pointed by `ptr`.
-unsafe fn write_u256(value: U256, ptr: *mut u8) {
+pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
     let bytes: B256 = value.into();
     ptr::copy(bytes.as_ptr(), ptr, 32);
 }

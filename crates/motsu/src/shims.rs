@@ -39,10 +39,10 @@
 //! ```
 #![allow(clippy::missing_safety_doc)]
 use std::slice;
-
+use alloy_primitives::ruint::aliases::B256;
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::context::Context;
+use crate::context::{write_address, write_u256, Context};
 
 pub(crate) const WORD_BYTES: usize = 32;
 pub(crate) type Bytes32 = [u8; WORD_BYTES];
@@ -149,7 +149,8 @@ pub const CA_CODEHASH: &[u8; 66] =
 pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
         Context::current().msg_sender().expect("msg_sender should be set");
-    std::ptr::copy(msg_sender.as_ptr(), sender, 20);
+    
+    write_address(sender, msg_sender);
 }
 
 /// Get the ETH value (U256) in wei sent to the program.
@@ -171,7 +172,7 @@ pub unsafe extern "C" fn contract_address(address: *mut u8) {
     let contract_address = Context::current()
         .contract_address()
         .expect("contract_address should be set");
-    std::ptr::copy(contract_address.as_ptr(), address, 20);
+    write_address(address, contract_address);
 }
 
 /// Gets the chain ID of the current chain. The semantics are equivalent to
@@ -232,9 +233,7 @@ pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
 /// [`BALANCE`]: https://www.evm.codes/#31
 pub unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
     let balance = Context::current().balance_raw(address);
-    let balance_bytes = balance.as_le_slice();
-
-    std::ptr::copy(balance_bytes.as_ptr(), dest, 32);
+    write_u256(dest, balance);
 }
 
 /// Returns the length of the last EVM call or deployment return result, or `0`
