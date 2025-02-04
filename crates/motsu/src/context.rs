@@ -143,7 +143,7 @@ impl Context {
             // drop guard to a concurrent hash map to avoid a deadlock,
             drop(storage);
             // and erase the test context.
-            let _ = STORAGE.remove(&self);
+            _ = STORAGE.remove(&self);
         }
 
         self.router(contract_address).reset_storage();
@@ -245,12 +245,12 @@ impl Context {
         }
 
         // Set the previous message sender and contract address back.
-        let _ = self.set_contract_address(previous_contract_address);
-        let _ = self.set_msg_sender(previous_msg_sender);
+        _ = self.set_contract_address(previous_contract_address);
+        _ = self.set_msg_sender(previous_msg_sender);
 
         // Set the previous msg_value if there is any.
         if let Some(previous) = previous_msg_value {
-            let _ = self.set_msg_value(previous);
+            _ = self.set_msg_value(previous);
         }
 
         result
@@ -259,8 +259,8 @@ impl Context {
     /// Set return data as bytes.
     fn set_return_data(self, data: Vec<u8>) {
         let mut call_storage = self.storage();
-        let _ = call_storage.call_output_len.insert(data.len());
-        let _ = call_storage.call_output.insert(data);
+        _ = call_storage.call_output_len.insert(data.len());
+        _ = call_storage.call_output.insert(data);
     }
 
     /// Read the return data (with a given `size`) from the last contract call
@@ -304,7 +304,7 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// Fail if there is not enough funds to transfer.
+    /// * If there is not enough funds to transfer.
     fn assert_enough_funds(self, address: Address, value: U256) {
         assert!(
             self.balance(address) >= value,
@@ -321,7 +321,7 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// Fail if there is not enough funds to transfer.
+    /// * If there is not enough funds to transfer.
     fn try_transfer_value(self) {
         let mut storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
@@ -353,7 +353,7 @@ impl Context {
         to: Address,
         value: U256,
     ) -> Option<()> {
-        let _ = self.checked_sub_assign_balance(from, value)?;
+        _ = self.checked_sub_assign_balance(from, value)?;
         self.add_assign_balance(to, value);
         Some(())
     }
@@ -498,10 +498,10 @@ impl<ST: StorageType> ContractCall<'_, ST> {
     /// Preset the call parameters.
     fn set_call_params(&self) {
         if let Some(value) = self.value {
-            let _ = Context::current().set_msg_value(value);
+            _ = Context::current().set_msg_value(value);
         }
-        let _ = Context::current().set_msg_sender(self.caller_address);
-        let _ = Context::current().set_contract_address(self.address());
+        _ = Context::current().set_msg_sender(self.caller_address);
+        _ = Context::current().set_contract_address(self.address());
     }
 }
 
