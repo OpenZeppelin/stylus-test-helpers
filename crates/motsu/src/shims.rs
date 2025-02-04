@@ -197,7 +197,7 @@ unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     };
 
     let account_codehash =
-        const_hex::const_decode_to_array::<32>(code_hash).unwrap();
+        const_hex::const_decode_to_array::<WORD_BYTES>(code_hash).unwrap();
 
     write_bytes32(dest, account_codehash);
 }
