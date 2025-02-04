@@ -225,7 +225,10 @@ impl Context {
         let previous_msg_value =
             value.and_then(|value| self.set_msg_value(value));
 
-        // TODO#q: add check if sender has enough funds
+        // If value set, check that sender contract has enough funds.
+        if let Some(value) = value {
+            self.assert_enough_funds(previous_contract_address, value);
+        }
 
         // Call external contract.
         let result = self
@@ -297,6 +300,18 @@ impl Context {
         self.router(address).exists()
     }
 
+    /// Check if `address` has enough funds to transfer `value`
+    ///
+    /// # Panics
+    ///
+    /// Fail if there is not enough funds to transfer.
+    fn assert_enough_funds(self, address: Address, value: U256) {
+        assert!(
+            self.balance(address) >= value,
+            "{address} account should have enough funds to transfer {value} value"
+        );
+    }
+
     /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
@@ -306,7 +321,7 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// If there is not enough funds to transfer.
+    /// Fail if there is not enough funds to transfer.
     fn try_transfer_value(self) {
         let mut storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
@@ -322,8 +337,10 @@ impl Context {
         if let Some(msg_value) = storage.msg_value.take() {
             // Drop storage to avoid a deadlock.
             drop(storage);
+
+            // Transfer and panic if there is not enough funds.
             self.checked_transfer(msg_sender, contract_address, msg_value)
-                .unwrap_or_else(|| panic!("should have enough funds for transfer - value is {msg_value}"));
+                .unwrap_or_else(|| panic!("{msg_sender} account should have enough funds to transfer {msg_value} value"));
         }
     }
 
@@ -581,11 +598,14 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         account: A,
         value: V,
     ) -> ContractCall<ST> {
-        // TODO#q: add check if sender has enough funds
+        let caller_address = account.into();
+        let value = value.into();
+        Context::current().assert_enough_funds(caller_address, value);
+
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address: account.into(),
-            value: Some(value.into()),
+            caller_address,
+            value: Some(value),
             contract_ref: self,
         }
     }
