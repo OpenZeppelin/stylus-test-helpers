@@ -39,9 +39,12 @@
 //! ```
 #![allow(clippy::missing_safety_doc)]
 use std::slice;
+
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::context::{read_address, write_address, write_bytes32, write_u256, Context, WORD_BYTES};
+use crate::context::{
+    read_address, write_address, write_bytes32, write_u256, Context, WORD_BYTES,
+};
 
 /// Arbitrum's CHAID ID.
 const CHAIN_ID: u64 = 42161;
@@ -108,10 +111,7 @@ unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-unsafe extern "C" fn storage_cache_bytes32(
-    key: *const u8,
-    value: *const u8,
-) {
+unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
     Context::current().set_bytes_raw(key, value);
 }
 
