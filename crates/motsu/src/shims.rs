@@ -39,13 +39,21 @@
 //! ```
 #![allow(clippy::missing_safety_doc)]
 use std::slice;
-use alloy_primitives::ruint::aliases::B256;
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::context::{write_address, write_u256, Context};
+use crate::context::{read_address, write_address, write_bytes32, write_u256, Context, WORD_BYTES};
 
-pub(crate) const WORD_BYTES: usize = 32;
-pub(crate) type Bytes32 = [u8; WORD_BYTES];
+/// Arbitrum's CHAID ID.
+const CHAIN_ID: u64 = 42161;
+
+/// Externally Owned Account (EOA) code hash (wallet account).
+const EOA_CODEHASH: &[u8; 66] =
+    b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+
+/// Contract Account (CA) code hash (smart contract code).
+/// NOTE: can be any 256-bit value to pass `has_code` check.
+const CA_CODEHASH: &[u8; 66] =
+    b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
 /// Efficiently computes the [`keccak256`] hash of the given preimage.
 /// The semantics are equivalent to that of the EVM's [`SHA3`] opcode.
@@ -53,7 +61,7 @@ pub(crate) type Bytes32 = [u8; WORD_BYTES];
 /// [`keccak256`]: https://en.wikipedia.org/wiki/SHA-3
 /// [`SHA3`]: https://www.evm.codes/#20
 #[no_mangle]
-pub unsafe extern "C" fn native_keccak256(
+unsafe extern "C" fn native_keccak256(
     bytes: *const u8,
     len: usize,
     output: *mut u8,
@@ -80,7 +88,7 @@ pub unsafe extern "C" fn native_keccak256(
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
+unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
     Context::current().get_bytes_raw(key, out);
 }
 
@@ -100,7 +108,7 @@ pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-pub unsafe extern "C" fn storage_cache_bytes32(
+unsafe extern "C" fn storage_cache_bytes32(
     key: *const u8,
     value: *const u8,
 ) {
@@ -113,21 +121,9 @@ pub unsafe extern "C" fn storage_cache_bytes32(
 ///
 /// [`SSTORE`]: https://www.evm.codes/#55
 #[no_mangle]
-pub unsafe extern "C" fn storage_flush_cache(_: bool) {
+unsafe extern "C" fn storage_flush_cache(_: bool) {
     // No-op: we don't use the cache in our unit-tests.
 }
-
-/// Arbitrum's CHAID ID.
-pub const CHAIN_ID: u64 = 42161;
-
-/// Externally Owned Account (EOA) code hash (wallet account).
-pub const EOA_CODEHASH: &[u8; 66] =
-    b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
-
-/// Contract Account (CA) code hash (smart contract code).
-/// NOTE: can be any 256-bit value to pass `has_code` check.
-pub const CA_CODEHASH: &[u8; 66] =
-    b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
 /// Gets the address of the account that called the program.
 ///
@@ -146,16 +142,15 @@ pub const CA_CODEHASH: &[u8; 66] =
 ///
 /// May panic if fails to parse `MSG_SENDER` as an address.
 #[no_mangle]
-pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
+unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
         Context::current().msg_sender().expect("msg_sender should be set");
-    
     write_address(sender, msg_sender);
 }
 
 /// Get the ETH value (U256) in wei sent to the program.
 #[no_mangle]
-pub unsafe extern "C" fn msg_value(value: *mut u8) {
+unsafe extern "C" fn msg_value(value: *mut u8) {
     Context::current().msg_value_raw(value);
 }
 
@@ -168,7 +163,7 @@ pub unsafe extern "C" fn msg_value(value: *mut u8) {
 ///
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
-pub unsafe extern "C" fn contract_address(address: *mut u8) {
+unsafe extern "C" fn contract_address(address: *mut u8) {
     let contract_address = Context::current()
         .contract_address()
         .expect("contract_address should be set");
@@ -180,7 +175,7 @@ pub unsafe extern "C" fn contract_address(address: *mut u8) {
 ///
 /// [`CHAINID`]: https://www.evm.codes/#46
 #[no_mangle]
-pub unsafe extern "C" fn chainid() -> u64 {
+unsafe extern "C" fn chainid() -> u64 {
     CHAIN_ID
 }
 
@@ -197,7 +192,7 @@ pub unsafe extern "C" fn chainid() -> u64 {
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
 #[no_mangle]
-pub unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
+unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
     // No-op: we don't check for events in our unit-tests.
 }
 
@@ -214,7 +209,7 @@ pub unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
 ///
 /// May panic if fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
 #[no_mangle]
-pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
+unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     let code_hash = if Context::current().has_code_raw(address) {
         CA_CODEHASH
     } else {
@@ -224,15 +219,16 @@ pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     let account_codehash =
         const_hex::const_decode_to_array::<32>(code_hash).unwrap();
 
-    std::ptr::copy(account_codehash.as_ptr(), dest, 32);
+    write_bytes32(dest, account_codehash);
 }
 
 /// Gets the ETH balance in wei of the account at the given address.
 /// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
 ///
 /// [`BALANCE`]: https://www.evm.codes/#31
-pub unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
-    let balance = Context::current().balance_raw(address);
+unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
+    let address = read_address(address);
+    let balance = Context::current().balance(address);
     write_u256(dest, balance);
 }
 
@@ -244,7 +240,7 @@ pub unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
 ///
 /// [`RETURN_DATA_SIZE`]: https://www.evm.codes/#3d
 #[no_mangle]
-pub unsafe extern "C" fn return_data_size() -> usize {
+unsafe extern "C" fn return_data_size() -> usize {
     Context::current().return_data_size()
 }
 
@@ -258,7 +254,7 @@ pub unsafe extern "C" fn return_data_size() -> usize {
 ///
 /// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
 #[no_mangle]
-pub unsafe extern "C" fn read_return_data(
+unsafe extern "C" fn read_return_data(
     dest: *mut u8,
     _offset: usize,
     size: usize,
@@ -281,7 +277,7 @@ pub unsafe extern "C" fn read_return_data(
 ///
 /// [`CALL`]: https://www.evm.codes/#f1
 #[no_mangle]
-pub unsafe extern "C" fn call_contract(
+unsafe extern "C" fn call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
@@ -313,7 +309,7 @@ pub unsafe extern "C" fn call_contract(
 ///
 /// [`STATIC_CALL`]: https://www.evm.codes/#FA
 #[no_mangle]
-pub unsafe extern "C" fn static_call_contract(
+unsafe extern "C" fn static_call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
@@ -343,7 +339,7 @@ pub unsafe extern "C" fn static_call_contract(
 ///
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#F4
 #[no_mangle]
-pub unsafe extern "C" fn delegate_call_contract(
+unsafe extern "C" fn delegate_call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
@@ -364,7 +360,7 @@ pub unsafe extern "C" fn delegate_call_contract(
 ///
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 #[no_mangle]
-pub unsafe extern "C" fn block_timestamp() -> u64 {
+unsafe extern "C" fn block_timestamp() -> u64 {
     // Epoch timestamp: 1st January 2025 00::00::00
     1_735_689_600
 }

@@ -7,10 +7,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
-use crate::{
-    prelude::{Bytes32, WORD_BYTES},
-    router::{RouterContext, TestRouter},
-};
+use crate::router::{RouterContext, TestRouter};
 
 /// Storage mock.
 ///
@@ -285,13 +282,7 @@ impl Context {
         self.router(address).exists()
     }
 
-    pub(crate) unsafe fn balance_raw(self, address: *const u8) -> U256 {
-        // TODO#q: write to destination here
-        let address = read_address(address);
-        self.balance(address)
-    }
-
-    fn balance(self, address: Address) -> U256 {
+    pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
     }
 
@@ -335,7 +326,7 @@ impl Context {
     }
 
     /// Transfer `value` from `from` to `to`.
-    /// 
+    ///
     /// Returns `None` if there is not enough funds to transfer.
     fn checked_transfer(
         self,
@@ -349,7 +340,7 @@ impl Context {
     }
 
     /// Subtract `value` from the balance of `address`.
-    /// 
+    ///
     /// Returns `None` if there is not enough of funds.
     fn checked_sub_assign_balance(
         self,
@@ -387,30 +378,30 @@ impl Context {
 }
 
 /// Read the word from location pointed by `ptr`.
-unsafe fn read_bytes32(ptr: *const u8) -> Bytes32 {
+pub(crate) unsafe fn read_bytes32(ptr: *const u8) -> Bytes32 {
     let mut res = Bytes32::default();
     ptr::copy(ptr, res.as_mut_ptr(), WORD_BYTES);
     res
 }
 
 /// Write the word `bytes` to the location pointed by `ptr`.
-unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
+pub(crate) unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
     ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
 }
 
 /// Read the [`Address`] from the raw pointer.
-unsafe fn read_address(ptr: *const u8) -> Address {
+pub(crate) unsafe fn read_address(ptr: *const u8) -> Address {
     let address_bytes = slice::from_raw_parts(ptr, 20);
     Address::from_slice(address_bytes)
 }
 
 /// Write the [`Address`] `address` to the location pointed by `ptr`.
-pub(crate) unsafe fn write_address(ptr: *mut u8, address: Address){
+pub(crate) unsafe fn write_address(ptr: *mut u8, address: Address) {
     ptr::copy(address.as_ptr(), ptr, 20);
 }
 
 /// Read the [`U256`] from the raw pointer.
-unsafe fn read_u256(ptr: *const u8) -> U256 {
+pub(crate) unsafe fn read_u256(ptr: *const u8) -> U256 {
     let mut data = B256::ZERO;
     ptr::copy(ptr, data.as_mut_ptr(), 32);
     data.into()
@@ -454,7 +445,10 @@ struct MockStorage {
     call_output_len: Option<usize>,
 }
 
+/// Contract's byte storage
 type ContractStorage = HashMap<Bytes32, Bytes32>;
+pub(crate) const WORD_BYTES: usize = 32;
+pub(crate) type Bytes32 = [u8; WORD_BYTES];
 
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
