@@ -309,7 +309,7 @@ mod ping_pong_tests {
         // Assert emitted events.
         assert!(Pinged { from: alice.address(), value: TEN }.emitted());
         assert!(Ponged { from: ping.address(), value: TEN }.emitted());
-        
+
         // Assert not emitted events
         assert!(!Pinged { from: ping.address(), value: TEN }.emitted());
         assert!(!Ponged { from: alice.address(), value: TEN }.emitted());
