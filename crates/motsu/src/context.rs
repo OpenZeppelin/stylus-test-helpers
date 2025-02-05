@@ -225,10 +225,8 @@ impl Context {
         let previous_msg_value =
             value.and_then(|value| self.set_msg_value(value));
 
-        // If value set, check that sender contract has enough funds.
-        if let Some(value) = value {
-            self.assert_enough_funds(previous_contract_address, value);
-        }
+        // Transfer value sent by message sender.
+        self.transfer_value();
 
         // Call external contract.
         let result = self
@@ -237,12 +235,6 @@ impl Context {
             .unwrap_or_else(|| {
                 panic!("selector not found - selector is {selector}")
             });
-
-        // If the call was successful,
-        if result.is_ok() {
-            // transfer value that wasn't transferred yet.
-            self.try_transfer_value();
-        }
 
         // Set the previous message sender and contract address back.
         _ = self.set_contract_address(previous_contract_address);
@@ -300,29 +292,18 @@ impl Context {
         self.router(address).exists()
     }
 
-    /// Check if `address` has enough funds to transfer `value`
-    ///
-    /// # Panics
-    ///
-    /// * If there is not enough funds to transfer.
-    fn assert_enough_funds(self, address: Address, value: U256) {
-        assert!(
-            self.balance(address) >= value,
-            "{address} account should have enough funds to transfer {value} value"
-        );
-    }
-
     /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
     }
 
-    /// Transfer unsent value from the message sender to the contract.
+    /// Transfer value from the message sender to the contract.
+    /// No-op if `msg_sender` or `contract_address` weren't set.
     ///
     /// # Panics
     ///
     /// * If there is not enough funds to transfer.
-    fn try_transfer_value(self) {
+    fn transfer_value(self) {
         let mut storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
             return;
@@ -339,9 +320,19 @@ impl Context {
             drop(storage);
 
             // Transfer and panic if there is not enough funds.
-            self.checked_transfer(msg_sender, contract_address, msg_value)
-                .unwrap_or_else(|| panic!("{msg_sender} account should have enough funds to transfer {msg_value} value"));
+            self.transfer(msg_sender, contract_address, msg_value);
         }
+    }
+
+    /// Transfer `value` from `from` account to `to` account.
+    ///
+    /// # Panics
+    ///
+    /// * If there is not enough funds to transfer.
+    fn transfer(self, from: Address, to: Address, value: U256) {
+        // Transfer and panic if there is not enough funds.
+        self.checked_transfer(from, to, value)
+            .unwrap_or_else(|| panic!("{from} account should have enough funds to transfer {value} value"));
     }
 
     /// Transfer `value` from `from` account to `to` account.
@@ -490,11 +481,6 @@ impl<ST: StorageType> ContractCall<'_, ST> {
         self.contract_ref.address
     }
 
-    /// Apply previously not reverted transactions.
-    fn apply_not_reverted_transactions() {
-        Context::current().try_transfer_value();
-    }
-
     /// Preset the call parameters.
     fn set_call_params(&self) {
         if let Some(value) = self.value {
@@ -510,7 +496,6 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        Self::apply_not_reverted_transactions();
         self.set_call_params();
         &self.storage
     }
@@ -519,7 +504,6 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        Self::apply_not_reverted_transactions();
         self.set_call_params();
         &mut self.storage
     }
@@ -600,8 +584,8 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     ) -> ContractCall<ST> {
         let caller_address = account.into();
         let value = value.into();
-        Context::current().assert_enough_funds(caller_address, value);
-
+        
+        Context::current().transfer(caller_address, self.address, value);
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address,
@@ -658,9 +642,6 @@ impl Funding for Address {
     }
 
     fn balance(&self) -> U256 {
-        // Before querying the balance, we should ensure all msg values been
-        // transferred.
-        Context::current().try_transfer_value();
         Context::current().balance(*self)
     }
 }
