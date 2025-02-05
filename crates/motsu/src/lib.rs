@@ -273,7 +273,7 @@ mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
     use stylus_sdk::{
         call::Call,
-        msg,
+        contract, msg,
         prelude::{public, storage, TopLevelStorage},
         storage::StorageAddress,
     };
@@ -286,6 +286,10 @@ mod proxies_tests {
             function callProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
             function payProxy() external payable;
+            #[allow(missing_docs)]
+            function passThisMuchToNextProxy(uint256 pass_value) external payable;
+            #[allow(missing_docs)]
+            function passHalfValueToNextProxy() external payable;
         }
     }
 
@@ -326,6 +330,41 @@ mod proxies_tests {
                 let proxy = IProxy::new(next_proxy);
                 let call = Call::new_in(self).value(value);
                 proxy.pay_proxy(call).expect("should pay proxy");
+            }
+        }
+
+        #[payable]
+        fn pass_this_much_to_next_proxy(&mut self, pass_value: U256) {
+            let next_proxy = self.next_proxy.get();
+
+            // If there is a next proxy.
+            if !next_proxy.is_zero() {
+                // Pay the next proxy.
+                let proxy = IProxy::new(next_proxy);
+                let call = Call::new_in(self).value(pass_value);
+                let value_for_next_next_proxy = pass_value / U256::from(2);
+                proxy
+                    .pass_this_much_to_next_proxy(
+                        call,
+                        value_for_next_next_proxy,
+                    )
+                    .expect("should pass half the value to the next proxy");
+            }
+        }
+
+        #[payable]
+        fn pass_half_value_to_next_proxy(&mut self) {
+            let next_proxy = self.next_proxy.get();
+
+            // If there is a next proxy.
+            if !next_proxy.is_zero() {
+                let half_balance = contract::balance() / U256::from(2);
+                // Pay the next proxy.
+                let proxy = IProxy::new(next_proxy);
+                let call = Call::new_in(self).value(half_balance);
+                proxy
+                    .pass_half_value_to_next_proxy(call)
+                    .expect("should pass half the value to the next proxy");
             }
         }
     }
@@ -394,5 +433,89 @@ mod proxies_tests {
         assert_eq!(proxy1.balance(), TEN - ONE);
         assert_eq!(proxy2.balance(), TEN - ONE);
         assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
+    }
+
+    #[motsu_proc::test]
+    fn error_when_transferring_values_for_nested_contract_calls(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
+        proxy1.init(alice, |storage| {
+            storage.next_proxy.set(proxy2.address());
+        });
+        proxy2.init(alice, |storage| {
+            storage.next_proxy.set(proxy3.address());
+        });
+        proxy3.init(alice, |storage| {
+            storage.next_proxy.set(Address::ZERO);
+        });
+
+        let zero = U256::ZERO;
+        let two = U256::from(2);
+        let four = U256::from(4);
+        let eight = U256::from(8);
+
+        // Fund alice, proxies have no funds.
+        alice.fund(eight);
+
+        assert_eq!(alice.balance(), eight);
+        assert_eq!(proxy1.balance(), zero);
+        assert_eq!(proxy2.balance(), zero);
+        assert_eq!(proxy3.balance(), zero);
+
+        // Call the first proxy.
+        proxy1
+            .sender_and_value(alice, eight)
+            .pass_this_much_to_next_proxy(four);
+
+        assert_eq!(alice.balance(), zero);
+        assert_eq!(proxy1.balance(), four);
+        assert_eq!(proxy2.balance(), two);
+        assert_eq!(proxy3.balance(), two);
+    }
+
+    #[motsu_proc::test]
+    fn wrong_contract_balances_for_nested_contract_calls(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
+        proxy1.init(alice, |storage| {
+            storage.next_proxy.set(proxy2.address());
+        });
+        proxy2.init(alice, |storage| {
+            storage.next_proxy.set(proxy3.address());
+        });
+        proxy3.init(alice, |storage| {
+            storage.next_proxy.set(Address::ZERO);
+        });
+
+        let zero = U256::ZERO;
+        let two = U256::from(2);
+        let four = U256::from(4);
+        let eight = U256::from(8);
+
+        // Fund alice, proxies have no funds.
+        alice.fund(eight);
+
+        assert_eq!(alice.balance(), eight);
+        assert_eq!(proxy1.balance(), zero);
+        assert_eq!(proxy2.balance(), zero);
+        assert_eq!(proxy3.balance(), zero);
+
+        // Call the first proxy.
+        proxy1.sender_and_value(alice, eight).pass_half_value_to_next_proxy();
+
+        assert_eq!(alice.balance(), zero);
+        assert_eq!(proxy1.balance(), four);
+        assert_eq!(proxy2.balance(), two);
+        assert_eq!(proxy3.balance(), two);
     }
 }
