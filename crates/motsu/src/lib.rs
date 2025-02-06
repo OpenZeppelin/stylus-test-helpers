@@ -436,7 +436,7 @@ mod proxies_tests {
     }
 
     #[motsu_proc::test]
-    fn pay_proxy_fixed_value(
+    fn pass_proxy_with_fixed_value(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -471,7 +471,7 @@ mod proxies_tests {
     }
 
     #[motsu_proc::test]
-    fn wrong_contract_balances_for_nested_contract_calls(
+    fn pay_proxy_with_half_balance(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
