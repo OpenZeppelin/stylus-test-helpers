@@ -55,7 +55,7 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
 
     // Assert that alice lost one wei and the proxy gained one wei.
     assert_eq!(alice.balance(), ten - one);
-    assert_eq!(proxy.balance(), ten + one);
+    assert_eq!(proxy.balance(), one);
 }
  ```
 

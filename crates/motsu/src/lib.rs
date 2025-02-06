@@ -55,7 +55,7 @@
 //!
 //!     // Assert that alice lost one wei and the proxy gained one wei.
 //!     assert_eq!(alice.balance(), ten - one);
-//!     assert_eq!(proxy.balance(), ten + one);
+//!     assert_eq!(proxy.balance(), one);
 //!  }
 //! ```
 //!
@@ -504,19 +504,32 @@ mod proxies_tests {
     }
 
     #[motsu_proc::test]
-    fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
-        // Initialize the proxy contract.
-        proxy.sender(alice).init(Address::ZERO);
+    fn pay_three_proxies(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(Address::ZERO);
 
-        // Fund alice.
+        // Fund accounts.
         alice.fund(TEN);
+        proxy1.fund(TEN);
+        proxy2.fund(TEN);
+        proxy3.fund(TEN);
 
-        // Call the contract.
-        proxy.sender_and_value(alice, ONE).pay_proxy();
+        // Call the first proxy.
+        proxy1.sender_and_value(alice, ONE).pay_proxy();
 
-        // Assert that alice lost one wei and the proxy gained one wei.
+        // By the end, each actor will lose `ONE`, except last proxy.
         assert_eq!(alice.balance(), TEN - ONE);
-        assert_eq!(proxy.balance(), TEN + ONE);
+        assert_eq!(proxy1.balance(), TEN - ONE);
+        assert_eq!(proxy2.balance(), TEN - ONE);
+        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
     }
 
     #[motsu_proc::test]
