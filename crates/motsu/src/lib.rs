@@ -270,12 +270,10 @@ mod ping_pong_tests {
 
 #[cfg(test)]
 mod proxies_tests {
-    use alloy_primitives::{address, uint, Address, U256};
+    use alloy_primitives::{uint, Address, U256};
     use stylus_sdk::{
         call::Call,
-        contract,
-        contract::address,
-        msg,
+        contract, msg,
         prelude::{public, storage, TopLevelStorage},
         storage::StorageAddress,
     };
@@ -344,7 +342,7 @@ mod proxies_tests {
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
                 let call = Call::new_in(self).value(this_value);
-                let value_for_next_next_proxy = this_value / U256::from(2);
+                let value_for_next_next_proxy = this_value / TWO;
                 proxy
                     .pass_proxy_with_fixed_value(
                         call,
@@ -360,7 +358,7 @@ mod proxies_tests {
 
             // If there is a next proxy.
             if !next_proxy.is_zero() {
-                let half_balance = contract::balance() / U256::from(2);
+                let half_balance = contract::balance() / TWO;
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
                 let call = Call::new_in(self).value(half_balance);
