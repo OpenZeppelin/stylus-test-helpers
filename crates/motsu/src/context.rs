@@ -1,12 +1,20 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{collections::{HashMap, HashSet}, fmt, hash::Hash, ptr, slice, thread::ThreadId};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    ptr, slice,
+    thread::ThreadId,
+};
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
+use stylus_sdk::{
+    alloy_primitives::uint, keccak_const::Keccak256, prelude::StorageType,
+    ArbResult,
+};
 
 use crate::{
     router::{TestRouter, VMRouterContext},
@@ -732,44 +740,27 @@ impl<T: SolEvent> EventLogExt for T {
     }
 }
 
-pub trait MotsuResult<T, E: fmt::Debug>{
-    fn motsu_unwrap(self) -> T;
-    fn motsu_unwrap_err(self) -> E;
-    fn motsu_expect(self, msg: &str) -> T;
-    fn motsu_expect_err(self, msg: &str) -> E;
+// TODO#q: add docs for DeriveFromTag
+pub trait DeriveFromTag {
+    fn from_tag(tag: &str) -> Self;
 }
 
-impl<T: fmt::Debug, E: fmt::Debug> MotsuResult<T, E> for Result<T, E> {
-    #[track_caller]
-    fn motsu_unwrap(self) -> T {
-        match self {
-            Ok(value) => value,
-            Err(err) => panic!("called `Result::motsu_unwrap()` on an `Err` value: {:?}", err),
-        }
-    }
-
-    #[track_caller]
-    fn motsu_unwrap_err(self) -> E {
-        match self {
-            Ok(value) => panic!("called `Result::motsu_unwrap_err()` on an `Ok` value: {:?}", value),
-            Err(err) => err,
-        }
-    }
-
-    #[track_caller]
-    fn motsu_expect(self, msg: &str) -> T {
-        match self {
-            Ok(value) => value,
-            Err(err) => panic!("{}", msg),
-        }
-    }
-
-    #[track_caller]
-    fn motsu_expect_err(self, msg: &str) -> E {
-        match self {
-            Ok(value) => panic!("{}", msg),
-            Err(err) => err,
-        }
+impl DeriveFromTag for Address {
+    fn from_tag(tag: &str) -> Self {
+        let hash = Keccak256::new().update(tag.as_bytes()).finalize();
+        // TODO#q: store tag here
+        Address::from_slice(&hash[..20])
     }
 }
 
+impl DeriveFromTag for Account {
+    fn from_tag(tag: &str) -> Self {
+        Account::new_at(Address::from_tag(tag))
+    }
+}
+
+impl<ST: StorageType + TestRouter + 'static> DeriveFromTag for Contract<ST> {
+    fn from_tag(tag: &str) -> Self {
+        Contract::new_at(Address::from_tag(tag))
+    }
+}
