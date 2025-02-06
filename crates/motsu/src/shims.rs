@@ -72,7 +72,7 @@ unsafe extern "C" fn native_keccak256(
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
+unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
     VMContext::current().get_bytes_raw(key, out);
 }
 
