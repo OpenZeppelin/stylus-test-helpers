@@ -1,7 +1,4 @@
 //! Router context for external calls mocks.
-//!
-//! NOTE: [`ROUTER_STORAGE`] is separated from the main test storage to
-//! avoid a panic on lock.
 
 use std::{
     borrow::BorrowMut,
