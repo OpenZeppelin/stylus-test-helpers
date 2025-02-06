@@ -8,7 +8,7 @@
 //!
 //! ## Motivation
 //!
-//! Without these shims we can't currently run unit tests for stylus contracts,
+//! Without these shims, we can't currently run unit tests for stylus contracts,
 //! since the symbols the compiled binaries expect to find are not there.
 //!
 //! If you run `cargo test` on a fresh Stylus project, it will error with:
@@ -16,36 +16,28 @@
 //! ```terminal
 //! dyld[97792]: missing symbol called
 //! ```
-//!
-//! This crate is a temporary solution until the Stylus team provides us with a
-//! different and more stable mechanism for unit-testing our contracts.
-//!
-//! ## Usage
-//!
-//! Import these shims in your test modules as `motsu::prelude::*` to populate
-//! the namespace with the appropriate symbols.
-//!
-//! ```rust,ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     use contracts::token::erc20::Erc20;
-//!
-//!     #[motsu::test]
-//!     fn reads_balance(contract: Erc20) {
-//!         let balance = contract.balance_of(Address::ZERO); // Access storage.
-//!         assert_eq!(balance, U256::ZERO);
-//!     }
-//! }
-//! ```
+#![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
 use std::slice;
 
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::context::Context;
+use crate::context::{
+    read_address, write_address, write_bytes32, write_u256, VMContext,
+    WORD_BYTES,
+};
 
-pub(crate) const WORD_BYTES: usize = 32;
-pub(crate) type Bytes32 = [u8; WORD_BYTES];
+/// Arbitrum's CHAID ID.
+const CHAIN_ID: u64 = 42161;
+
+/// Externally Owned Account (EOA) code hash (wallet account).
+const EOA_CODEHASH: &[u8; 66] =
+    b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+
+/// Contract Account (CA) code hash (smart contract code).
+/// NOTE: can be any 256-bit value to pass `has_code` check.
+const CA_CODEHASH: &[u8; 66] =
+    b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
 /// Efficiently computes the [`keccak256`] hash of the given preimage.
 /// The semantics are equivalent to that of the EVM's [`SHA3`] opcode.
@@ -53,7 +45,7 @@ pub(crate) type Bytes32 = [u8; WORD_BYTES];
 /// [`keccak256`]: https://en.wikipedia.org/wiki/SHA-3
 /// [`SHA3`]: https://www.evm.codes/#20
 #[no_mangle]
-pub unsafe extern "C" fn native_keccak256(
+unsafe extern "C" fn native_keccak256(
     bytes: *const u8,
     len: usize,
     output: *mut u8,
@@ -80,8 +72,8 @@ pub unsafe extern "C" fn native_keccak256(
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
-    Context::current().get_bytes_raw(key, out);
+unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
+    VMContext::current().get_bytes_raw(key, out);
 }
 
 /// Writes a 32-byte value to the permanent storage cache.
@@ -100,11 +92,8 @@ pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 ///
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
-pub unsafe extern "C" fn storage_cache_bytes32(
-    key: *const u8,
-    value: *const u8,
-) {
-    Context::current().set_bytes_raw(key, value);
+unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
+    VMContext::current().set_bytes_raw(key, value);
 }
 
 /// Persists any dirty values in the storage cache to the EVM state trie,
@@ -113,26 +102,15 @@ pub unsafe extern "C" fn storage_cache_bytes32(
 ///
 /// [`SSTORE`]: https://www.evm.codes/#55
 #[no_mangle]
-pub unsafe extern "C" fn storage_flush_cache(_: bool) {
+unsafe extern "C" fn storage_flush_cache(_: bool) {
     // No-op: we don't use the cache in our unit-tests.
 }
 
-/// Arbitrum's CHAID ID.
-pub const CHAIN_ID: u64 = 42161;
-
-/// Externally Owned Account (EOA) code hash (wallet account).
-pub const EOA_CODEHASH: &[u8; 66] =
-    b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
-
-/// Contract Account (CA) code hash (smart contract code).
-/// NOTE: can be any 256-bit value to pass `has_code` check.
-pub const CA_CODEHASH: &[u8; 66] =
-    b"0x1111111111111111111111111111111111111111111111111111111111111111";
-
 /// Gets the address of the account that called the program.
 ///
-/// For normal L2-to-L2 transactions the semantics are equivalent to that of the
-/// EVM's [`CALLER`] opcode, including in cases arising from [`DELEGATE_CALL`].
+/// For normal L2-to-L2 transactions, the semantics are equivalent to that of
+/// the EVM's [`CALLER`] opcode, including in cases arising from
+/// [`DELEGATE_CALL`].
 ///
 /// For L1-to-L2 retryable ticket transactions, the top-level sender's address
 /// will be aliased. See [`Retryable Ticket Address Aliasing`][aliasing] for
@@ -146,17 +124,16 @@ pub const CA_CODEHASH: &[u8; 66] =
 ///
 /// May panic if fails to parse `MSG_SENDER` as an address.
 #[no_mangle]
-pub unsafe extern "C" fn msg_sender(sender: *mut u8) {
+unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
-        Context::current().msg_sender().expect("msg_sender should be set");
-    std::ptr::copy(msg_sender.as_ptr(), sender, 20);
+        VMContext::current().msg_sender().expect("msg_sender should be set");
+    write_address(sender, msg_sender);
 }
 
 /// Get the ETH value (U256) in wei sent to the program.
 #[no_mangle]
-pub unsafe extern "C" fn msg_value(value: *mut u8) {
-    let dummy_msg_value: Bytes32 = Bytes32::default();
-    std::ptr::copy(dummy_msg_value.as_ptr(), value, 32);
+unsafe extern "C" fn msg_value(value: *mut u8) {
+    VMContext::current().msg_value_raw(value);
 }
 
 /// Gets the address of the current program. The semantics are equivalent to
@@ -168,11 +145,11 @@ pub unsafe extern "C" fn msg_value(value: *mut u8) {
 ///
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
-pub unsafe extern "C" fn contract_address(address: *mut u8) {
-    let contract_address = Context::current()
+unsafe extern "C" fn contract_address(address: *mut u8) {
+    let contract_address = VMContext::current()
         .contract_address()
         .expect("contract_address should be set");
-    std::ptr::copy(contract_address.as_ptr(), address, 20);
+    write_address(address, contract_address);
 }
 
 /// Gets the chain ID of the current chain. The semantics are equivalent to
@@ -180,7 +157,7 @@ pub unsafe extern "C" fn contract_address(address: *mut u8) {
 ///
 /// [`CHAINID`]: https://www.evm.codes/#46
 #[no_mangle]
-pub unsafe extern "C" fn chainid() -> u64 {
+unsafe extern "C" fn chainid() -> u64 {
     CHAIN_ID
 }
 
@@ -197,7 +174,7 @@ pub unsafe extern "C" fn chainid() -> u64 {
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
 #[no_mangle]
-pub unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
+unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
     // No-op: we don't check for events in our unit-tests.
 }
 
@@ -214,29 +191,40 @@ pub unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
 ///
 /// May panic if fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
 #[no_mangle]
-pub unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
-    let code_hash = if Context::current().has_code_raw(address) {
+unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
+    let code_hash = if VMContext::current().has_code_raw(address) {
         CA_CODEHASH
     } else {
         EOA_CODEHASH
     };
 
     let account_codehash =
-        const_hex::const_decode_to_array::<32>(code_hash).unwrap();
+        const_hex::const_decode_to_array::<WORD_BYTES>(code_hash).unwrap();
 
-    std::ptr::copy(account_codehash.as_ptr(), dest, 32);
+    write_bytes32(dest, account_codehash);
+}
+
+/// Gets the ETH balance in wei of the account at the given address.
+/// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
+///
+/// [`BALANCE`]: https://www.evm.codes/#31
+#[no_mangle]
+unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
+    let address = read_address(address);
+    let balance = VMContext::current().balance(address);
+    write_u256(dest, balance);
 }
 
 /// Returns the length of the last EVM call or deployment return result, or `0`
-/// if neither have happened during the program's execution.
+/// if neither has happened during the program's execution.
 ///
 /// The semantics are equivalent to that of the EVM's [`RETURN_DATA_SIZE`]
 /// opcode.
 ///
 /// [`RETURN_DATA_SIZE`]: https://www.evm.codes/#3d
 #[no_mangle]
-pub unsafe extern "C" fn return_data_size() -> usize {
-    Context::current().return_data_size()
+unsafe extern "C" fn return_data_size() -> usize {
+    VMContext::current().return_data_size()
 }
 
 /// Copies the bytes of the last EVM call or deployment return result.
@@ -249,41 +237,42 @@ pub unsafe extern "C" fn return_data_size() -> usize {
 ///
 /// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
 #[no_mangle]
-pub unsafe extern "C" fn read_return_data(
+unsafe extern "C" fn read_return_data(
     dest: *mut u8,
     _offset: usize,
     size: usize,
 ) -> usize {
-    Context::current().read_return_data_raw(dest, size)
+    VMContext::current().read_return_data_raw(dest, size)
 }
 
 /// Calls the contract at the given address with options for passing value and
 /// to limit the amount of gas supplied. The return status indicates whether the
-/// call succeeded, and is nonzero on failure.
+/// call succeeded and is nonzero on failure.
 ///
-/// In both cases `return_data_len` will store the length of the result, the
+/// In both cases, `return_data_len` will store the length of the result, the
 /// bytes of which can be read via the `read_return_data` hostio. The bytes are
 /// not returned directly so that the programmer can potentially save gas by
 /// choosing which subset of the return result they'd like to copy.
 ///
 /// The semantics are equivalent to that of the EVM's [`CALL`] opcode, including
-/// callvalue stipends and the 63/64 gas rule. This means that supplying the
+/// call value stipends and the 63/64 gas rule. This means that supplying the
 /// `u64::MAX` gas can be used to send as much as possible.
 ///
 /// [`CALL`]: https://www.evm.codes/#f1
 #[no_mangle]
-pub unsafe extern "C" fn call_contract(
+unsafe extern "C" fn call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
-    _value: *const u8,
+    value: *const u8,
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    Context::current().call_contract_raw(
+    VMContext::current().call_contract_with_value_raw(
         contract,
         calldata,
         calldata_len,
+        value,
         return_data_len,
     )
 }
@@ -303,14 +292,14 @@ pub unsafe extern "C" fn call_contract(
 ///
 /// [`STATIC_CALL`]: https://www.evm.codes/#FA
 #[no_mangle]
-pub unsafe extern "C" fn static_call_contract(
+unsafe extern "C" fn static_call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    Context::current().call_contract_raw(
+    VMContext::current().call_contract_raw(
         contract,
         calldata,
         calldata_len,
@@ -320,9 +309,9 @@ pub unsafe extern "C" fn static_call_contract(
 
 /// Delegate calls the contract at the given address, with the option to limit
 /// the amount of gas supplied. The return status indicates whether the call
-/// succeeded, and is nonzero on failure.
+/// succeeded and is nonzero on failure.
 ///
-/// In both cases `return_data_len` will store the length of the result, the
+/// In both cases, `return_data_len` will store the length of the result, the
 /// bytes of which can be read via the `read_return_data` hostio. The bytes are
 /// not returned directly so that the programmer can potentially save gas by
 /// choosing which subset of the return result they'd like to copy.
@@ -333,14 +322,14 @@ pub unsafe extern "C" fn static_call_contract(
 ///
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#F4
 #[no_mangle]
-pub unsafe extern "C" fn delegate_call_contract(
+unsafe extern "C" fn delegate_call_contract(
     contract: *const u8,
     calldata: *const u8,
     calldata_len: usize,
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    Context::current().call_contract_raw(
+    VMContext::current().call_contract_raw(
         contract,
         calldata,
         calldata_len,
@@ -354,7 +343,7 @@ pub unsafe extern "C" fn delegate_call_contract(
 ///
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 #[no_mangle]
-pub unsafe extern "C" fn block_timestamp() -> u64 {
+unsafe extern "C" fn block_timestamp() -> u64 {
     // Epoch timestamp: 1st January 2025 00::00::00
     1_735_689_600
 }
