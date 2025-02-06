@@ -3,8 +3,7 @@
 use std::{collections::HashMap, ptr, slice, thread::ThreadId};
 
 use alloy_primitives::{Address, B256, U256};
-use dashmap::{mapref::one::RefMut, DashMap};
-use dashmap::try_result::TryResult;
+use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
@@ -91,8 +90,8 @@ impl Context {
         self.storage().contract_address.replace(address)
     }
 
-    /// Set an optional message value to `value` and return the previous value if
-    /// any.
+    /// Set an optional message value to `value` and return the previous value
+    /// if any.
     ///
     /// Setting `value` to `None` will effectively clear the message value, e.g.
     /// for non "payable" call.
