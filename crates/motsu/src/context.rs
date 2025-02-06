@@ -475,8 +475,8 @@ pub(crate) type Bytes32 = [u8; WORD_BYTES];
 /// account.
 pub struct ContractCall<'a, ST: StorageType> {
     storage: ST,
-    caller_address: Address,
-    value: Option<U256>,
+    msg_sender: Address,
+    msg_value: Option<U256>,
     /// We need to hold a reference to [`Contract<ST>`], because
     /// `Contract::<ST>::new().sender(alice)` can accidentally drop
     /// [`Contract<ST>`].
@@ -494,8 +494,8 @@ impl<ST: StorageType> ContractCall<'_, ST> {
 
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        _ = Context::current().replace_optional_msg_value(self.value);
-        _ = Context::current().replace_msg_sender(self.caller_address);
+        _ = Context::current().replace_optional_msg_value(self.msg_value);
+        _ = Context::current().replace_msg_sender(self.msg_sender);
         _ = Context::current().replace_contract_address(self.address());
     }
 }
@@ -580,8 +580,8 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address: account.into(),
-            value: None,
+            msg_sender: account.into(),
+            msg_value: None,
             contract_ref: self,
         }
     }
@@ -598,8 +598,8 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
 
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address,
-            value: Some(value),
+            msg_sender: caller_address,
+            msg_value: Some(value),
             contract_ref: self,
         }
     }
