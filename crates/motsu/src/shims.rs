@@ -73,7 +73,7 @@ unsafe extern "C" fn native_keccak256(
 /// May panic if unable to lock `STORAGE`.
 #[no_mangle]
 pub unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
-    Context::current().get_bytes_raw(key, out);
+    VMContext::current().get_bytes_raw(key, out);
 }
 
 /// Writes a 32-byte value to the permanent storage cache.
@@ -174,7 +174,7 @@ unsafe extern "C" fn chainid() -> u64 {
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
 #[no_mangle]
-unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
+unsafe extern "C" fn emit_log(data: *const u8, len: usize, topics: usize) {
     VMContext::current().store_log_raw(data, len, topics);
 }
 
