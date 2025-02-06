@@ -448,26 +448,21 @@ mod proxies_tests {
         proxy2.sender(alice).init(proxy3.address());
         proxy3.sender(alice).init(Address::ZERO);
 
-        let zero = U256::ZERO;
-        let two = uint!(2_U256);
-        let four = U256::from(4);
-        let eight = U256::from(8);
-
         // Fund alice, proxies have no funds.
-        alice.fund(eight);
+        alice.fund(EIGHT);
 
-        assert_eq!(alice.balance(), eight);
-        assert_eq!(proxy1.balance(), zero);
-        assert_eq!(proxy2.balance(), zero);
-        assert_eq!(proxy3.balance(), zero);
+        assert_eq!(alice.balance(), EIGHT);
+        assert_eq!(proxy1.balance(), U256::ZERO);
+        assert_eq!(proxy2.balance(), U256::ZERO);
+        assert_eq!(proxy3.balance(), U256::ZERO);
 
         // Call the first proxy.
-        proxy1.sender_and_value(alice, eight).pass_proxy_with_fixed_value(four);
+        proxy1.sender_and_value(alice, EIGHT).pass_proxy_with_fixed_value(FOUR);
 
-        assert_eq!(alice.balance(), zero);
-        assert_eq!(proxy1.balance(), four);
-        assert_eq!(proxy2.balance(), two);
-        assert_eq!(proxy3.balance(), two);
+        assert_eq!(alice.balance(), U256::ZERO);
+        assert_eq!(proxy1.balance(), FOUR);
+        assert_eq!(proxy2.balance(), TWO);
+        assert_eq!(proxy3.balance(), TWO);
     }
 
     #[motsu_proc::test]
@@ -483,26 +478,21 @@ mod proxies_tests {
         proxy2.sender(alice).init(proxy3.address());
         proxy3.sender(alice).init(Address::ZERO);
 
-        let zero = U256::ZERO;
-        let two = TWO;
-        let four = FOUR;
-        let eight = EIGHT;
-
         // Fund alice, proxies have no funds.
-        alice.fund(eight);
+        alice.fund(EIGHT);
 
-        assert_eq!(alice.balance(), eight);
-        assert_eq!(proxy1.balance(), zero);
-        assert_eq!(proxy2.balance(), zero);
-        assert_eq!(proxy3.balance(), zero);
+        assert_eq!(alice.balance(), EIGHT);
+        assert_eq!(proxy1.balance(), U256::ZERO);
+        assert_eq!(proxy2.balance(), U256::ZERO);
+        assert_eq!(proxy3.balance(), U256::ZERO);
 
         // Call the first proxy.
-        proxy1.sender_and_value(alice, eight).pay_proxy_with_half_balance();
+        proxy1.sender_and_value(alice, EIGHT).pay_proxy_with_half_balance();
 
-        assert_eq!(alice.balance(), zero);
-        assert_eq!(proxy1.balance(), four);
-        assert_eq!(proxy2.balance(), two);
-        assert_eq!(proxy3.balance(), two);
+        assert_eq!(alice.balance(), U256::ZERO);
+        assert_eq!(proxy1.balance(), FOUR);
+        assert_eq!(proxy2.balance(), TWO);
+        assert_eq!(proxy3.balance(), TWO);
     }
 
     #[motsu_proc::test]
