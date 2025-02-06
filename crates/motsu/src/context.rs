@@ -1,13 +1,16 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{collections::HashMap, ptr, slice, thread::ThreadId};
+use std::{collections::HashMap, hash::Hash, ptr, slice, thread::ThreadId};
 
 use alloy_primitives::{Address, B256, U256};
-use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
+use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
-use crate::router::{RouterContext, TestRouter};
+use crate::{
+    router::{RouterContext, TestRouter},
+    storage_access::AccessStorage,
+};
 
 /// Storage mock.
 ///
@@ -381,15 +384,7 @@ impl Context {
 
     /// Get reference to the storage for the current test thread.
     fn storage(self) -> RefMut<'static, Context, MockStorage> {
-        match STORAGE.try_get_mut(&self) {
-            TryResult::Present(router) => router,
-            TryResult::Absent => {
-                panic!("contract should be initialised first")
-            }
-            TryResult::Locked => {
-                panic!("storage is locked")
-            }
-        }
+        STORAGE.access_storage(&self)
     }
 
     /// Get router for the contract at `address`.

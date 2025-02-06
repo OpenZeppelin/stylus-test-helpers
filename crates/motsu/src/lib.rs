@@ -54,6 +54,7 @@ mod context;
 pub mod prelude;
 mod router;
 mod shims;
+mod storage_access;
 
 pub use motsu_proc::test;
 

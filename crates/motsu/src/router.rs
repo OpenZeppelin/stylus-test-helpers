@@ -7,13 +7,15 @@ use std::{
 };
 
 use alloy_primitives::{uint, Address};
-use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
+use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     abi::Router,
     prelude::{StorageType, TopLevelStorage},
     ArbResult,
 };
+
+use crate::storage_access::AccessStorage;
 
 /// Router Storage.
 ///
@@ -47,15 +49,7 @@ impl RouterContext {
 
     /// Get reference to the call storage for the current test thread.
     fn storage(self) -> RefMut<'static, RouterContext, RouterStorage> {
-        match ROUTER_STORAGE.try_get_mut(&self) {
-            TryResult::Present(router) => router,
-            TryResult::Absent => {
-                panic!("contract should be initialised first")
-            }
-            TryResult::Locked => {
-                panic!("router storage is locked")
-            }
-        }
+        ROUTER_STORAGE.access_storage(&self)
     }
 
     /// Check if the router exists for the contract.
