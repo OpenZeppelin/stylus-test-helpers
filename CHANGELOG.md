@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Mocks for the `msg::sender()` #14
+- Mocks for the `msg::value()` and account balance #31
 - Mocks for the external contract calls. 
   Two and more contracts can be injected into test #14
 - Option to inject `Account` or `Address` in the test #14
