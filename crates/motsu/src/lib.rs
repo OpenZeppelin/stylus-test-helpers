@@ -136,9 +136,9 @@
 //! For `motsu` to work correctly, `stylus-sdk` should **not** have
 //! default `hostio-caching` feature enabled.
 //!
-//! Following features: storage reset after erroneous transaction, `proptest`
-//! affordances for [`crate::prelude::Contract`] and [`crate::prelude::Account`]
-//! are not supported, and planed to be added soon.
+//! Following features: event log assertions, storage reset after erroneous
+//! transaction, `proptest` affordances for [`crate::prelude::Contract`] and
+//! [`crate::prelude::Account`] are not supported, and planed to be added soon.
 //!
 //! Reentrant tests patterns currently not implemented, and the test case will
 //! panic once a callee contract calls a caller contract.

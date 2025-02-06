@@ -9,6 +9,10 @@ Japanese -- we hold a stylus in our hand.
 
 ## Usage
 
+This crate enables unit-testing for Stylus contracts. It abstracts away the
+machinery necessary for writing tests behind a
+[`#[motsu::test]`][test_attribute] procedural macro.
+
 Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
 to get access to VM affordances:
 
@@ -96,14 +100,14 @@ fn call_three_proxies(
 Annotating a test function that accepts no parameters will make
 [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
 
- ```rust
+ ```rust,ignore
  #[cfg(test)]
- mod tests {
-     #[motsu::test] // Equivalent to #[test]
-     fn test_fn() {
-         ...
-     }
- }
+mod tests {
+    #[motsu::test] // Equivalent to #[test]
+    fn test_fn() {
+        ...
+    }
+}
  ```
 
 NOTE!!!
@@ -137,9 +141,9 @@ NOTE!!!
 For `motsu` to work correctly, `stylus-sdk` should **not** have
 default `hostio-caching` feature enabled.
 
-Following features: storage reset after erroneous transaction, `proptest` affordances for
-[`crate::prelude::Contract`] and [`crate::prelude::Account`] are not
-supported, and planed to be added soon.
+Following features: event log assertions, storage reset after erroneous transaction,
+`proptest` affordances for [`crate::prelude::Contract`] and [`crate::prelude::Account`]
+are not supported, and planed to be added soon.
 
 Reentrant tests patterns currently not implemented, and the test case will
 panic once a callee contract calls a caller contract.
