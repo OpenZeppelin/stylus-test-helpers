@@ -106,7 +106,7 @@
 //! }
 //! ```
 //!
-//! NOTE!!! 
+//! NOTE!!!
 //! We require a contract to implement unsafe trait
 //! `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
 //! Typically, all contracts marked with [`stylus_sdk::prelude::entrypoint`]
@@ -132,13 +132,13 @@
 //! unsafe impl TopLevelStorage for Erc20 {}
 //! ```
 //!
-//! NOTE!!! 
+//! NOTE!!!
 //! For `motsu` to work correctly, `stylus-sdk` should **not** have
 //! default `hostio-caching` feature enabled.
 //!
-//! Following features: storage reset after erroneous transaction, `proptest` affordances for
-//! [`crate::prelude::Contract`] and [`crate::prelude::Account`] are not
-//! supported, and planed to be added soon.
+//! Following features: storage reset after erroneous transaction, `proptest`
+//! affordances for [`crate::prelude::Contract`] and [`crate::prelude::Account`]
+//! are not supported, and planed to be added soon.
 //!
 //! Reentrant tests patterns currently not implemented, and the test case will
 //! panic once a callee contract calls a caller contract.
@@ -352,6 +352,7 @@ mod ping_pong_tests {
     }
 
     #[motsu_proc::test]
+    #[allow(unused)]
     fn contract_should_not_drop() {
         let alice = Account::random();
         let ping = Contract::<PingContract>::new();
