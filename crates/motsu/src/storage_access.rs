@@ -1,3 +1,5 @@
+//! Traits for accessing storage.
+
 use std::hash::Hash;
 
 use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
