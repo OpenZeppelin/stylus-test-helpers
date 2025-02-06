@@ -2,6 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     ptr, slice,
     thread::ThreadId,
 };
@@ -12,7 +13,10 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
-use crate::router::{RouterContext, TestRouter};
+use crate::{
+    router::{RouterContext, TestRouter},
+    storage_access::AccessStorage,
+};
 
 /// Storage mock.
 ///
@@ -22,7 +26,7 @@ use crate::router::{RouterContext, TestRouter};
 ///
 /// The value is the [`MockStorage`], a storage of the test case.
 ///
-/// NOTE: The [`DashMap`] will deadlock execution, when the same key is
+/// NOTE: The [`Context::storage`] will panic on lock, when the same key is
 /// accessed twice from the same thread.
 static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
 
@@ -80,7 +84,7 @@ impl Context {
     }
 
     /// Set the message sender address and return the previous sender if any.
-    fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
+    fn replace_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
 
@@ -90,28 +94,36 @@ impl Context {
         self.storage().msg_sender
     }
 
-    /// Set the address of the contract, that is called.
-    fn set_contract_address(self, address: Address) -> Option<Address> {
+    /// Replace the address of the contract, and return the previous address if
+    /// any.
+    fn replace_contract_address(self, address: Address) -> Option<Address> {
         self.storage().contract_address.replace(address)
     }
 
-    /// Set message value to `value` and return the previous value if any.
-    pub(crate) fn set_msg_value(self, value: U256) -> Option<U256> {
-        self.storage().msg_value.replace(value)
+    /// Replace an optional message with `value` and return the previous value
+    /// if any.
+    ///
+    /// Setting `value` to `None` will effectively clear the message value, e.g.
+    /// for non "payable" call.
+    pub(crate) fn replace_optional_msg_value(
+        self,
+        value: Option<U256>,
+    ) -> Option<U256> {
+        std::mem::replace(&mut self.storage().msg_value, value)
     }
 
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
-        let value: U256 = self.msg_value();
+        let value: U256 = self.msg_value().unwrap_or_default();
         write_u256(output, value);
     }
 
     /// Get the value sent to the contract as [`U256`].
-    pub(crate) fn msg_value(self) -> U256 {
-        self.storage().msg_value.unwrap_or_default()
+    pub(crate) fn msg_value(self) -> Option<U256> {
+        self.storage().msg_value
     }
 
-    /// Get the address of the contract, that is called.
+    /// Get the address of the contract that is called.
     pub(crate) fn contract_address(self) -> Option<Address> {
         self.storage().contract_address
     }
@@ -145,7 +157,7 @@ impl Context {
 
         // if no more contracts left,
         if storage.contract_data.is_empty() {
-            // drop guard to a concurrent hash map to avoid a deadlock,
+            // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
             _ = STORAGE.remove(&self);
@@ -160,13 +172,13 @@ impl Context {
         address: *const u8,
         calldata: *const u8,
         calldata_len: usize,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
         let result = self.call_contract(address, selector, &input, None);
-        self.process_arb_result_raw(result, return_data_len)
+        self.process_arb_result_raw(result, return_data_size)
     }
 
     /// Call the contract at raw `address` with the given raw `calldata` and
@@ -177,31 +189,31 @@ impl Context {
         calldata: *const u8,
         calldata_len: usize,
         value: *const u8,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
         let result = self.call_contract(address, selector, &input, Some(value));
-        self.process_arb_result_raw(result, return_data_len)
+        self.process_arb_result_raw(result, return_data_size)
     }
 
     /// Based on `result`, set the return data.
-    /// Return 0 if `result` is `Ok`, otherwise return 1.
+    /// Return 0 if `result` is `Ok`, otherwise 1.
     unsafe fn process_arb_result_raw(
         self,
         result: ArbResult,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         match result {
             Ok(res) => {
-                return_data_len.write(res.len());
+                return_data_size.write(res.len());
                 self.set_return_data(res);
                 0
             }
             Err(err) => {
-                return_data_len.write(err.len());
+                return_data_size.write(err.len());
                 self.set_return_data(err);
                 1
             }
@@ -220,20 +232,17 @@ impl Context {
         // Set the caller contract as message sender and callee contract as
         // a receiver (`contract_address`).
         let previous_contract_address = self
-            .set_contract_address(contract_address)
+            .replace_contract_address(contract_address)
             .expect("contract_address should be set");
         let previous_msg_sender = self
-            .set_msg_sender(previous_contract_address)
+            .replace_msg_sender(previous_contract_address)
             .expect("msg_sender should be set");
 
         // Set new msg_value, and store the previous one.
-        let previous_msg_value =
-            value.and_then(|value| self.set_msg_value(value));
+        let previous_msg_value = self.replace_optional_msg_value(value);
 
-        // If value set, check that sender contract has enough funds.
-        if let Some(value) = value {
-            self.assert_enough_funds(previous_contract_address, value);
-        }
+        // Transfer value sent by message sender.
+        self.transfer_value();
 
         // Call external contract.
         let result = self
@@ -243,20 +252,12 @@ impl Context {
                 panic!("selector not found - selector is {selector}")
             });
 
-        // If the call was successful,
-        if result.is_ok() {
-            // transfer value that wasn't transferred yet.
-            self.try_transfer_value();
-        }
-
         // Set the previous message sender and contract address back.
-        _ = self.set_contract_address(previous_contract_address);
-        _ = self.set_msg_sender(previous_msg_sender);
+        _ = self.replace_contract_address(previous_contract_address);
+        _ = self.replace_msg_sender(previous_msg_sender);
 
-        // Set the previous msg_value if there is any.
-        if let Some(previous) = previous_msg_value {
-            _ = self.set_msg_value(previous);
-        }
+        // Set the previous msg_value.
+        self.replace_optional_msg_value(previous_msg_value);
 
         result
     }
@@ -264,8 +265,8 @@ impl Context {
     /// Set return data as bytes.
     fn set_return_data(self, data: Vec<u8>) {
         let mut call_storage = self.storage();
-        _ = call_storage.call_output_len.insert(data.len());
-        _ = call_storage.call_output.insert(data);
+        _ = call_storage.return_data_size.insert(data.len());
+        _ = call_storage.return_data.insert(data);
     }
 
     /// Read the return data (with a given `size`) from the last contract call
@@ -283,14 +284,14 @@ impl Context {
     /// Return data's size in bytes from the last contract call.
     pub(crate) fn return_data_size(self) -> usize {
         self.storage()
-            .call_output_len
+            .return_data_size
             .take()
             .expect("call_output_len should be set")
     }
 
     /// Return data's bytes from the last contract call.
     fn return_data(self) -> Vec<u8> {
-        self.storage().call_output.take().expect("call_output should be set")
+        self.storage().return_data.take().expect("call_output should be set")
     }
 
     /// Check if the contract at raw `address` has code.
@@ -327,30 +328,19 @@ impl Context {
         self.storage().events.insert(event);
     }
 
-    /// Check if `address` has enough funds to transfer `value`
-    ///
-    /// # Panics
-    ///
-    /// * If there is not enough funds to transfer.
-    fn assert_enough_funds(self, address: Address, value: U256) {
-        assert!(
-            self.balance(address) >= value,
-            "{address} account should have enough funds to transfer {value} value"
-        );
-    }
-
     /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
     }
 
-    /// Transfer unsent value from the message sender to the contract.
+    /// Transfer value from the message sender to the contract.
+    /// No-op if `msg_sender` or `contract_address` weren't set.
     ///
     /// # Panics
     ///
     /// * If there is not enough funds to transfer.
-    fn try_transfer_value(self) {
-        let mut storage = self.storage();
+    fn transfer_value(self) {
+        let storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
             return;
         };
@@ -359,16 +349,24 @@ impl Context {
         };
 
         // We should transfer the value only if it is set.
-        // And we should transfer the value only once, despite this function
-        // being called multiple times (using `Option::take(..)`).
-        if let Some(msg_value) = storage.msg_value.take() {
-            // Drop storage to avoid a deadlock.
+        if let Some(msg_value) = storage.msg_value {
+            // Drop storage to avoid a panic on lock.
             drop(storage);
 
             // Transfer and panic if there is not enough funds.
-            self.checked_transfer(msg_sender, contract_address, msg_value)
-                .unwrap_or_else(|| panic!("{msg_sender} account should have enough funds to transfer {msg_value} value"));
+            self.transfer(msg_sender, contract_address, msg_value);
         }
+    }
+
+    /// Transfer `value` from `from` account to `to` account.
+    ///
+    /// # Panics
+    ///
+    /// * If there is not enough funds to transfer.
+    fn transfer(self, from: Address, to: Address, value: U256) {
+        // Transfer and panic if there is not enough funds.
+        self.checked_transfer(from, to, value)
+            .unwrap_or_else(|| panic!("{from} account should have enough funds to transfer {value} value"));
     }
 
     /// Transfer `value` from `from` account to `to` account.
@@ -380,7 +378,7 @@ impl Context {
         to: Address,
         value: U256,
     ) -> Option<()> {
-        _ = self.checked_sub_assign_balance(from, value)?;
+        self.checked_sub_assign_balance(from, value)?;
         self.add_assign_balance(to, value);
         Some(())
     }
@@ -414,7 +412,7 @@ impl Context {
 
     /// Get reference to the storage for the current test thread.
     fn storage(self) -> RefMut<'static, Context, MockStorage> {
-        STORAGE.get_mut(&self).expect("contract should be initialised first")
+        STORAGE.access_storage(&self)
     }
 
     /// Get router for the contract at `address`.
@@ -488,9 +486,9 @@ struct MockStorage {
     /// Event logs emitted during [`Context::current`].
     events: HashSet<Log>,
     // Output of a contract call.
-    call_output: Option<Vec<u8>>,
+    return_data: Option<Vec<u8>>,
     // Output length of a contract call.
-    call_output_len: Option<usize>,
+    return_data_size: Option<usize>,
 }
 
 /// Event log emitted during [`Context::current`].
@@ -529,8 +527,8 @@ pub(crate) type Bytes32 = [u8; WORD_BYTES];
 /// account.
 pub struct ContractCall<'a, ST: StorageType> {
     storage: ST,
-    caller_address: Address,
-    value: Option<U256>,
+    msg_sender: Address,
+    msg_value: Option<U256>,
     /// We need to hold a reference to [`Contract<ST>`], because
     /// `Contract::<ST>::new().sender(alice)` can accidentally drop
     /// [`Contract<ST>`].
@@ -541,23 +539,12 @@ pub struct ContractCall<'a, ST: StorageType> {
 }
 
 impl<ST: StorageType> ContractCall<'_, ST> {
-    /// Get the contract's address.
-    pub fn address(&self) -> Address {
-        self.contract_ref.address
-    }
-
-    /// Apply previously not reverted transactions.
-    fn apply_not_reverted_transactions() {
-        Context::current().try_transfer_value();
-    }
-
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        if let Some(value) = self.value {
-            _ = Context::current().set_msg_value(value);
-        }
-        _ = Context::current().set_msg_sender(self.caller_address);
-        _ = Context::current().set_contract_address(self.address());
+        _ = Context::current().replace_optional_msg_value(self.msg_value);
+        _ = Context::current().replace_msg_sender(self.msg_sender);
+        _ = Context::current()
+            .replace_contract_address(self.contract_ref.address);
     }
 }
 
@@ -566,8 +553,8 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        Self::apply_not_reverted_transactions();
         self.set_call_params();
+        Context::current().transfer_value();
         &self.storage
     }
 }
@@ -575,8 +562,8 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        Self::apply_not_reverted_transactions();
         self.set_call_params();
+        Context::current().transfer_value();
         &mut self.storage
     }
 }
@@ -618,10 +605,10 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     /// the given `account`.
     pub fn init<A: Into<Address>, Output>(
         &self,
-        account: A,
+        sender: A,
         initializer: impl FnOnce(&mut ST) -> Output,
     ) -> Output {
-        initializer(&mut self.sender(account.into()))
+        initializer(&mut self.sender(sender.into()))
     }
 
     /// Create a new contract with default storage on the random address.
@@ -641,8 +628,8 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address: account.into(),
-            value: None,
+            msg_sender: account.into(),
+            msg_value: None,
             contract_ref: self,
         }
     }
@@ -651,17 +638,16 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     #[must_use]
     pub fn sender_and_value<A: Into<Address>, V: Into<U256>>(
         &self,
-        account: A,
+        sender: A,
         value: V,
     ) -> ContractCall<ST> {
-        let caller_address = account.into();
+        let caller_address = sender.into();
         let value = value.into();
-        Context::current().assert_enough_funds(caller_address, value);
 
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
-            caller_address,
-            value: Some(value),
+            msg_sender: caller_address,
+            msg_value: Some(value),
             contract_ref: self,
         }
     }
@@ -714,9 +700,6 @@ impl Funding for Address {
     }
 
     fn balance(&self) -> U256 {
-        // Before querying the balance, we should ensure all msg values been
-        // transferred.
-        Context::current().try_transfer_value();
         Context::current().balance(*self)
     }
 }

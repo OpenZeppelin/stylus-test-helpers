@@ -1,0 +1,52 @@
+name: test
+# This is the main CI workflow that runs the test suite on all pushes to main
+# and all pull requests. It runs the following jobs:
+# - required: runs the test suite on ubuntu with stable and beta rust
+# toolchains.
+permissions:
+  contents: read
+on:
+  push:
+    branches: [ main, release/* ]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  required:
+    runs-on: ubuntu-latest
+    name: ubuntu / ${{ matrix.toolchain }}
+    strategy:
+      matrix:
+        # Run on stable and beta to ensure that tests won't break on the next
+        # version of the rust toolchain.
+        toolchain: [ stable, beta ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install rust ${{ matrix.toolchain }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          rustflags: ""
+
+      - name: Install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Cargo generate-lockfile
+        # Enable this ci template to run regardless of whether the lockfile is
+        # checked in or not.
+        if: hashFiles('Cargo.lock') == ''
+        run: cargo generate-lockfile
+
+      - name: Run unit tests
+        run: cargo nextest run --locked --all-targets
+
+      - name: Run doc tests
+        run: cargo test --locked --doc
