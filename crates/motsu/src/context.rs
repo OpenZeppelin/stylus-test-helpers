@@ -486,7 +486,8 @@ impl<ST: StorageType> ContractCall<'_, ST> {
     fn set_call_params(&self) {
         _ = Context::current().replace_optional_msg_value(self.msg_value);
         _ = Context::current().replace_msg_sender(self.msg_sender);
-        _ = Context::current().replace_contract_address(self.contract_ref.address);
+        _ = Context::current()
+            .replace_contract_address(self.contract_ref.address);
     }
 }
 

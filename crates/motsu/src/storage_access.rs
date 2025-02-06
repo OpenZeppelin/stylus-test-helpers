@@ -1,17 +1,16 @@
 use std::hash::Hash;
-use dashmap::DashMap;
-use dashmap::mapref::one::RefMut;
-use dashmap::try_result::TryResult;
+
+use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
 
 /// Trait for accessing test storage.
 pub(crate) trait AccessStorage {
     type Key;
     type Value;
-    
+
     /// Get mutable access to storage with `key`.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// * After 10 attempts to access the storage.
     /// * If the contract wasn't initialized.
     fn access_storage(
@@ -21,10 +20,11 @@ pub(crate) trait AccessStorage {
         self.access_storage_with_backoff(key, 10)
     }
 
-    /// Get mutable access to storage with `key`, with `backoff` number of attempts.
-    /// 
+    /// Get mutable access to storage with `key`, with `backoff` number of
+    /// attempts.
+    ///
     /// # Panics
-    /// 
+    ///
     /// * After `backoff` attempts to access the storage.
     /// * If the contract wasn't initialized.
     fn access_storage_with_backoff(
