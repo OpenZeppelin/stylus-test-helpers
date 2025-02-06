@@ -90,20 +90,30 @@ impl Context {
         self.storage().contract_address.replace(address)
     }
 
-    /// Set message value to `value` and return the previous value if any.
-    pub(crate) fn set_msg_value(self, value: U256) -> Option<U256> {
-        self.storage().msg_value.replace(value)
+    /// Set optional message value to `value` and return the previous value if
+    /// any.
+    ///
+    /// Setting `value` to `None` will effectively clear the message value, e.g.
+    /// for non "payable" call.
+    pub(crate) fn set_optional_msg_value(
+        self,
+        value: Option<U256>,
+    ) -> Option<U256> {
+        let msg_value = &mut self.storage().msg_value;
+        let previous = msg_value.take();
+        *msg_value = value;
+        previous
     }
 
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
-        let value: U256 = self.msg_value();
+        let value: U256 = self.msg_value().expect("msg_value should be set");
         write_u256(output, value);
     }
 
     /// Get the value sent to the contract as [`U256`].
-    pub(crate) fn msg_value(self) -> U256 {
-        self.storage().msg_value.unwrap_or_default()
+    pub(crate) fn msg_value(self) -> Option<U256> {
+        self.storage().msg_value
     }
 
     /// Get the address of the contract, that is called.
@@ -222,8 +232,7 @@ impl Context {
             .expect("msg_sender should be set");
 
         // Set new msg_value, and store the previous one.
-        let previous_msg_value =
-            value.and_then(|value| self.set_msg_value(value));
+        let previous_msg_value = self.set_optional_msg_value(value);
 
         // Transfer value sent by message sender.
         self.transfer_value();
@@ -240,10 +249,8 @@ impl Context {
         _ = self.set_contract_address(previous_contract_address);
         _ = self.set_msg_sender(previous_msg_sender);
 
-        // Set the previous msg_value if there is any.
-        if let Some(previous) = previous_msg_value {
-            _ = self.set_msg_value(previous);
-        }
+        // Set the previous msg_value.
+        self.set_optional_msg_value(previous_msg_value);
 
         result
     }
@@ -481,9 +488,7 @@ impl<ST: StorageType> ContractCall<'_, ST> {
 
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        if let Some(value) = self.value {
-            _ = Context::current().set_msg_value(value);
-        }
+        _ = Context::current().set_optional_msg_value(self.value);
         _ = Context::current().set_msg_sender(self.caller_address);
         _ = Context::current().set_contract_address(self.address());
     }

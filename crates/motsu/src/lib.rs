@@ -431,13 +431,11 @@ mod proxies_tests {
         proxy1.sender_and_value(alice, ONE).pay_proxy();
 
         // By the end, each actor will lose `ONE`, except last proxy.
-        assert_eq!(alice.balance(), TEN - ONE); // 10 - 1
-        assert_eq!(proxy1.balance(), TEN - ONE); // 10 + 1 - 2
-        assert_eq!(proxy2.balance(), TEN - ONE); // 10 + 2 - 3
-        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE); // 10 + 3
+        assert_eq!(alice.balance(), TEN - ONE);
+        assert_eq!(proxy1.balance(), TEN - ONE);
+        assert_eq!(proxy2.balance(), TEN - ONE);
+        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
     }
-
-    // TODO#q: if the msg value wasn't set we shouldn't set it
 
     #[motsu_proc::test]
     fn pay_proxy_fixed_value(
