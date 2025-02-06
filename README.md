@@ -19,9 +19,9 @@ Japanese -- we hold a stylus in our hand.
 
 ### Usage
 
-You can import `motsu` from crates.io by adding the following line to your `Cargo.toml`.
+You can import `motsu` from crates.io by adding the following lines to your `Cargo.toml`.
 For `motsu` to work correctly, `stylus-sdk` should **not** have a default `hostio-caching`
-feature enabled, like:
+feature enabled.
 
 ```toml
 [dev-dependencies]
