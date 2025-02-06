@@ -4,6 +4,7 @@ use std::{collections::HashMap, ptr, slice, thread::ThreadId};
 
 use alloy_primitives::{Address, B256, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
+use dashmap::try_result::TryResult;
 use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
@@ -17,7 +18,7 @@ use crate::router::{RouterContext, TestRouter};
 ///
 /// The value is the [`MockStorage`], a storage of the test case.
 ///
-/// NOTE: The [`DashMap`] will deadlock execution, when the same key is
+/// NOTE: The [`Context::storage`] will panic on lock, when the same key is
 /// accessed twice from the same thread.
 static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
 
@@ -150,7 +151,7 @@ impl Context {
 
         // if no more contracts left,
         if storage.contract_data.is_empty() {
-            // drop guard to a concurrent hash map to avoid a deadlock,
+            // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
             _ = STORAGE.remove(&self);
@@ -321,7 +322,7 @@ impl Context {
 
         // We should transfer the value only if it is set.
         if let Some(msg_value) = storage.msg_value {
-            // Drop storage to avoid a deadlock.
+            // Drop storage to avoid a panic on lock.
             drop(storage);
 
             // Transfer and panic if there is not enough funds.
@@ -383,7 +384,15 @@ impl Context {
 
     /// Get reference to the storage for the current test thread.
     fn storage(self) -> RefMut<'static, Context, MockStorage> {
-        STORAGE.get_mut(&self).expect("contract should be initialised first")
+        match STORAGE.try_get_mut(&self) {
+            TryResult::Present(router) => router,
+            TryResult::Absent => {
+                panic!("contract should be initialised first")
+            }
+            TryResult::Locked => {
+                panic!("storage is locked")
+            }
+        }
     }
 
     /// Get router for the contract at `address`.

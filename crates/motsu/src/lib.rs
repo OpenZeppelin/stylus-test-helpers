@@ -504,4 +504,26 @@ mod proxies_tests {
         assert_eq!(proxy2.balance(), two);
         assert_eq!(proxy3.balance(), two);
     }
+
+    #[motsu_proc::test]
+    fn no_locks_with_panics() {
+        for _ in 0..1000 {
+            let proxy1 = Contract::<Proxy>::new();
+            let proxy2 = Contract::<Proxy>::new();
+            let proxy3 = Contract::<Proxy>::new();
+            let alice = Account::random();
+
+            // Set up a chain of three proxies.
+            // With the given call chain: proxy1 -> proxy2 -> proxy3.
+            proxy1.sender(alice).init(proxy2.address());
+            proxy2.sender(alice).init(proxy3.address());
+            proxy3.sender(alice).init(Address::ZERO);
+
+            // Call the first proxy.
+            let result = proxy1.sender(alice).call_proxy(TEN);
+
+            // The value is incremented by 1 for each proxy.
+            assert_eq!(result, TEN + ONE + ONE + ONE);
+        }
+    }
 }
