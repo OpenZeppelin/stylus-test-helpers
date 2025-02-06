@@ -1,10 +1,10 @@
-//! Traits for accessing storage.
+//! Tooling for accessing Motsu test VM storage.
 
 use std::hash::Hash;
 
 use dashmap::{mapref::one::RefMut, try_result::TryResult, DashMap};
 
-/// Trait for accessing test storage.
+/// Trait for Motsu test VM storage access.
 pub(crate) trait AccessStorage {
     type Key;
     type Value;

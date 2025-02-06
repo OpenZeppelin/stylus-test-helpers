@@ -71,6 +71,8 @@ mod ping_pong_tests {
         storage::{StorageAddress, StorageU256},
     };
 
+    use crate::context::{Account, Contract};
+
     use crate::prelude::*;
 
     sol! {
@@ -560,8 +562,8 @@ mod proxies_tests {
             // Call the first proxy.
             let result = proxy1.sender(alice).call_proxy(TEN);
 
-            // The value is incremented by 1 for each proxy.
-            assert_eq!(result, TEN + ONE + ONE + ONE);
-        }
+        // The value is incremented by 1 for each proxy.
+        assert_eq!(result, TEN + ONE + ONE + ONE);
     }
+}
 }

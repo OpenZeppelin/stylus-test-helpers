@@ -14,30 +14,31 @@ use once_cell::sync::Lazy;
 use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
 
 use crate::{
-    router::{RouterContext, TestRouter},
+    router::{TestRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
 
-/// Storage mock.
+/// Motsu VM Storage.
 ///
 /// A global mutable key-value store that allows concurrent access.
 ///
-/// The key is the test [`Context`], an id of the test thread.
+/// The key is the test [`VMContext`], an id of the test thread.
 ///
-/// The value is the [`MockStorage`], a storage of the test case.
+/// The value is the [`VMContextStorage`], a storage of the test case.
 ///
-/// NOTE: The [`Context::storage`] will panic on lock, when the same key is
+/// NOTE: The [`VMContext::storage`] will panic on lock, when the same key is
 /// accessed twice from the same thread.
-static STORAGE: Lazy<DashMap<Context, MockStorage>> = Lazy::new(DashMap::new);
+static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
+    Lazy::new(DashMap::new);
 
-/// Context of stylus unit tests associated with the current test thread.
+/// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
-pub struct Context {
+pub struct VMContext {
     thread_id: ThreadId,
 }
 
-impl Context {
+impl VMContext {
     /// Get test context associated with the current test thread.
     #[must_use]
     pub fn current() -> Self {
@@ -90,7 +91,7 @@ impl Context {
 
     /// Get the message sender address.
     #[must_use]
-    pub fn msg_sender(self) -> Option<Address> {
+    pub(crate) fn msg_sender(self) -> Option<Address> {
         self.storage().msg_sender
     }
 
@@ -134,7 +135,7 @@ impl Context {
         self,
         contract_address: Address,
     ) {
-        if STORAGE
+        if MOTSU_VM
             .entry(self)
             .or_default()
             .contract_data
@@ -147,10 +148,10 @@ impl Context {
         self.router(contract_address).init_storage::<ST>();
     }
 
-    /// Reset storage for the current [`Context`] and `contract_address`.
+    /// Reset storage for the current [`VMContext`] and `contract_address`.
     ///
     /// If all test contracts are removed, flush storage for the current
-    /// test [`Context`].
+    /// test [`VMContext`].
     fn reset_storage(self, contract_address: Address) {
         let mut storage = self.storage();
         storage.contract_data.remove(&contract_address);
@@ -160,7 +161,7 @@ impl Context {
             // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
-            _ = STORAGE.remove(&self);
+            _ = MOTSU_VM.remove(&self);
         }
 
         self.router(contract_address).reset_storage();
@@ -411,13 +412,13 @@ impl Context {
     }
 
     /// Get reference to the storage for the current test thread.
-    fn storage(self) -> RefMut<'static, Context, MockStorage> {
-        STORAGE.access_storage(&self)
+    fn storage(self) -> RefMut<'static, VMContext, VMContextStorage> {
+        MOTSU_VM.access_storage(&self)
     }
 
     /// Get router for the contract at `address`.
-    fn router(self, address: Address) -> RouterContext {
-        RouterContext::new(self.thread_id, address)
+    fn router(self, address: Address) -> VMRouterContext {
+        VMRouterContext::new(self.thread_id, address)
     }
 }
 
@@ -472,7 +473,7 @@ unsafe fn decode_calldata(
 
 /// Storage for unit test's mock data.
 #[derive(Default)]
-struct MockStorage {
+struct VMContextStorage {
     /// Address of the message sender.
     msg_sender: Option<Address>,
     /// The ETH value in wei sent to the program.
@@ -541,9 +542,9 @@ pub struct ContractCall<'a, ST: StorageType> {
 impl<ST: StorageType> ContractCall<'_, ST> {
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        _ = Context::current().replace_optional_msg_value(self.msg_value);
-        _ = Context::current().replace_msg_sender(self.msg_sender);
-        _ = Context::current()
+        _ = VMContext::current().replace_optional_msg_value(self.msg_value);
+        _ = VMContext::current().replace_msg_sender(self.msg_sender);
+        _ = VMContext::current()
             .replace_contract_address(self.contract_ref.address);
     }
 }
@@ -554,7 +555,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.set_call_params();
-        Context::current().transfer_value();
+        VMContext::current().transfer_value();
         &self.storage
     }
 }
@@ -563,7 +564,7 @@ impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
-        Context::current().transfer_value();
+        VMContext::current().transfer_value();
         &mut self.storage
     }
 }
@@ -576,7 +577,7 @@ pub struct Contract<ST: StorageType> {
 
 impl<ST: StorageType> Drop for Contract<ST> {
     fn drop(&mut self) {
-        Context::current().reset_storage(self.address);
+        VMContext::current().reset_storage(self.address);
     }
 }
 
@@ -596,7 +597,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     /// Create a new contract with the given `address`.
     #[must_use]
     pub fn new_at(address: Address) -> Self {
-        Context::current().init_storage::<ST>(address);
+        VMContext::current().init_storage::<ST>(address);
 
         Self { phantom: ::core::marker::PhantomData, address }
     }
@@ -696,11 +697,11 @@ pub trait Funding {
 
 impl Funding for Address {
     fn fund(&self, value: U256) {
-        Context::current().add_assign_balance(*self, value);
+        VMContext::current().add_assign_balance(*self, value);
     }
 
     fn balance(&self) -> U256 {
-        Context::current().balance(*self)
+        VMContext::current().balance(*self)
     }
 }
 
@@ -732,6 +733,6 @@ pub trait EventLogExt {
 
 impl<T: SolEvent> EventLogExt for T {
     fn emitted(&self) -> bool {
-        Context::current().emitted(self)
+        VMContext::current().emitted(self)
     }
 }
