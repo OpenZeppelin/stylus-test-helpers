@@ -116,7 +116,7 @@ impl Context {
         self.storage().msg_value
     }
 
-    /// Get the address of the contract, that is called.
+    /// Get the address of the contract that is called.
     pub(crate) fn contract_address(self) -> Option<Address> {
         self.storage().contract_address
     }
@@ -349,7 +349,7 @@ impl Context {
         to: Address,
         value: U256,
     ) -> Option<()> {
-        _ = self.checked_sub_assign_balance(from, value)?;
+        self.checked_sub_assign_balance(from, value)?;
         self.add_assign_balance(to, value);
         Some(())
     }
@@ -551,10 +551,10 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     /// the given `account`.
     pub fn init<A: Into<Address>, Output>(
         &self,
-        account: A,
+        sender: A,
         initializer: impl FnOnce(&mut ST) -> Output,
     ) -> Output {
-        initializer(&mut self.sender(account.into()))
+        initializer(&mut self.sender(sender.into()))
     }
 
     /// Create a new contract with default storage on the random address.
@@ -584,10 +584,10 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     #[must_use]
     pub fn sender_and_value<A: Into<Address>, V: Into<U256>>(
         &self,
-        account: A,
+        sender: A,
         value: V,
     ) -> ContractCall<ST> {
-        let caller_address = account.into();
+        let caller_address = sender.into();
         let value = value.into();
 
         ContractCall {
