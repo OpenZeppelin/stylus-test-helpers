@@ -261,10 +261,11 @@ mod ping_pong_tests {
         let ping = Contract::<PingContract>::new();
         let mut ping = ping.sender(alice);
         let pong = Contract::<PongContract>::new();
+        let pong_address = pong.address();
         let pong = pong.sender(alice);
 
         _ = ping
-            .ping(pong.address(), TEN)
+            .ping(pong_address, TEN)
             .expect("contract ping should not drop");
     }
 }
