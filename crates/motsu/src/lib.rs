@@ -372,11 +372,10 @@ mod proxies_tests {
     }
 
     impl Proxy {
-        fn init(&mut self, next_proxy: Address){
+        fn init(&mut self, next_proxy: Address) {
             self.next_proxy.set(next_proxy);
         }
     }
-    
 
     unsafe impl TopLevelStorage for Proxy {}
 
@@ -386,7 +385,6 @@ mod proxies_tests {
     const EIGHT: U256 = uint!(8_U256);
 
     const TEN: U256 = uint!(10_U256);
-    
 
     #[motsu_proc::test]
     fn call_three_proxies(
