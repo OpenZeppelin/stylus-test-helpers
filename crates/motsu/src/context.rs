@@ -90,7 +90,7 @@ impl Context {
         self.storage().contract_address.replace(address)
     }
 
-    /// Set optional message value to `value` and return the previous value if
+    /// Set an optional message value to `value` and return the previous value if
     /// any.
     ///
     /// Setting `value` to `None` will effectively clear the message value, e.g.
@@ -193,7 +193,7 @@ impl Context {
     }
 
     /// Based on `result`, set the return data.
-    /// Return 0 if `result` is `Ok`, otherwise return 1.
+    /// Return 0 if `result` is `Ok`, otherwise 1.
     unsafe fn process_arb_result_raw(
         self,
         result: ArbResult,
