@@ -1,11 +1,6 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    ptr, slice,
-    thread::ThreadId,
-};
+use std::{collections::{HashMap, HashSet}, fmt, hash::Hash, ptr, slice, thread::ThreadId};
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
@@ -736,3 +731,45 @@ impl<T: SolEvent> EventLogExt for T {
         VMContext::current().emitted(self)
     }
 }
+
+pub trait MotsuResult<T, E: fmt::Debug>{
+    fn motsu_unwrap(self) -> T;
+    fn motsu_unwrap_err(self) -> E;
+    fn motsu_expect(self, msg: &str) -> T;
+    fn motsu_expect_err(self, msg: &str) -> E;
+}
+
+impl<T: fmt::Debug, E: fmt::Debug> MotsuResult<T, E> for Result<T, E> {
+    #[track_caller]
+    fn motsu_unwrap(self) -> T {
+        match self {
+            Ok(value) => value,
+            Err(err) => panic!("called `Result::motsu_unwrap()` on an `Err` value: {:?}", err),
+        }
+    }
+
+    #[track_caller]
+    fn motsu_unwrap_err(self) -> E {
+        match self {
+            Ok(value) => panic!("called `Result::motsu_unwrap_err()` on an `Ok` value: {:?}", value),
+            Err(err) => err,
+        }
+    }
+
+    #[track_caller]
+    fn motsu_expect(self, msg: &str) -> T {
+        match self {
+            Ok(value) => value,
+            Err(err) => panic!("{}", msg),
+        }
+    }
+
+    #[track_caller]
+    fn motsu_expect_err(self, msg: &str) -> E {
+        match self {
+            Ok(value) => panic!("{}", msg),
+            Err(err) => err,
+        }
+    }
+}
+
