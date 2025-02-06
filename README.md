@@ -19,7 +19,7 @@ You can import `motsu` from crates.io by adding the following line to your `Carg
 
 ```toml
 [dev-dependencies]
-motsu = "0.3.0"
+motsu = "0.4.0"
 ```
 
 Then, when writing tests, use `#[motsu::test]` instead of `#[test]` to get access to VM
