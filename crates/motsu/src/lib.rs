@@ -10,28 +10,87 @@
 //! ## Usage
 //!
 //! Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
-//! to get access to VM affordances.
-//!
-//! Note that we require contracts to implement
-//! `stylus_sdk::prelude::StorageType`. This trait is typically implemented by
-//! default with `stylus_proc::sol_storage` or `stylus_proc::storage` macros.
+//! to get access to VM affordances:
 //!
 //! ```rust
 //! #[cfg(test)]
 //! mod tests {
-//!     use openzeppelin_stylus::token::erc20::Erc20;
-//!     use motsu::prelude::{Account, Contract};
+//!     use motsu::prelude::*;
 //!     use stylus_sdk::alloy_primitives::{Address, U256};
 //!
 //!     #[motsu::test]
 //!     fn reads_balance(
 //!         contract: Contract<Erc20>,
 //!         alice: Account,
-//!     ) {  
+//!     ) {
 //!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
 //! }
+//! ```
+//!
+//! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
+//! to contract, and should accept an account or address as an argument.
+//!
+//! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
+//! pass additional value to the contract:
+//!
+//! ```rust
+//!  use motsu::prelude::*;
+//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
+//!
+//!  #[motsu_proc::test]
+//!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
+//!     let one = uint!(1_U256);
+//!     let ten = uint!(10_U256);
+//!
+//!     // Initialize the proxy contract.
+//!     proxy.sender(alice).init(Address::ZERO);
+//!
+//!     // Fund alice.
+//!     alice.fund(ten);
+//!
+//!     // Call the contract.
+//!     proxy.sender_and_value(alice, one).pay_proxy();
+//!
+//!     // Assert that alice lost one wei and the proxy gained one wei.
+//!     assert_eq!(alice.balance(), ten - one);
+//!     assert_eq!(proxy.balance(), ten + one);
+//!  }
+//! ```
+//!
+//! Multiple external calls are supported in Motsu. Assuming `Proxy` is a
+//! contract that exposes `#[public]` function `call_proxy`. Where it adds `one`
+//! to the passed argument and calls next `Proxy` contract at the address
+//! provided during initialization. The following test case can emulate a call
+//! chain of three `Proxy` contracts:
+//!
+//! ```rust
+//!  use motsu::prelude::*;
+//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
+//!
+//!  #[motsu_proc::test]
+//!  fn call_three_proxies(
+//!     proxy1: Contract<Proxy>,
+//!     proxy2: Contract<Proxy>,
+//!     proxy3: Contract<Proxy>,
+//!     alice: Account,
+//!  ) {
+//!     let one = uint!(1_U256);
+//!     let ten = uint!(10_U256);
+//!
+//!     // Set up a chain of three proxies.
+//!     // With the given call chain: proxy1 -> proxy2 -> proxy3.
+//!     proxy1.sender(alice).init(proxy2.address());
+//!     proxy2.sender(alice).init(proxy3.address());
+//!     proxy3.sender(alice).init(Address::ZERO);
+//!
+//!     // Call the first proxy.
+//!     let result = proxy1.sender(alice).call_proxy(ten);
+//!
+//!     // The value is incremented by 1 for each proxy.
+//!     assert_eq!(result, ten + one + one + one);
+//!  }
 //! ```
 //!
 //! Annotating a test function that accepts no parameters will make
@@ -46,6 +105,43 @@
 //!     }
 //! }
 //! ```
+//!
+//! NOTE!!! 
+//! We require a contract to implement unsafe trait
+//! `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
+//! Typically, all contracts marked with [`stylus_sdk::prelude::entrypoint`]
+//! will have this trait automatically derived. Otherwise, you should do it by
+//! yourself:
+//!
+//! ```rust
+//! use stylus_sdk::{
+//!     storage::{StorageMap, StorageU256, StorageAddress},
+//!     prelude::*,
+//!     alloy_primitives::Address,
+//! };
+//!
+//! // Entry point is not implemented, so we should implement `TopLevelStorage` ourselves.
+//! // #[entrypoint]
+//! #[storage]
+//! pub struct Erc20 {
+//!     balances: StorageMap<Address, StorageU256>,
+//!     allowances: StorageMap<Address, StorageMap<Address, StorageU256>>,
+//!     total_supply: StorageU256,
+//! }
+//!
+//! unsafe impl TopLevelStorage for Erc20 {}
+//! ```
+//!
+//! NOTE!!! 
+//! For `motsu` to work correctly, `stylus-sdk` should **not** have
+//! default `hostio-caching` feature enabled.
+//!
+//! Following features: storage reset after erroneous transaction, `proptest` affordances for
+//! [`crate::prelude::Contract`] and [`crate::prelude::Account`] are not
+//! supported, and planed to be added soon.
+//!
+//! Reentrant tests patterns currently not implemented, and the test case will
+//! panic once a callee contract calls a caller contract.
 //!
 //! [test_attribute]: crate::test
 #[cfg(test)]
@@ -407,32 +503,19 @@ mod proxies_tests {
     }
 
     #[motsu_proc::test]
-    fn pay_three_proxies(
-        proxy1: Contract<Proxy>,
-        proxy2: Contract<Proxy>,
-        proxy3: Contract<Proxy>,
-        alice: Account,
-    ) {
-        // Set up a chain of three proxies.
-        // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+    fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
+        // Initialize the proxy contract.
+        proxy.sender(alice).init(Address::ZERO);
 
-        // Fund accounts.
+        // Fund alice.
         alice.fund(TEN);
-        proxy1.fund(TEN);
-        proxy2.fund(TEN);
-        proxy3.fund(TEN);
 
-        // Call the first proxy.
-        proxy1.sender_and_value(alice, ONE).pay_proxy();
+        // Call the contract.
+        proxy.sender_and_value(alice, ONE).pay_proxy();
 
-        // By the end, each actor will lose `ONE`, except last proxy.
+        // Assert that alice lost one wei and the proxy gained one wei.
         assert_eq!(alice.balance(), TEN - ONE);
-        assert_eq!(proxy1.balance(), TEN - ONE);
-        assert_eq!(proxy2.balance(), TEN - ONE);
-        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
+        assert_eq!(proxy.balance(), TEN + ONE);
     }
 
     #[motsu_proc::test]
