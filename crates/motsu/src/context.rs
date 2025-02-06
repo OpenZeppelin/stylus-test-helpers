@@ -304,7 +304,7 @@ impl Context {
     ///
     /// * If there is not enough funds to transfer.
     fn transfer_value(self) {
-        let mut storage = self.storage();
+        let storage = self.storage();
         let Some(msg_sender) = storage.msg_sender else {
             return;
         };
@@ -313,9 +313,7 @@ impl Context {
         };
 
         // We should transfer the value only if it is set.
-        // And we should transfer the value only once, despite this function
-        // being called multiple times (using `Option::take(..)`).
-        if let Some(msg_value) = storage.msg_value.take() {
+        if let Some(msg_value) = storage.msg_value {
             // Drop storage to avoid a deadlock.
             drop(storage);
 
@@ -497,6 +495,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.set_call_params();
+        Context::current().transfer_value();
         &self.storage
     }
 }
@@ -505,6 +504,7 @@ impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
+        Context::current().transfer_value();
         &mut self.storage
     }
 }
@@ -584,8 +584,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     ) -> ContractCall<ST> {
         let caller_address = account.into();
         let value = value.into();
-        
-        Context::current().transfer(caller_address, self.address, value);
+
         ContractCall {
             storage: unsafe { ST::new(uint!(0_U256), 0) },
             caller_address,

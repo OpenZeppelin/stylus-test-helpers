@@ -270,10 +270,12 @@ mod ping_pong_tests {
 
 #[cfg(test)]
 mod proxies_tests {
-    use alloy_primitives::{uint, Address, U256};
+    use alloy_primitives::{address, uint, Address, U256};
     use stylus_sdk::{
         call::Call,
-        contract, msg,
+        contract,
+        contract::address,
+        msg,
         prelude::{public, storage, TopLevelStorage},
         storage::StorageAddress,
     };
@@ -334,15 +336,15 @@ mod proxies_tests {
         }
 
         #[payable]
-        fn pass_this_much_to_next_proxy(&mut self, pass_value: U256) {
+        fn pass_proxy_with_fixed_value(&mut self, this_value: U256) {
             let next_proxy = self.next_proxy.get();
 
             // If there is a next proxy.
             if !next_proxy.is_zero() {
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(pass_value);
-                let value_for_next_next_proxy = pass_value / U256::from(2);
+                let call = Call::new_in(self).value(this_value);
+                let value_for_next_next_proxy = this_value / U256::from(2);
                 proxy
                     .pass_this_much_to_next_proxy(
                         call,
@@ -353,7 +355,7 @@ mod proxies_tests {
         }
 
         #[payable]
-        fn pass_half_value_to_next_proxy(&mut self) {
+        fn pay_proxy_with_half_balance(&mut self) {
             let next_proxy = self.next_proxy.get();
 
             // If there is a next proxy.
@@ -369,10 +371,22 @@ mod proxies_tests {
         }
     }
 
+    impl Proxy {
+        fn init(&mut self, next_proxy: Address){
+            self.next_proxy.set(next_proxy);
+        }
+    }
+    
+
     unsafe impl TopLevelStorage for Proxy {}
 
     const ONE: U256 = uint!(1_U256);
+    const TWO: U256 = uint!(2_U256);
+    const FOUR: U256 = uint!(4_U256);
+    const EIGHT: U256 = uint!(8_U256);
+
     const TEN: U256 = uint!(10_U256);
+    
 
     #[motsu_proc::test]
     fn call_three_proxies(
@@ -383,15 +397,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.init(alice, |storage| {
-            storage.next_proxy.set(proxy2.address());
-        });
-        proxy2.init(alice, |storage| {
-            storage.next_proxy.set(proxy3.address());
-        });
-        proxy3.init(alice, |storage| {
-            storage.next_proxy.set(Address::ZERO);
-        });
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(Address::ZERO);
 
         // Call the first proxy.
         let result = proxy1.sender(alice).call_proxy(TEN);
@@ -409,15 +417,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.init(alice, |storage| {
-            storage.next_proxy.set(proxy2.address());
-        });
-        proxy2.init(alice, |storage| {
-            storage.next_proxy.set(proxy3.address());
-        });
-        proxy3.init(alice, |storage| {
-            storage.next_proxy.set(Address::ZERO);
-        });
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(Address::ZERO);
 
         // Fund accounts.
         alice.fund(TEN);
@@ -429,14 +431,16 @@ mod proxies_tests {
         proxy1.sender_and_value(alice, ONE).pay_proxy();
 
         // By the end, each actor will lose `ONE`, except last proxy.
-        assert_eq!(alice.balance(), TEN - ONE);
-        assert_eq!(proxy1.balance(), TEN - ONE);
-        assert_eq!(proxy2.balance(), TEN - ONE);
-        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
+        assert_eq!(alice.balance(), TEN - ONE); // 10 - 1
+        assert_eq!(proxy1.balance(), TEN - ONE); // 10 + 1 - 2
+        assert_eq!(proxy2.balance(), TEN - ONE); // 10 + 2 - 3
+        assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE); // 10 + 3
     }
 
+    // TODO#q: if the msg value wasn't set we shouldn't set it
+
     #[motsu_proc::test]
-    fn error_when_transferring_values_for_nested_contract_calls(
+    fn pay_proxy_fixed_value(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -444,18 +448,12 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.init(alice, |storage| {
-            storage.next_proxy.set(proxy2.address());
-        });
-        proxy2.init(alice, |storage| {
-            storage.next_proxy.set(proxy3.address());
-        });
-        proxy3.init(alice, |storage| {
-            storage.next_proxy.set(Address::ZERO);
-        });
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(Address::ZERO);
 
         let zero = U256::ZERO;
-        let two = U256::from(2);
+        let two = uint!(2_U256);
         let four = U256::from(4);
         let eight = U256::from(8);
 
@@ -468,9 +466,7 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), zero);
 
         // Call the first proxy.
-        proxy1
-            .sender_and_value(alice, eight)
-            .pass_this_much_to_next_proxy(four);
+        proxy1.sender_and_value(alice, eight).pass_proxy_with_fixed_value(four);
 
         assert_eq!(alice.balance(), zero);
         assert_eq!(proxy1.balance(), four);
@@ -487,20 +483,14 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.init(alice, |storage| {
-            storage.next_proxy.set(proxy2.address());
-        });
-        proxy2.init(alice, |storage| {
-            storage.next_proxy.set(proxy3.address());
-        });
-        proxy3.init(alice, |storage| {
-            storage.next_proxy.set(Address::ZERO);
-        });
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(Address::ZERO);
 
         let zero = U256::ZERO;
-        let two = U256::from(2);
-        let four = U256::from(4);
-        let eight = U256::from(8);
+        let two = TWO;
+        let four = FOUR;
+        let eight = EIGHT;
 
         // Fund alice, proxies have no funds.
         alice.fund(eight);
@@ -511,7 +501,7 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), zero);
 
         // Call the first proxy.
-        proxy1.sender_and_value(alice, eight).pass_half_value_to_next_proxy();
+        proxy1.sender_and_value(alice, eight).pay_proxy_with_half_balance();
 
         assert_eq!(alice.balance(), zero);
         assert_eq!(proxy1.balance(), four);
