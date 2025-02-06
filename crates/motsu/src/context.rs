@@ -163,13 +163,13 @@ impl Context {
         address: *const u8,
         calldata: *const u8,
         calldata_len: usize,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
         let result = self.call_contract(address, selector, &input, None);
-        self.process_arb_result_raw(result, return_data_len)
+        self.process_arb_result_raw(result, return_data_size)
     }
 
     /// Call the contract at raw `address` with the given raw `calldata` and
@@ -180,14 +180,14 @@ impl Context {
         calldata: *const u8,
         calldata_len: usize,
         value: *const u8,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
         let result = self.call_contract(address, selector, &input, Some(value));
-        self.process_arb_result_raw(result, return_data_len)
+        self.process_arb_result_raw(result, return_data_size)
     }
 
     /// Based on `result`, set the return data.
@@ -195,16 +195,16 @@ impl Context {
     unsafe fn process_arb_result_raw(
         self,
         result: ArbResult,
-        return_data_len: *mut usize,
+        return_data_size: *mut usize,
     ) -> u8 {
         match result {
             Ok(res) => {
-                return_data_len.write(res.len());
+                return_data_size.write(res.len());
                 self.set_return_data(res);
                 0
             }
             Err(err) => {
-                return_data_len.write(err.len());
+                return_data_size.write(err.len());
                 self.set_return_data(err);
                 1
             }
@@ -256,8 +256,8 @@ impl Context {
     /// Set return data as bytes.
     fn set_return_data(self, data: Vec<u8>) {
         let mut call_storage = self.storage();
-        _ = call_storage.call_output_len.insert(data.len());
-        _ = call_storage.call_output.insert(data);
+        _ = call_storage.return_data_size.insert(data.len());
+        _ = call_storage.return_data.insert(data);
     }
 
     /// Read the return data (with a given `size`) from the last contract call
@@ -275,14 +275,14 @@ impl Context {
     /// Return data's size in bytes from the last contract call.
     pub(crate) fn return_data_size(self) -> usize {
         self.storage()
-            .call_output_len
+            .return_data_size
             .take()
             .expect("call_output_len should be set")
     }
 
     /// Return data's bytes from the last contract call.
     fn return_data(self) -> Vec<u8> {
-        self.storage().call_output.take().expect("call_output should be set")
+        self.storage().return_data.take().expect("call_output should be set")
     }
 
     /// Check if the contract at raw `address` has code.
@@ -461,9 +461,9 @@ struct MockStorage {
     /// Account's address to balance mapping.
     balances: HashMap<Address, U256>,
     // Output of a contract call.
-    call_output: Option<Vec<u8>>,
+    return_data: Option<Vec<u8>>,
     // Output length of a contract call.
-    call_output_len: Option<usize>,
+    return_data_size: Option<usize>,
 }
 
 /// Contract's byte storage
