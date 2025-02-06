@@ -2,7 +2,8 @@
 
 use std::{
     borrow::BorrowMut,
-    sync::{Arc, Mutex, TryLockError},
+    marker::PhantomData,
+    sync::{Arc, Mutex},
     thread::ThreadId,
 };
 
@@ -68,34 +69,24 @@ impl VMRouterContext {
         // Drop the storage reference to avoid a panic on lock.
         drop(storage);
 
-        // Try to get lock on the router.
-        let lock_result = router.try_lock();
-        match lock_result {
-            // If lock is acquired, route the message.
-            Ok(mut router) => router.route(selector, input),
-            // Panic instead of locking.
-            Err(TryLockError::WouldBlock) => {
-                panic!("recursive calls are not supported in motsu")
-            }
-            // This branch should not be reached, since we don't catch
-            // panics.
-            Err(TryLockError::Poisoned(_)) => {
-                panic!("should not call contract that panicked")
-            }
-        }
+        router.create_and_route(selector, input)
     }
 
     /// Initialise contract router for the current test thread and
     /// `contract_address`.
-    pub(crate) fn init_storage<ST: StorageType + TestRouter + 'static>(self) {
+    pub(crate) fn init_storage<ST: StorageType + VMRouter + 'static>(self) {
         let contract_address = self.contract_address;
         if MOTSU_VM_ROUTERS
             .insert(
                 self,
                 VMRouterStorage {
-                    router: Arc::new(Mutex::new(unsafe {
-                        ST::new(uint!(0_U256), 0)
-                    })),
+                    // Mutex is important since a contract type is not `Sync`.
+                    // We don't lock anything and let rust compiler know that
+                    // `RouterFactory` is `Sync` and can be shared between
+                    // threads.
+                    router: Arc::new(RouterFactory::<Mutex<ST>> {
+                        _phantom: PhantomData,
+                    }),
                 },
             )
             .is_some()
@@ -113,19 +104,48 @@ impl VMRouterContext {
 /// Metadata related to the router of an external contract.
 struct VMRouterStorage {
     // Contract's router.
-    // NOTE: Mutex is important since contract type is not `Sync`.
-    router: Arc<Mutex<dyn TestRouter>>,
+    router: Arc<dyn CreateRouter>,
 }
 
-/// A trait for routing messages to the appropriate selector in tests.
+/// A trait for router's creation.
+trait CreateRouter: Send + Sync {
+    /// Instantiate a new router.
+    fn create(&self) -> Box<dyn VMRouter>;
+
+    /// Instantiate a new router and instantly route a message to the matching
+    /// selector.
+    /// Returns `None` if the `selector` wasn't found.
+    fn create_and_route(
+        &self,
+        selector: u32,
+        input: &[u8],
+    ) -> Option<ArbResult> {
+        self.create().route(selector, input)
+    }
+}
+
+/// A factory for router creation.
+struct RouterFactory<R> {
+    _phantom: PhantomData<R>,
+}
+
+impl<R: StorageType + VMRouter + 'static> CreateRouter
+    for RouterFactory<Mutex<R>>
+{
+    fn create(&self) -> Box<dyn VMRouter> {
+        Box::new(unsafe { R::new(uint!(0_U256), 0) })
+    }
+}
+
+/// A trait for routing messages to the matching selector.
 #[allow(clippy::module_name_repetitions)]
-pub trait TestRouter: Send {
+pub(crate) trait VMRouter: Send {
     /// Tries to find and execute a method for the given `selector`, returning
     /// `None` if the `selector` wasn't found.
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
 }
 
-impl<R> TestRouter for R
+impl<R> VMRouter for R
 where
     R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + Send,
 {
