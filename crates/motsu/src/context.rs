@@ -75,7 +75,7 @@ impl Context {
     }
 
     /// Set the message sender address and return the previous sender if any.
-    fn set_msg_sender(self, msg_sender: Address) -> Option<Address> {
+    fn replace_msg_sender(self, msg_sender: Address) -> Option<Address> {
         self.storage().msg_sender.replace(msg_sender)
     }
 
@@ -85,24 +85,22 @@ impl Context {
         self.storage().msg_sender
     }
 
-    /// Set the address of the contract, that is called.
-    fn set_contract_address(self, address: Address) -> Option<Address> {
+    /// Replace the address of the contract, and return the previous address if
+    /// any.
+    fn replace_contract_address(self, address: Address) -> Option<Address> {
         self.storage().contract_address.replace(address)
     }
 
-    /// Set an optional message value to `value` and return the previous value
+    /// Replace an optional message with `value` and return the previous value
     /// if any.
     ///
     /// Setting `value` to `None` will effectively clear the message value, e.g.
     /// for non "payable" call.
-    pub(crate) fn set_optional_msg_value(
+    pub(crate) fn replace_optional_msg_value(
         self,
         value: Option<U256>,
     ) -> Option<U256> {
-        let msg_value = &mut self.storage().msg_value;
-        let previous = msg_value.take();
-        *msg_value = value;
-        previous
+        std::mem::replace(&mut self.storage().msg_value, value)
     }
 
     /// Write the value sent to the contract to `output`.
@@ -225,14 +223,14 @@ impl Context {
         // Set the caller contract as message sender and callee contract as
         // a receiver (`contract_address`).
         let previous_contract_address = self
-            .set_contract_address(contract_address)
+            .replace_contract_address(contract_address)
             .expect("contract_address should be set");
         let previous_msg_sender = self
-            .set_msg_sender(previous_contract_address)
+            .replace_msg_sender(previous_contract_address)
             .expect("msg_sender should be set");
 
         // Set new msg_value, and store the previous one.
-        let previous_msg_value = self.set_optional_msg_value(value);
+        let previous_msg_value = self.replace_optional_msg_value(value);
 
         // Transfer value sent by message sender.
         self.transfer_value();
@@ -246,11 +244,11 @@ impl Context {
             });
 
         // Set the previous message sender and contract address back.
-        _ = self.set_contract_address(previous_contract_address);
-        _ = self.set_msg_sender(previous_msg_sender);
+        _ = self.replace_contract_address(previous_contract_address);
+        _ = self.replace_msg_sender(previous_msg_sender);
 
         // Set the previous msg_value.
-        self.set_optional_msg_value(previous_msg_value);
+        self.replace_optional_msg_value(previous_msg_value);
 
         result
     }
@@ -496,9 +494,9 @@ impl<ST: StorageType> ContractCall<'_, ST> {
 
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        _ = Context::current().set_optional_msg_value(self.value);
-        _ = Context::current().set_msg_sender(self.caller_address);
-        _ = Context::current().set_contract_address(self.address());
+        _ = Context::current().replace_optional_msg_value(self.value);
+        _ = Context::current().replace_msg_sender(self.caller_address);
+        _ = Context::current().replace_contract_address(self.address());
     }
 }
 
