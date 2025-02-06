@@ -105,7 +105,7 @@ impl Context {
 
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
-        let value: U256 = self.msg_value().expect("msg_value should be set");
+        let value: U256 = self.msg_value().unwrap_or_default();
         write_u256(output, value);
     }
 
