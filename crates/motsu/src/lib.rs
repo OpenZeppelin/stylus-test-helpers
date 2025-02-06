@@ -289,9 +289,9 @@ mod proxies_tests {
             #[allow(missing_docs)]
             function payProxy() external payable;
             #[allow(missing_docs)]
-            function passThisMuchToNextProxy(uint256 pass_value) external payable;
+            function passProxyWithFixedValue(uint256 pass_value) external payable;
             #[allow(missing_docs)]
-            function passHalfValueToNextProxy() external payable;
+            function payProxyWithHalfBalance() external payable;
         }
     }
 
@@ -346,7 +346,7 @@ mod proxies_tests {
                 let call = Call::new_in(self).value(this_value);
                 let value_for_next_next_proxy = this_value / U256::from(2);
                 proxy
-                    .pass_this_much_to_next_proxy(
+                    .pass_proxy_with_fixed_value(
                         call,
                         value_for_next_next_proxy,
                     )
@@ -365,7 +365,7 @@ mod proxies_tests {
                 let proxy = IProxy::new(next_proxy);
                 let call = Call::new_in(self).value(half_balance);
                 proxy
-                    .pass_half_value_to_next_proxy(call)
+                    .pay_proxy_with_half_balance(call)
                     .expect("should pass half the value to the next proxy");
             }
         }
