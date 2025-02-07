@@ -139,7 +139,7 @@ impl<R: StorageType + VMRouter + 'static> CreateRouter
 
 /// A trait for routing messages to the matching selector.
 #[allow(clippy::module_name_repetitions)]
-pub(crate) trait VMRouter: Send {
+pub trait VMRouter: Send {
     /// Tries to find and execute a method for the given `selector`, returning
     /// `None` if the `selector` wasn't found.
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
