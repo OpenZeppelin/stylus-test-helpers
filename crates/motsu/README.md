@@ -34,10 +34,10 @@ mod tests {
 }
  ```
 
-Function `Contract::sender` is necessary to trigger call
+Function `Contract::sender()` is necessary to trigger call
 to a contract, and should accept an `Account` or `Address` as an argument.
 
-Alternatively `Contract::sender_and_value` can be used to
+Alternatively `Contract::sender_and_value()` can be used to
 pass additional value to the contract:
 
  ```rust
