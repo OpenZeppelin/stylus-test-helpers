@@ -10,17 +10,15 @@ Japanese -- we hold a stylus in our hand.
 ## Usage
 
 This crate enables unit-testing for Stylus contracts. It abstracts away the
-machinery necessary for writing tests behind a
-[`#[motsu::test]`][test_attribute] procedural macro.
+machinery necessary for writing tests behind a `#[motsu::test]` procedural macro.
 
-Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
+Annotate tests with `#[motsu::test]` instead of `#[test]`
 to get access to VM affordances:
 
  ```rust
  #[cfg(test)]
 mod tests {
     use motsu::prelude::*;
-    use stylus_sdk::alloy_primitives::{Address, U256};
 
     #[motsu::test]
     fn reads_balance(
@@ -42,9 +40,8 @@ pass additional value to the contract:
 
  ```rust
 use motsu::prelude::*;
-use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 
-#[motsu_proc::test]
+#[motsu::test]
 fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
     let one = uint!(1_U256);
     let ten = uint!(10_U256);
@@ -72,9 +69,8 @@ chain of three `Proxy` contracts:
 
  ```rust
 use motsu::prelude::*;
-use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 
-#[motsu_proc::test]
+#[motsu::test]
 fn call_three_proxies(
     proxy1: Contract<Proxy>,
     proxy2: Contract<Proxy>,
@@ -99,7 +95,7 @@ fn call_three_proxies(
  ```
 
 Annotating a test function that accepts no parameters will make
-[`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
+`#[motsu::test]` behave the same as `#[test]`.
 
  ```rust,ignore
  #[cfg(test)]
@@ -141,12 +137,6 @@ unsafe impl TopLevelStorage for Erc20 {}
 NOTE!!!
 For `motsu` to work correctly, `stylus-sdk` should **not** have
 default `hostio-caching` feature enabled.
-
-Following features: event log assertions, storage reset after erroneous transaction,
-`proptest` affordances for `Contract` and `Account`
-are not supported, and planed to be added soon.
-
-[test_attribute]: crate::test
 
 ### Notice
 
