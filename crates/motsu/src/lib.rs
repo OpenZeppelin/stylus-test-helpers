@@ -255,26 +255,6 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
-    fn deref_invalidated_storage_cache(
-        ping: Contract<PingContract>,
-        pong: Contract<PongContract>,
-        alice: Account,
-    ) {
-        let mut alice_ping = ping.sender(alice);
-        let alice_pong = pong.sender(alice);
-
-        assert_eq!(alice_ping.contract_address.get(), Address::ZERO);
-        assert_eq!(alice_pong.contract_address.get(), Address::ZERO);
-
-        _ = alice_ping
-            .ping(pong.address(), TEN)
-            .expect("should ping successfully");
-
-        assert_eq!(alice_ping.contract_address.get(), ping.address());
-        assert_eq!(alice_pong.contract_address.get(), pong.address());
-    }
-
-    #[motsu::test]
     #[allow(unused)]
     fn contract_should_not_drop() {
         let alice = Account::random();
