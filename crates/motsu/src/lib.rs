@@ -411,6 +411,40 @@ mod proxies_tests {
     unsafe impl TopLevelStorage for Proxy {}
 
     #[motsu::test]
+    fn test_storage_cleanup_behavior() {
+        let addr = Address::random();
+
+        // First contract instance
+        let proxy1 = Contract::<Proxy>::new_at(addr);
+        let alice = Account::random();
+        proxy1.sender(alice).init(Address::ZERO);
+
+        // Drop first instance
+        drop(proxy1);
+
+        // Second contract at same address should work fine
+        let proxy2 = Contract::<Proxy>::new_at(addr);
+        proxy2.sender(alice).init(Address::ZERO);
+
+        // This is expected behavior - storage is cleaned up on drop
+        // If we tried to access proxy1 here it would panic since its storage is
+        // gone
+    }
+
+    #[motsu::test]
+    #[should_panic(expected = "contract storage already initialized")]
+    fn test_storage_duplicate_contract() {
+        let addr = Address::random();
+
+        // First contract instance
+        let _proxy1 = Contract::<Proxy>::new_at(addr);
+
+        // Attempting to create second instance at same address while first
+        // exists should panic
+        let _proxy2 = Contract::<Proxy>::new_at(addr);
+    }
+
+    #[motsu::test]
     fn call_three_proxies(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
