@@ -55,7 +55,7 @@ pub mod prelude;
 mod router;
 mod shims;
 mod storage_access;
-mod result_ext;
+mod revert;
 
 pub use motsu_proc::test;
 

@@ -51,3 +51,51 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
         }
     }
 }
+
+#[derive(Default)]
+pub(crate) struct Backuped<D: Clone + Default> {
+    data: D,
+    // TODO#q: do we need an optional backup?
+    backup: Option<D>,
+}
+
+impl<D: Clone + Default> Backuped<D> {
+    fn new(data: D) -> Self {
+        Self { data: data.clone(), backup: Some(data) }
+    }
+
+    // TODO#q: implement deref?
+    fn data(&self) -> &D {
+        &self.data
+    }
+
+    fn data_mut(&mut self) -> &mut D {
+        &mut self.data
+    }
+
+    // Should be called before starting call between contracts.
+    fn clone_data(&self) -> D {
+        self.data.clone()
+    }
+
+    /// Should be called when transaction was successful.
+    fn reset_backup(&mut self) {
+        // To not copy backup another time.
+        _ = self.backup.take();
+    }
+
+    /// Should be called when transaction failed.
+    fn restore_from_backup(&mut self) {
+        self.data = self.backup.clone().expect("unable revert transaction");
+    }
+
+    /// Should be called when call between contracts failed.
+    fn restore_from_data(&mut self, data: D) {
+        self.data = data;
+    }
+
+    /// Should be called when we start a new transaction
+    fn create_backup(&mut self) {
+        let _ = self.backup.insert(self.data.clone());
+    }
+}
