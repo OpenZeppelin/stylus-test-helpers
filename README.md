@@ -19,21 +19,25 @@ Japanese -- we hold a stylus in our hand.
 
 ### Usage
 
-You can import `motsu` from crates.io by adding the following lines to your `Cargo.toml`.
-For `motsu` to work correctly, `stylus-sdk` should **not** have a default `hostio-caching`
-feature enabled.
+Add motsu to your project's dependencies:
 
 ```toml
 [dev-dependencies]
 motsu = "0.4.0"
+
+[dependencies]
 stylus-sdk = { version = "0.7.0", default-features = false, features = [
   "mini-alloc",
 ] }
 ```
 
+Important: When using motsu, the stylus-sdk must be configured without
+the default `hostio-caching` feature to prevent conflicts.
+E.g., you can use the mini-alloc feature without including defaults as shown above.
+
 ## Contribute
 
-If you're interested in contributing please check our [contribution guidelines].
+If you're interested in contributing, please check our [contribution guidelines].
 
 [contribution guidelines]: ./CONTRIBUTING.md
 
