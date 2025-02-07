@@ -85,7 +85,7 @@ impl VMRouterContext {
                     // `RouterFactory` is `Sync` and can be shared between
                     // threads.
                     router: Arc::new(RouterFactory::<Mutex<ST>> {
-                        _phantom: PhantomData,
+                        phantom: PhantomData,
                     }),
                 },
             )
@@ -114,6 +114,7 @@ trait CreateRouter: Send + Sync {
 
     /// Instantiate a new router and instantly route a message to the matching
     /// selector.
+    /// 
     /// Returns `None` if the `selector` wasn't found.
     fn create_and_route(
         &self,
@@ -126,7 +127,7 @@ trait CreateRouter: Send + Sync {
 
 /// A factory for router creation.
 struct RouterFactory<R> {
-    _phantom: PhantomData<R>,
+    phantom: PhantomData<R>,
 }
 
 impl<R: StorageType + VMRouter + 'static> CreateRouter
