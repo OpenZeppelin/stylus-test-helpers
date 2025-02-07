@@ -53,7 +53,7 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
     // Fund alice.
     alice.fund(ten);
 
-    // Call the contract.
+    // Call some contract with value.
     proxy.sender_and_value(alice, one).pay_proxy();
 
     // Assert that alice lost one wei and the proxy gained one wei.
