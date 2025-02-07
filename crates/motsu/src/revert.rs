@@ -14,6 +14,9 @@ pub trait ResultExt<T, E: fmt::Debug> {
 
 // TODO#q: substitute tags in the error message
 
+// TODO#q: Don't print debug information about the error.
+// `E` should implement `Into<Vec<u8>>`
+
 impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     #[track_caller]
     fn motsu_unwrap(self) -> T {
