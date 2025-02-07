@@ -17,6 +17,7 @@ use stylus_sdk::{
 };
 
 use crate::{
+    revert::Backuped,
     router::{TestRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
@@ -245,13 +246,13 @@ impl VMContext {
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
-        // TODO#q: backup
-        // We have `data` and `backup`.
-        // We should store cloned `data` here.
-        // If result is success, use `new_data` and `backup`
-        // If result is error, use `data` and `backup`
-        // NOTE: we should do backup before transfering value, to have a value
-        // reverted in case of failure
+        // We should do backup before transferring value, to have balances
+        // reverted in case of failure.
+        let storage = self.storage();
+        let contract_data = storage.contract_data.clone_data();
+        let balances = storage.balances.clone_data();
+        let events = storage.events.clone_data();
+        drop(storage);
 
         // Transfer value sent by message sender.
         self.transfer_value();
@@ -263,6 +264,15 @@ impl VMContext {
             .unwrap_or_else(|| {
                 panic!("selector not found - selector is {selector}")
             });
+
+        // If the call was unsuccessful, we should restore the data.
+        if result.is_err() {
+            // Recover from backups.
+            let mut storage = self.storage();
+            storage.contract_data.restore_from_data(contract_data);
+            storage.balances.restore_from_data(balances);
+            storage.events.restore_from_data(events);
+        }
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -421,6 +431,30 @@ impl VMContext {
             .and_modify(|v| *v += value)
             .or_insert(value)
     }
+    
+    // TODO#q: document the following functions
+    
+    pub(crate) fn reset_backup(self){
+        let mut storage = self.storage();
+        storage.contract_data.reset_backup();
+        storage.balances.reset_backup();
+        storage.events.reset_backup();
+    }
+    
+    pub(crate) fn restore_from_backup(self){
+        let mut storage = self.storage();
+        storage.contract_data.restore_from_backup();
+        storage.balances.restore_from_backup();
+        storage.events.restore_from_backup();
+    }
+    
+    /// NOTE: Should create backup before transfering the value
+    fn create_backup(self){
+        let mut storage = self.storage();
+        storage.contract_data.create_backup();
+        storage.balances.create_backup();
+        storage.events.create_backup();
+    }
 
     /// Get reference to the storage for the current test thread.
     fn storage(self) -> RefMut<'static, VMContext, VMContextStorage> {
@@ -491,12 +525,13 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
+    // TODO#q: move contract_data, balances, events to VMPersistentStorage
     /// Contract's address to mock data storage mapping.
-    contract_data: HashMap<Address, ContractStorage>,
+    contract_data: Backuped<HashMap<Address, ContractStorage>>,
     /// Account's address to balance mapping.
-    balances: HashMap<Address, U256>,
+    balances: Backuped<HashMap<Address, U256>>,
     /// Event logs emitted during [`Context::current`].
-    events: HashSet<Log>,
+    events: Backuped<HashSet<Log>>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
@@ -504,7 +539,7 @@ struct VMContextStorage {
 }
 
 /// Event log emitted during [`Context::current`].
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 struct Log {
     data: Vec<u8>,
     topics: usize,
@@ -565,6 +600,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        VMContext::current().create_backup();
         self.set_call_params();
         VMContext::current().transfer_value();
         &self.storage
@@ -574,6 +610,7 @@ impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        VMContext::current().create_backup();
         self.set_call_params();
         VMContext::current().transfer_value();
         &mut self.storage
@@ -772,4 +809,3 @@ impl<ST: StorageType + TestRouter + 'static> DeriveFromTag for Contract<ST> {
         Contract::new_at(Address::from_tag(tag))
     }
 }
-

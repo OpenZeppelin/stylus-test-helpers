@@ -1,6 +1,9 @@
 // TODO#q: add docs
 
 use core::fmt;
+use std::ops::{Deref, DerefMut};
+
+use crate::context::VMContext;
 
 pub trait ResultExt<T, E: fmt::Debug> {
     fn motsu_unwrap(self) -> T;
@@ -10,44 +13,51 @@ pub trait ResultExt<T, E: fmt::Debug> {
 }
 
 // TODO#q: substitute tags in the error message
-// TODO#q: revert transaction when it is applicable
 
 impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     #[track_caller]
     fn motsu_unwrap(self) -> T {
         match self {
-            Ok(value) => value,
-            Err(err) => panic!(
-                "called `Result::motsu_unwrap()` on an `Err` value: {:?}",
-                err
-            ),
+            Ok(value) => {
+                VMContext::current().reset_backup();
+                value
+            }
+            Err(err) => panic!("failed to call contract: {err:?}",),
         }
     }
 
     #[track_caller]
     fn motsu_unwrap_err(self) -> E {
         match self {
-            Ok(value) => panic!(
-                "called `Result::motsu_unwrap_err()` on an `Ok` value: {:?}",
-                value
-            ),
-            Err(err) => err,
+            Ok(value) => {
+                panic!("expected failure calling contract: {value:?}")
+            }
+            Err(err) => {
+                VMContext::current().restore_from_backup();
+                err
+            }
         }
     }
 
     #[track_caller]
     fn motsu_expect(self, msg: &str) -> T {
         match self {
-            Ok(value) => value,
-            Err(err) => panic!("{}", msg),
+            Ok(value) => {
+                VMContext::current().reset_backup();
+                value
+            }
+            Err(err) => panic!("failed to call contract: {msg:?}: {err:?}"),
         }
     }
 
     #[track_caller]
     fn motsu_expect_err(self, msg: &str) -> E {
         match self {
-            Ok(value) => panic!("{}", msg),
-            Err(err) => err,
+            Ok(value) => panic!("expected failure calling contract: {msg:?}"),
+            Err(err) => {
+                VMContext::current().restore_from_backup();
+                err
+            }
         }
     }
 }
@@ -59,43 +69,44 @@ pub(crate) struct Backuped<D: Clone + Default> {
     backup: Option<D>,
 }
 
-impl<D: Clone + Default> Backuped<D> {
-    fn new(data: D) -> Self {
-        Self { data: data.clone(), backup: Some(data) }
-    }
+impl<D: Clone + Default> Deref for Backuped<D> {
+    type Target = D;
 
-    // TODO#q: implement deref?
-    fn data(&self) -> &D {
+    fn deref(&self) -> &Self::Target {
         &self.data
     }
+}
 
-    fn data_mut(&mut self) -> &mut D {
+impl<D: Clone + Default> DerefMut for Backuped<D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
+}
 
-    // Should be called before starting call between contracts.
-    fn clone_data(&self) -> D {
+impl<D: Clone + Default> Backuped<D> {
+    /// Should be called before starting call between contracts.
+    pub(crate) fn clone_data(&self) -> D {
         self.data.clone()
     }
 
     /// Should be called when transaction was successful.
-    fn reset_backup(&mut self) {
+    pub(crate) fn reset_backup(&mut self) {
         // To not copy backup another time.
         _ = self.backup.take();
     }
 
     /// Should be called when transaction failed.
-    fn restore_from_backup(&mut self) {
+    pub(crate) fn restore_from_backup(&mut self) {
         self.data = self.backup.clone().expect("unable revert transaction");
     }
 
     /// Should be called when call between contracts failed.
-    fn restore_from_data(&mut self, data: D) {
+    pub(crate) fn restore_from_data(&mut self, data: D) {
         self.data = data;
     }
 
     /// Should be called when we start a new transaction
-    fn create_backup(&mut self) {
+    pub(crate) fn create_backup(&mut self) {
         let _ = self.backup.insert(self.data.clone());
     }
 }
