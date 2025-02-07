@@ -27,20 +27,21 @@ mod tests {
         contract: Contract<Erc20>,
         alice: Account,
     ) {
-        let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
+        // Access storage.
+        let balance = contract.sender(alice).balance_of(Address::ZERO);
         assert_eq!(balance, U256::ZERO);
     }
 }
  ```
 
-Function [`crate::prelude::Contract::sender`] is necessary to trigger call
-to contract, and should accept an account or address as an argument.
+Function `Contract::sender` is necessary to trigger call
+to a contract, and should accept an `Account` or `Address` as an argument.
 
-Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
+Alternatively `Contract::sender_and_value` can be used to
 pass additional value to the contract:
 
  ```rust
-  use motsu::prelude::*;
+use motsu::prelude::*;
 use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 
 #[motsu_proc::test]
@@ -64,13 +65,13 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
  ```
 
 Multiple external calls are supported in Motsu. Assuming `Proxy` is a
-contract that exposes `#[public]` function `call_proxy`. Where it adds `one`
+contract that exposes (`#[public]`) function `call_proxy`. Where it adds `one`
 to the passed argument and calls next `Proxy` contract at the address
 provided during initialization. The following test case can emulate a call
 chain of three `Proxy` contracts:
 
  ```rust
-  use motsu::prelude::*;
+use motsu::prelude::*;
 use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 
 #[motsu_proc::test]
@@ -113,8 +114,8 @@ mod tests {
 NOTE!!!
 We require a contract to implement unsafe trait
 `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
-Typically, all contracts marked with [`stylus_sdk::prelude::entrypoint`]
-will have this trait automatically derived.
+Typically, all contracts marked with `#[entrypoint]` will have this trait
+automatically derived.
 Otherwise, you should do it by
 yourself:
 
@@ -142,11 +143,8 @@ For `motsu` to work correctly, `stylus-sdk` should **not** have
 default `hostio-caching` feature enabled.
 
 Following features: event log assertions, storage reset after erroneous transaction,
-`proptest` affordances for [`crate::prelude::Contract`] and [`crate::prelude::Account`]
+`proptest` affordances for `Contract` and `Account`
 are not supported, and planed to be added soon.
-
-Reentrant tests patterns currently not implemented, and the test case will
-panic once a callee contract calls a caller contract.
 
 [test_attribute]: crate::test
 

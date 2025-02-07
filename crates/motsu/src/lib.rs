@@ -144,9 +144,6 @@
 //! transaction, `proptest` affordances for [`crate::prelude::Contract`] and
 //! [`crate::prelude::Account`] are not supported, and planed to be added soon.
 //!
-//! Reentrant tests patterns currently not implemented, and the test case will
-//! panic once a callee contract calls a caller contract.
-//!
 //! [test_attribute]: crate::test
 #[cfg(test)]
 extern crate alloc;
