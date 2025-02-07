@@ -504,7 +504,7 @@ impl<ST: StorageType> ContractCall<'_, ST> {
     /// artifacts from the previous invocations.
     fn invalidate_storage_cache(&self) {
         let uncached_storage = unsafe { ST::new(uint!(0_U256), 0) };
-        _ = self.storage.replace(uncached_storage);
+        self.storage.set(uncached_storage);
     }
 }
 
