@@ -23,14 +23,16 @@
 //!         contract: Contract<Erc20>,
 //!         alice: Account,
 //!     ) {
-//!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
+//!         // Access storage.
+//!         let balance = contract.sender(alice).balance_of(Address::ZERO);
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
 //! }
 //! ```
 //!
 //! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
-//! to contract, and should accept an account or address as an argument.
+//! to a contract, and should accept an [`crate::prelude::Account`] or an
+//! [`stylus_sdk::alloy_primitives::Address`] as an argument.
 //!
 //! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
 //! pass additional value to the contract:
@@ -39,7 +41,7 @@
 //!  use motsu::prelude::*;
 //!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 //!
-//!  #[motsu_proc::test]
+//!  #[motsu::test]
 //!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
 //!     let one = uint!(1_U256);
 //!     let ten = uint!(10_U256);
@@ -59,17 +61,19 @@
 //!  }
 //! ```
 //!
-//! Multiple external calls are supported in Motsu. Assuming `Proxy` is a
-//! contract that exposes `#[public]` function `call_proxy`. Where it adds `one`
-//! to the passed argument and calls next `Proxy` contract at the address
-//! provided during initialization. The following test case can emulate a call
-//! chain of three `Proxy` contracts:
+//! Multiple external calls are supported in Motsu.
+//! Assuming [`crate::proxies_tests::Proxy`] is a contract that exposes
+//! `#[public]` function [`crate::proxies_tests::Proxy::call_proxy`].
+//! Where it adds `one` to the passed argument and calls next
+//! [`crate::proxies_tests::Proxy`] contract at the address provided during
+//! initialization. The following test case can emulate a call chain of three
+//! [`crate::proxies_tests::Proxy`] contracts:
 //!
 //! ```rust
 //!  use motsu::prelude::*;
 //!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 //!
-//!  #[motsu_proc::test]
+//!  #[motsu::test]
 //!  fn call_three_proxies(
 //!     proxy1: Contract<Proxy>,
 //!     proxy2: Contract<Proxy>,
@@ -108,10 +112,10 @@
 //!
 //! NOTE!!!
 //! We require a contract to implement unsafe trait
-//! `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
-//! Typically, all contracts marked with [`stylus_sdk::prelude::entrypoint`]
-//! will have this trait automatically derived. Otherwise, you should do it by
-//! yourself:
+//! [`stylus_sdk::prelude::TopLevelStorage`], for a contract to be used in
+//! tests. Typically, all contracts marked with
+//! [`stylus_sdk::prelude::entrypoint`] will have this trait automatically
+//! derived. Otherwise, you should do it by yourself:
 //!
 //! ```rust
 //! use stylus_sdk::{
