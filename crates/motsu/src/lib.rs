@@ -298,7 +298,7 @@ mod proxies_tests {
         call::Call,
         contract, msg,
         prelude::{public, storage, TopLevelStorage},
-        storage::StorageAddress,
+        storage::{StorageAddress, StorageU256},
     };
 
     use crate::prelude::*;
@@ -325,11 +325,20 @@ mod proxies_tests {
 
     #[storage]
     struct Proxy {
+        value: StorageU256,
         next_proxy: StorageAddress,
     }
 
     #[public]
     impl Proxy {
+        fn increment_value(&mut self) {
+            self.value.set(self.value.checked_add(ONE).unwrap());
+        }
+
+        fn value(&self) -> U256 {
+            self.value.get()
+        }
+
         fn call_proxy(&mut self, value: U256) -> U256 {
             if value == CALL_PROXY_LIMIT {
                 return value;
@@ -411,27 +420,6 @@ mod proxies_tests {
     unsafe impl TopLevelStorage for Proxy {}
 
     #[motsu::test]
-    fn test_storage_cleanup_behavior() {
-        let addr = Address::random();
-
-        // First contract instance
-        let proxy1 = Contract::<Proxy>::new_at(addr);
-        let alice = Account::random();
-        proxy1.sender(alice).init(Address::ZERO);
-
-        // Drop first instance
-        drop(proxy1);
-
-        // Second contract at same address should work fine
-        let proxy2 = Contract::<Proxy>::new_at(addr);
-        proxy2.sender(alice).init(Address::ZERO);
-
-        // This is expected behavior - storage is cleaned up on drop
-        // If we tried to access proxy1 here it would panic since its storage is
-        // gone
-    }
-
-    #[motsu::test]
     #[should_panic(expected = "contract storage already initialized")]
     fn test_storage_duplicate_contract() {
         let addr = Address::random();
@@ -442,6 +430,31 @@ mod proxies_tests {
         // Attempting to create second instance at same address while first
         // exists should panic
         let _proxy2 = Contract::<Proxy>::new_at(addr);
+    }
+
+    #[motsu::test]
+    fn test_storage_cleanup(alice: Account, addr: Address) {
+        // First contract
+        let proxy1 = Contract::<Proxy>::new_at(addr);
+        proxy1.sender(alice).init(alice.address());
+
+        assert_eq!(U256::ZERO, proxy1.sender(alice).value());
+        assert_eq!(alice.address(), proxy1.sender(alice).next_proxy.get());
+
+        proxy1.sender(alice).increment_value();
+
+        assert_eq!(ONE, proxy1.sender(alice).value());
+        assert_eq!(alice.address(), proxy1.sender(alice).next_proxy.get());
+
+        // Drop first contract
+        drop(proxy1);
+
+        // Second contract at same address
+        let proxy2 = Contract::<Proxy>::new_at(addr);
+
+        // Should have fresh state
+        assert_eq!(U256::ZERO, proxy2.sender(alice).value());
+        assert_eq!(Address::ZERO, proxy2.sender(alice).next_proxy.get());
     }
 
     #[motsu::test]
