@@ -271,7 +271,7 @@ mod ping_pong_tests {
 
     #[motsu::test]
     #[should_panic(expected = "contract storage already initialized")]
-    fn test_storage_duplicate_contract() {
+    fn storage_duplicate_contract() {
         let addr = Address::random();
 
         // First contract instance
@@ -283,7 +283,7 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
-    fn test_storage_cleanup(alice: Account, addr: Address) {
+    fn storage_cleanup(alice: Account, addr: Address) {
         // First contract
         let pong1 = Contract::<PongContract>::new_at(addr);
 
