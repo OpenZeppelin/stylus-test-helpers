@@ -151,11 +151,6 @@ mod ping_pong_tests {
         MagicError(MagicError),
     }
 
-    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
-
-    const ONE: U256 = uint!(1_U256);
-    const TEN: U256 = uint!(10_U256);
-
     sol! {
         /// Emitted when [`PongContract`] was called.
         ///

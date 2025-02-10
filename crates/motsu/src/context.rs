@@ -9,7 +9,7 @@ use std::{
     thread::ThreadId,
 };
 
-use alloy_primitives::{Address, Log, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
