@@ -135,8 +135,8 @@
 //! unsafe impl TopLevelStorage for Erc20 {}
 //! ```
 //!
-//! **Important:** For `motsu` to work correctly, `stylus-sdk` should **not** have
-//! a default `hostio-caching` feature enabled.
+//! **Important:** For `motsu` to work correctly, `stylus-sdk` should **not**
+//! have a default `hostio-caching` feature enabled.
 //!
 //! [test_attribute]: crate::test
 #[cfg(test)]
