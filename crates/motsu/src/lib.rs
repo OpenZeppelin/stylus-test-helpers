@@ -260,17 +260,23 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
+        // This test is different from `contract_address` test, since it checks
+        // that `StorageType` contract correctly resets.
         let mut alice_ping = ping.sender(alice);
         let alice_pong = pong.sender(alice);
 
-        assert_eq!(alice_ping.contract_address.get(), Address::ZERO);
+        // `alice_pong.contract_address.get()` invocation will cache the value
+        // of `contract_address` for the next immutable call.
         assert_eq!(alice_pong.contract_address.get(), Address::ZERO);
 
+        // Here `alice` calls `ping` contract and should implicitly change
+        // `pong.contract_address`.
         _ = alice_ping
             .ping(pong.address(), TEN)
             .expect("should ping successfully");
 
-        assert_eq!(alice_ping.contract_address.get(), ping.address());
+        // And we will check that we're not reading cached `Address::ZERO`
+        // value, but the actual one.
         assert_eq!(alice_pong.contract_address.get(), pong.address());
     }
 
