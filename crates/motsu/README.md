@@ -15,8 +15,8 @@ machinery necessary for writing tests behind a `#[motsu::test]` procedural macro
 Annotate tests with `#[motsu::test]` instead of `#[test]`
 to get access to VM affordances:
 
- ```rust
- #[cfg(test)]
+```rust
+#[cfg(test)]
 mod tests {
     use openzeppelin_stylus::token::erc20::{Erc20, IErc20};
     use motsu::prelude::*;
@@ -31,7 +31,7 @@ mod tests {
         assert_eq!(balance, U256::ZERO);
     }
 }
- ```
+```
 
 Function `Contract::sender()` is necessary to trigger call
 to a contract, and should accept an `Account` or `Address` as an argument.
@@ -39,7 +39,7 @@ to a contract, and should accept an `Account` or `Address` as an argument.
 Alternatively `Contract::sender_and_value()` can be used to
 pass additional value to the contract:
 
- ```rust
+```rust
 use motsu::prelude::*;
 
 #[motsu::test]
@@ -60,7 +60,7 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
     assert_eq!(alice.balance(), ten - one);
     assert_eq!(proxy.balance(), one);
 }
- ```
+```
 
 Multiple external calls are supported in Motsu. Assuming `Proxy` is a
 contract that exposes (`#[public]`) function `call_proxy`. Where it adds `one`
@@ -68,7 +68,7 @@ to the passed argument and calls next `Proxy` contract at the address
 provided during initialization. The following test case can emulate a call
 chain of three `Proxy` contracts:
 
- ```rust
+```rust
 use motsu::prelude::*;
 
 #[motsu::test]
@@ -93,20 +93,20 @@ fn call_three_proxies(
     // The value is incremented by 1 for each proxy.
     assert_eq!(result, ten + one + one + one);
 }
- ```
+```
 
 Annotating a test function that accepts no parameters will make
 `#[motsu::test]` behave the same as `#[test]`.
 
- ```rust,ignore
- #[cfg(test)]
+```rust,ignore
+#[cfg(test)]
 mod tests {
     #[motsu::test] // Equivalent to #[test]
     fn test_fn() {
         ...
     }
 }
- ```
+```
 
 **Important:** We require a contract to implement unsafe trait
 `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
@@ -114,7 +114,7 @@ Typically, all contracts marked with `#[entrypoint]` will have this trait
 automatically derived.
 Otherwise, you should do it by manually:
 
- ```rust
+```rust
  use stylus_sdk::{
     storage::{StorageMap, StorageU256, StorageAddress},
     prelude::*,
@@ -131,9 +131,9 @@ pub struct Erc20 {
 }
 
 unsafe impl TopLevelStorage for Erc20 {}
- ```
+```
 
-**Important:** For `motsu` to work correctly, `stylus-sdk` should **not** have 
+**Important:** For `motsu` to work correctly, `stylus-sdk` should **not** have
 a default `hostio-caching` feature enabled.
 
 ### Notice
