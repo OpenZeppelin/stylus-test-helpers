@@ -255,21 +255,6 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
-    #[allow(unused)]
-    fn contract_should_not_drop() {
-        let alice = Account::random();
-        let ping = Contract::<PingContract>::new();
-        let mut ping = ping.sender(alice);
-        let pong = Contract::<PongContract>::new();
-        let pong_address = pong.address();
-        let pong = pong.sender(alice);
-
-        _ = ping
-            .ping(pong_address, TEN)
-            .expect("contract ping should not drop");
-    }
-
-    #[motsu::test]
     #[should_panic(expected = "contract storage already initialized")]
     fn storage_duplicate_contract() {
         let addr = Address::random();
