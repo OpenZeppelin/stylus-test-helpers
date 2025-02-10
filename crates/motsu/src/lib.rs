@@ -268,6 +268,42 @@ mod ping_pong_tests {
             .ping(pong_address, TEN)
             .expect("contract ping should not drop");
     }
+
+    #[motsu::test]
+    #[should_panic(expected = "contract storage already initialized")]
+    fn test_storage_duplicate_contract() {
+        let addr = Address::random();
+
+        // First contract instance
+        let _ping1 = Contract::<PingContract>::new_at(addr);
+
+        // Attempting to create second instance at same address while first
+        // exists should panic
+        let _ping2 = Contract::<PingContract>::new_at(addr);
+    }
+
+    #[motsu::test]
+    fn test_storage_cleanup(alice: Account, addr: Address) {
+        // First contract
+        let pong1 = Contract::<PongContract>::new_at(addr);
+
+        pong1.sender(alice).pong(U256::ZERO).expect("should pong");
+
+        assert_eq!(alice.address(), pong1.sender(alice).ponged_from.get());
+        assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
+        assert_eq!(addr, pong1.sender(alice).contract_address.get());
+
+        // Drop first contract
+        drop(pong1);
+
+        // Second contract at same address
+        let pong2 = Contract::<PongContract>::new_at(addr);
+
+        // Should have fresh state
+        assert_eq!(Address::ZERO, pong2.sender(alice).ponged_from.get());
+        assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
+        assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
+    }
 }
 
 #[cfg(test)]
@@ -398,44 +434,6 @@ mod proxies_tests {
     }
 
     unsafe impl TopLevelStorage for Proxy {}
-
-    #[motsu::test]
-    #[should_panic(expected = "contract storage already initialized")]
-    fn test_storage_duplicate_contract() {
-        let addr = Address::random();
-
-        // First contract instance
-        let _proxy1 = Contract::<Proxy>::new_at(addr);
-
-        // Attempting to create second instance at same address while first
-        // exists should panic
-        let _proxy2 = Contract::<Proxy>::new_at(addr);
-    }
-
-    #[motsu::test]
-    fn test_storage_cleanup(alice: Account, addr: Address) {
-        // First contract
-        let proxy1 = Contract::<Proxy>::new_at(addr);
-        proxy1.sender(alice).init(alice.address());
-
-        assert_eq!(U256::ZERO, proxy1.sender(alice).value());
-        assert_eq!(alice.address(), proxy1.sender(alice).next_proxy.get());
-
-        proxy1.sender(alice).increment_value();
-
-        assert_eq!(ONE, proxy1.sender(alice).value());
-        assert_eq!(alice.address(), proxy1.sender(alice).next_proxy.get());
-
-        // Drop first contract
-        drop(proxy1);
-
-        // Second contract at same address
-        let proxy2 = Contract::<Proxy>::new_at(addr);
-
-        // Should have fresh state
-        assert_eq!(U256::ZERO, proxy2.sender(alice).value());
-        assert_eq!(Address::ZERO, proxy2.sender(alice).next_proxy.get());
-    }
 
     #[motsu::test]
     fn call_three_proxies(
