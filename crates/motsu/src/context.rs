@@ -12,7 +12,7 @@ use std::{
 use alloy_primitives::{Address, B256, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
+use stylus_sdk::{prelude::StorageType, ArbResult};
 
 use crate::{
     router::{VMRouter, VMRouterContext},
@@ -498,13 +498,12 @@ impl<ST: StorageType> ContractCall<'_, ST> {
             .replace_contract_address(self.contract_ref.address);
     }
 
-    /// Invalidate the storage cache, by replacing it with an empty storage
-    /// struct.
+    /// Invalidate the storage cache of stylus contract [`StorageType`], by
+    /// replacing it with an empty storage struct.
     /// Otherwise, instead of expected values, we can receive
     /// artifacts from the previous invocations.
-    fn invalidate_storage_cache(&self) {
-        let uncached_storage = unsafe { ST::new(uint!(0_U256), 0) };
-        _ = self.storage.replace(uncached_storage);
+    fn invalidate_storage_type_cache(&self) {
+        self.storage.set(create_default_storage_type());
     }
 }
 
@@ -515,8 +514,13 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
     fn deref(&self) -> &Self::Target {
         self.set_call_params();
         VMContext::current().transfer_value();
-        self.invalidate_storage_cache();
 
+        // SAFETY: We don't use `ST` contract type as intended by rust.
+        // We don't care about any state it has in any property.
+        // But we do care that it should go each time through shim and retrieve
+        // the only VALID state.
+        // And doesn't retrieve any cached properties.
+        self.invalidate_storage_type_cache();
         unsafe { self.storage.as_ptr().as_ref().unwrap() }
     }
 }
@@ -526,8 +530,8 @@ impl<ST: StorageType> DerefMut for ContractCall<'_, ST> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.set_call_params();
         VMContext::current().transfer_value();
-        self.invalidate_storage_cache();
 
+        self.invalidate_storage_type_cache();
         self.storage.get_mut()
     }
 }
@@ -591,7 +595,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
     #[must_use]
     pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
-            storage: Cell::new(unsafe { ST::new(uint!(0_U256), 0) }),
+            storage: Cell::new(create_default_storage_type()),
             msg_sender: account.into(),
             msg_value: None,
             contract_ref: self,
@@ -609,12 +613,18 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         let value = value.into();
 
         ContractCall {
-            storage: Cell::new(unsafe { ST::new(uint!(0_U256), 0) }),
+            storage: Cell::new(create_default_storage_type()),
             msg_sender: caller_address,
             msg_value: Some(value),
             contract_ref: self,
         }
     }
+}
+
+/// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
+/// `0` offset.
+pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
+    unsafe { ST::new(U256::ZERO, 0) }
 }
 
 /// Account used to call contracts.

@@ -554,6 +554,8 @@ mod proxies_tests {
 
     #[motsu::test]
     fn no_locks_with_panics() {
+        // Checks that Motsu VM locking behavior is correct when running the
+        // same test multiple times on the same thread.
         for _ in 0..1000 {
             let proxy1 = Contract::<Proxy>::new();
             let proxy2 = Contract::<Proxy>::new();

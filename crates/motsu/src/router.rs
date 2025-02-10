@@ -7,7 +7,7 @@ use std::{
     thread::ThreadId,
 };
 
-use alloy_primitives::{uint, Address};
+use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
@@ -16,7 +16,9 @@ use stylus_sdk::{
     ArbResult,
 };
 
-use crate::storage_access::AccessStorage;
+use crate::{
+    context::create_default_storage_type, storage_access::AccessStorage,
+};
 
 /// Motsu VM Router Storage.
 ///
@@ -85,7 +87,7 @@ impl VMRouterContext {
                     // `RouterFactory` is `Sync` and can be shared between
                     // threads.
                     router: Arc::new(RouterFactory::<Mutex<ST>> {
-                        _phantom: PhantomData,
+                        phantom: PhantomData,
                     }),
                 },
             )
@@ -114,6 +116,7 @@ trait CreateRouter: Send + Sync {
 
     /// Instantiate a new router and instantly route a message to the matching
     /// selector.
+    ///
     /// Returns `None` if the `selector` wasn't found.
     fn create_and_route(
         &self,
@@ -126,14 +129,14 @@ trait CreateRouter: Send + Sync {
 
 /// A factory for router creation.
 struct RouterFactory<R> {
-    _phantom: PhantomData<R>,
+    phantom: PhantomData<R>,
 }
 
 impl<R: StorageType + VMRouter + 'static> CreateRouter
     for RouterFactory<Mutex<R>>
 {
     fn create(&self) -> Box<dyn VMRouter> {
-        Box::new(unsafe { R::new(uint!(0_U256), 0) })
+        Box::new(create_default_storage_type::<R>())
     }
 }
 
