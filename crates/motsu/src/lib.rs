@@ -110,11 +110,11 @@
 //! }
 //! ```
 //!
-//! **Important:** We require a contract to implement unsafe trait
-//! [`stylus_sdk::prelude::TopLevelStorage`], for a contract to be used in
-//! tests. Typically, all contracts marked with
-//! [`stylus_sdk::prelude::entrypoint`] will have this trait automatically
-//! derived. Otherwise, you should do it by yourself:
+//! **Important:** To use a contract in tests, you must ensure it implements the
+//! unsafe trait [`stylus_sdk::prelude::TopLevelStorage`]. While this trait is
+//! automatically derived for contracts marked with
+//! [`stylus_sdk::prelude::entrypoint`], you'll need to implement it manually
+//! for any contract without this attribute:
 //!
 //! ```rust
 //! use stylus_sdk::{
