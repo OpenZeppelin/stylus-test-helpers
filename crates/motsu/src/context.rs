@@ -13,10 +13,7 @@ use alloy_primitives::{Address, B256, U256};
 use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{
-    alloy_primitives::uint, keccak_const::Keccak256, prelude::StorageType,
-    ArbResult,
-};
+use stylus_sdk::{keccak_const::Keccak256, prelude::StorageType, ArbResult};
 
 use crate::{
     revert::Backuped,
@@ -436,14 +433,14 @@ impl VMContext {
 
     // TODO#q: document the following functions
 
-    pub(crate) fn reset_backup(self){
+    pub(crate) fn reset_backup(self) {
         let mut storage = self.storage();
         storage.contract_data.reset_backup();
         storage.balances.reset_backup();
         storage.events.reset_backup();
     }
 
-    pub(crate) fn restore_from_backup(self){
+    pub(crate) fn restore_from_backup(self) {
         let mut storage = self.storage();
         storage.contract_data.restore_from_backup();
         storage.balances.restore_from_backup();
@@ -451,7 +448,7 @@ impl VMContext {
     }
 
     /// NOTE: Should create backup before transfering the value
-    fn create_backup(self){
+    fn create_backup(self) {
         let mut storage = self.storage();
         storage.contract_data.create_backup();
         storage.balances.create_backup();
@@ -841,7 +838,7 @@ impl DeriveFromTag for Account {
     }
 }
 
-impl<ST: StorageType + TestRouter + 'static> DeriveFromTag for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> DeriveFromTag for Contract<ST> {
     fn from_tag(tag: &str) -> Self {
         Contract::new_at(Address::from_tag(tag))
     }
