@@ -110,8 +110,7 @@
 //! }
 //! ```
 //!
-//! NOTE!!!
-//! We require a contract to implement unsafe trait
+//! **Important:** We require a contract to implement unsafe trait
 //! [`stylus_sdk::prelude::TopLevelStorage`], for a contract to be used in
 //! tests. Typically, all contracts marked with
 //! [`stylus_sdk::prelude::entrypoint`] will have this trait automatically
@@ -136,13 +135,8 @@
 //! unsafe impl TopLevelStorage for Erc20 {}
 //! ```
 //!
-//! NOTE!!!
-//! For `motsu` to work correctly, `stylus-sdk` should **not** have
-//! default `hostio-caching` feature enabled.
-//!
-//! Following features: event log assertions, storage reset after erroneous
-//! transaction, `proptest` affordances for [`crate::prelude::Contract`] and
-//! [`crate::prelude::Account`] are not supported, and planed to be added soon.
+//! **Important:** For `motsu` to work correctly, `stylus-sdk` should **not** have
+//! a default `hostio-caching` feature enabled.
 //!
 //! [test_attribute]: crate::test
 #[cfg(test)]

@@ -108,13 +108,11 @@ mod tests {
 }
  ```
 
-NOTE!!!
-We require a contract to implement unsafe trait
+**Important:** We require a contract to implement unsafe trait
 `stylus_sdk::prelude::TopLevelStorage`, for a contract to be used in tests.
 Typically, all contracts marked with `#[entrypoint]` will have this trait
 automatically derived.
-Otherwise, you should do it by
-yourself:
+Otherwise, you should do it by manually:
 
  ```rust
  use stylus_sdk::{
@@ -135,9 +133,8 @@ pub struct Erc20 {
 unsafe impl TopLevelStorage for Erc20 {}
  ```
 
-NOTE!!!
-For `motsu` to work correctly, `stylus-sdk` should **not** have
-default `hostio-caching` feature enabled.
+**Important:** For `motsu` to work correctly, `stylus-sdk` should **not** have 
+a default `hostio-caching` feature enabled.
 
 ### Notice
 
