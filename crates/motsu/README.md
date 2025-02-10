@@ -18,7 +18,7 @@ to get access to VM affordances:
  ```rust
  #[cfg(test)]
 mod tests {
-    use openzeppelin_stylus::token::erc20::Erc20;
+    use openzeppelin_stylus::token::erc20::{Erc20, IErc20};
     use motsu::prelude::*;
 
     #[motsu::test]
