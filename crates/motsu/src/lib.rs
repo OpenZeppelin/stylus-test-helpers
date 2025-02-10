@@ -267,6 +267,9 @@ mod ping_pong_tests {
         let _ping2 = Contract::<PingContract>::new_at(addr);
     }
 
+    // Although the same address is very unlikely to be reused on the actual
+    // chain, this is still an allowed "feature" of motsu, so we "document" the
+    // behavior with this unit test.
     #[motsu::test]
     fn storage_cleanup(alice: Account, addr: Address) {
         // First contract
