@@ -1,14 +1,21 @@
 //! Unit-testing context for Stylus contracts.
 
-use std::{collections::HashMap, hash::Hash, ptr, slice, thread::ThreadId};
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    hash::Hash,
+    ops::{Deref, DerefMut},
+    ptr, slice,
+    thread::ThreadId,
+};
 
 use alloy_primitives::{Address, B256, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{alloy_primitives::uint, prelude::StorageType, ArbResult};
+use stylus_sdk::{prelude::StorageType, ArbResult};
 
 use crate::{
-    router::{TestRouter, VMRouterContext},
+    router::{VMRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
 
@@ -125,7 +132,7 @@ impl VMContext {
 
     /// Initialise contract's storage for the current test thread and
     /// `contract_address`.
-    fn init_storage<ST: StorageType + TestRouter + 'static>(
+    fn init_storage<ST: StorageType + VMRouter + 'static>(
         self,
         contract_address: Address,
     ) {
@@ -443,7 +450,7 @@ unsafe fn decode_calldata(
     (selector, input)
 }
 
-/// Storage for unit test's mock data.
+/// Main storage for Motsu test VM.
 #[derive(Default)]
 struct VMContextStorage {
     /// Address of the message sender.
@@ -470,12 +477,12 @@ pub(crate) type Bytes32 = [u8; WORD_BYTES];
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
 pub struct ContractCall<'a, ST: StorageType> {
-    storage: ST,
+    storage: Cell<ST>,
     msg_sender: Address,
     msg_value: Option<U256>,
     /// We need to hold a reference to [`Contract<ST>`], because
     /// `Contract::<ST>::new().sender(alice)` can accidentally drop
-    /// [`Contract<ST>`].
+    /// [`Contract<ST>`] and call would fail.
     ///
     /// With `contract_ref` code like: `Contract::<ST>::new().sender(alice)`
     /// will not compile.
@@ -490,25 +497,52 @@ impl<ST: StorageType> ContractCall<'_, ST> {
         _ = VMContext::current()
             .replace_contract_address(self.contract_ref.address);
     }
+
+    /// Invalidate the storage cache of stylus contract [`StorageType`], by
+    /// replacing it with an empty storage struct.
+    /// Otherwise, instead of expected values, we can receive
+    /// artifacts from the previous invocations.
+    fn invalidate_storage_type_cache(&self) {
+        self.storage.set(create_default_storage_type());
+    }
 }
 
-impl<ST: StorageType> ::core::ops::Deref for ContractCall<'_, ST> {
+impl<ST: StorageType> Deref for ContractCall<'_, ST> {
     type Target = ST;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        // Set parameters for call such as `msg_sender`, `contract_address`,
+        // `msg_value`.
         self.set_call_params();
+
+        // Transfer value (if any) from the `msg_sender` to `contract_address`,
+        // that was set on the previous step.
         VMContext::current().transfer_value();
-        &self.storage
+
+        // SAFETY: We don't use `ST` contract type as intended by rust.
+        // We don't care about any state it has in any property.
+        // But we do care that it should go each time through shim and retrieve
+        // the only VALID state.
+        // And doesn't retrieve any cached properties.
+        self.invalidate_storage_type_cache();
+        unsafe { self.storage.as_ptr().as_ref().unwrap() }
     }
 }
 
-impl<ST: StorageType> ::core::ops::DerefMut for ContractCall<'_, ST> {
+impl<ST: StorageType> DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        // Set parameters for call such as `msg_sender`, `contract_address`,
+        // `msg_value`.
         self.set_call_params();
+
+        // Transfer value (if any) from the `msg_sender` to `contract_address`,
+        // that was set on the previous step.
         VMContext::current().transfer_value();
-        &mut self.storage
+
+        self.invalidate_storage_type_cache();
+        self.storage.get_mut()
     }
 }
 
@@ -524,13 +558,13 @@ impl<ST: StorageType> Drop for Contract<ST> {
     }
 }
 
-impl<ST: StorageType + TestRouter + 'static> Default for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> Default for Contract<ST> {
     fn default() -> Self {
         Contract::new_at(Address::default())
     }
 }
 
-impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
     /// Create a new contract with default storage on the random address.
     #[must_use]
     pub fn new() -> Self {
@@ -571,7 +605,7 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
     #[must_use]
     pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
         ContractCall {
-            storage: unsafe { ST::new(uint!(0_U256), 0) },
+            storage: Cell::new(create_default_storage_type()),
             msg_sender: account.into(),
             msg_value: None,
             contract_ref: self,
@@ -589,12 +623,18 @@ impl<ST: StorageType + TestRouter + 'static> Contract<ST> {
         let value = value.into();
 
         ContractCall {
-            storage: unsafe { ST::new(uint!(0_U256), 0) },
+            storage: Cell::new(create_default_storage_type()),
             msg_sender: caller_address,
             msg_value: Some(value),
             contract_ref: self,
         }
     }
+}
+
+/// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
+/// `0` offset.
+pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
+    unsafe { ST::new(U256::ZERO, 0) }
 }
 
 /// Account used to call contracts.
@@ -658,7 +698,7 @@ impl Funding for Account {
     }
 }
 
-impl<ST: StorageType + TestRouter + 'static> Funding for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     fn fund(&self, value: U256) {
         self.address().fund(value);
     }
