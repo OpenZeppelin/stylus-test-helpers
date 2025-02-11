@@ -37,7 +37,10 @@ Function `Contract::sender()` is necessary to trigger call
 to a contract, and should accept an `Account` or `Address` as an argument.
 
 Alternatively `Contract::sender_and_value()` can be used to
-pass additional value to the contract:
+pass additional value to the contract.
+To make a payable call work, user should be funded with
+`Account::fund` method (there is no funding by default),
+like in example below:
 
 ```rust
 use motsu::prelude::*;

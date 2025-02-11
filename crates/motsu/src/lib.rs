@@ -35,7 +35,10 @@
 //! [`stylus_sdk::alloy_primitives::Address`] as an argument.
 //!
 //! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
-//! pass additional value to the contract:
+//! pass additional value to the contract.
+//! To make a payable call work, user should be funded with
+//! [`crate::prelude::Account::fund`] method (there is no funding by default),
+//! like in example below:
 //!
 //! ```rust
 //!  use motsu::prelude::*;
