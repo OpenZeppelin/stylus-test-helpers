@@ -65,11 +65,11 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
 }
 ```
 
-Multiple external calls are supported in Motsu. Assuming `Proxy` is a
-contract that exposes (`#[public]`) function `call_proxy`. Where it adds `one`
-to the passed argument and calls next `Proxy` contract at the address
-provided during initialization. The following test case can emulate a call
-chain of three `Proxy` contracts:
+Multiple external calls are supported in Motsu.
+Assuming `Proxy` is a contract that exposes (`#[public]`) function `call_proxy`,
+where it adds `one` to the passed argument and calls next `Proxy` contract 
+at the address provided during initialization.
+The following test case can emulate a call chain of three `Proxy` contracts:
 
 ```rust
 use motsu::prelude::*;

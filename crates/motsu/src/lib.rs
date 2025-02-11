@@ -65,12 +65,10 @@
 //! ```
 //!
 //! Multiple external calls are supported in Motsu.
-//! Assuming [`crate::proxies_tests::Proxy`] is a contract that exposes
-//! `#[public]` function [`crate::proxies_tests::Proxy::call_proxy`].
-//! Where it adds `one` to the passed argument and calls next
-//! [`crate::proxies_tests::Proxy`] contract at the address provided during
-//! initialization. The following test case can emulate a call chain of three
-//! [`crate::proxies_tests::Proxy`] contracts:
+//! Assuming `Proxy` is a contract that exposes `#[public]` function
+//! `Proxy::call_proxy`, where it adds `one` to the passed argument and calls
+//! next `Proxy` contract at the address provided during initialization.
+//! The following test case can emulate a call chain of three `Proxy` contracts:
 //!
 //! ```rust
 //!  use motsu::prelude::*;
