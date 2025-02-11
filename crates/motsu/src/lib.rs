@@ -255,6 +255,32 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
+    fn deref_invalidated_storage_cache(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        // This test is different from `contract_address` test, since it checks
+        // that `StorageType` contract correctly resets.
+        let mut alice_ping = ping.sender(alice);
+        let alice_pong = pong.sender(alice);
+
+        // `alice_pong.contract_address.get()` invocation will cache the value
+        // of `contract_address` for the next immutable call.
+        assert_eq!(alice_pong.contract_address.get(), Address::ZERO);
+
+        // Here `alice` calls `ping` contract and should implicitly change
+        // `pong.contract_address`.
+        _ = alice_ping
+            .ping(pong.address(), TEN)
+            .expect("should ping successfully");
+
+        // And we will check that we're not reading cached `Address::ZERO`
+        // value, but the actual one.
+        assert_eq!(alice_pong.contract_address.get(), pong.address());
+    }
+
+    #[motsu::test]
     #[should_panic(expected = "contract storage already initialized")]
     fn storage_duplicate_contract() {
         let addr = Address::random();

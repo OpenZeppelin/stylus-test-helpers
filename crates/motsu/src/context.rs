@@ -512,7 +512,12 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        // Set parameters for call such as `msg_sender`, `contract_address`,
+        // `msg_value`.
         self.set_call_params();
+
+        // Transfer value (if any) from the `msg_sender` to `contract_address`,
+        // that was set on the previous step.
         VMContext::current().transfer_value();
 
         // SAFETY: We don't use `ST` contract type as intended by rust.
@@ -528,7 +533,12 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        // Set parameters for call such as `msg_sender`, `contract_address`,
+        // `msg_value`.
         self.set_call_params();
+
+        // Transfer value (if any) from the `msg_sender` to `contract_address`,
+        // that was set on the previous step.
         VMContext::current().transfer_value();
 
         self.invalidate_storage_type_cache();
