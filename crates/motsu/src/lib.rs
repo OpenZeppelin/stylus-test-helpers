@@ -328,7 +328,7 @@ mod proxies_tests {
         call::Call,
         contract, msg,
         prelude::{public, storage, TopLevelStorage},
-        storage::{StorageAddress, StorageU256},
+        storage::StorageAddress,
     };
 
     use crate::prelude::*;
@@ -355,20 +355,11 @@ mod proxies_tests {
 
     #[storage]
     struct Proxy {
-        value: StorageU256,
         next_proxy: StorageAddress,
     }
 
     #[public]
     impl Proxy {
-        fn increment_value(&mut self) {
-            self.value.set(self.value.checked_add(ONE).unwrap());
-        }
-
-        fn value(&self) -> U256 {
-            self.value.get()
-        }
-
         fn call_proxy(&mut self, value: U256) -> U256 {
             if value == CALL_PROXY_LIMIT {
                 return value;
