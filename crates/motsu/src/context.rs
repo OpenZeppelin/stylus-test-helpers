@@ -1,7 +1,7 @@
 //! Unit-testing context for Stylus contracts.
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
@@ -507,7 +507,7 @@ impl<ST: StorageType> ContractCall<'_, ST> {
     }
 }
 
-impl<ST: StorageType> Deref for ContractCall<'_, ST> {
+impl<ST: StorageType> ContractCall<'_, ST> {
     type Target = ST;
 
     #[inline]
@@ -579,16 +579,6 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         Self { phantom: ::core::marker::PhantomData, address }
     }
 
-    /// Initialize the contract with an `initializer` function, and on behalf of
-    /// the given `account`.
-    pub fn init<A: Into<Address>, Output>(
-        &self,
-        sender: A,
-        initializer: impl FnOnce(&mut ST) -> Output,
-    ) -> Output {
-        initializer(&mut self.sender(sender.into()))
-    }
-
     /// Create a new contract with default storage on the random address.
     #[must_use]
     pub fn random() -> Self {
@@ -603,13 +593,8 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
 
     /// Call contract `self` with `account` as a sender.
     #[must_use]
-    pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
-        ContractCall {
-            storage: Cell::new(create_default_storage_type()),
-            msg_sender: account.into(),
-            msg_value: None,
-            contract_ref: self,
-        }
+    pub fn sender<A: Into<Address>>(&self, account: A) -> Call<ST> {
+        Call { msg_sender: account.into(), msg_value: None, contract_ref: self }
     }
 
     /// Call contract `self` with `account` as a sender and `value`.
@@ -618,16 +603,87 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         &self,
         sender: A,
         value: V,
-    ) -> ContractCall<ST> {
+    ) -> Call<ST> {
         let caller_address = sender.into();
         let value = value.into();
 
-        ContractCall {
-            storage: Cell::new(create_default_storage_type()),
+        Call {
             msg_sender: caller_address,
             msg_value: Some(value),
             contract_ref: self,
         }
+    }
+}
+
+// New builder struct with clear namespace separation
+pub struct Call<'a, ST: StorageType> {
+    msg_sender: Address,
+    msg_value: Option<U256>,
+    contract_ref: &'a Contract<ST>,
+}
+
+impl<'a, ST: StorageType> Call<'a, ST> {
+    pub fn sender<A: Into<Address>>(mut self, account: A) -> Self {
+        self.msg_sender = account.into();
+        self
+    }
+
+    pub fn value<V: Into<U256>>(mut self, value: V) -> Self {
+        self.msg_value = Some(value.into());
+        self
+    }
+
+    // Final build step that's implicit in the deref
+    fn build(&self) -> ContractCall<'a, ST> {
+        ContractCall {
+            storage: Cell::new(create_default_storage_type()),
+            msg_sender: self.msg_sender,
+            msg_value: self.msg_value,
+            contract_ref: self.contract_ref,
+        }
+    }
+}
+
+pub struct ScopedCall<'a, ST: StorageType> {
+    inner: Call<'a, ST>,
+    built: RefCell<Option<Box<ContractCall<'a, ST>>>>,
+}
+
+impl<'a, ST: StorageType> ScopedCall<'a, ST> {
+    fn get_or_build_call(&self) -> &ContractCall<'a, ST> {
+        let mut built = self.built.borrow_mut();
+        if built.is_none() {
+            *built = Some(Box::new(self.inner.build()));
+        }
+        // SAFETY: We just ensured it's Some
+        // This ref is valid because built outlives the returned reference
+        &*built.as_ref().unwrap()
+    }
+
+    fn get_or_build_call_mut(&self) -> &mut ContractCall<'a, ST> {
+        let mut built = self.built.borrow_mut();
+        if built.is_none() {
+            *built = Some(Box::new(self.inner.build()));
+        }
+        // SAFETY: We just ensured it's Some
+        // This ref is valid because built outlives the returned reference
+        &mut *built.as_mut().unwrap()
+    }
+}
+
+// Add automatic conversion from Call to ContractCall
+impl<'a, ST: StorageType> Deref for ScopedCall<'a, ST> {
+    type Target = ContractCall<'a, ST>;
+
+    fn deref(&self) -> &Self::Target {
+        // This conversion happens automatically when methods are called
+        self.build()
+    }
+}
+
+impl<ST: StorageType> DerefMut for ScopedCall<'_, ST> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.build()
     }
 }
 
