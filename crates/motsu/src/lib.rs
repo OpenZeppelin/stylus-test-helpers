@@ -55,7 +55,6 @@ pub mod prelude;
 mod router;
 mod shims;
 mod storage_access;
-
 pub use motsu_proc::test;
 
 #[cfg(test)]
@@ -63,6 +62,7 @@ mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
     use alloy_sol_types::{sol, SolError};
+    use motsu_proc as motsu;
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
@@ -72,6 +72,10 @@ mod ping_pong_tests {
     };
 
     use crate::context::{Account, Contract};
+
+    const ONE: U256 = uint!(1_U256);
+    const TEN: U256 = uint!(10_U256);
+    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
 
     #[storage]
     struct PingContract {
@@ -130,11 +134,6 @@ mod ping_pong_tests {
         MagicError(MagicError),
     }
 
-    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
-
-    const ONE: U256 = uint!(1_U256);
-    const TEN: U256 = uint!(10_U256);
-
     #[storage]
     struct PongContract {
         pongs_count: StorageU256,
@@ -165,7 +164,7 @@ mod ping_pong_tests {
 
     unsafe impl TopLevelStorage for PongContract {}
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn external_call(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -182,7 +181,7 @@ mod ping_pong_tests {
         assert_eq!(pong.sender(alice).pongs_count.get(), ONE);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn external_call_error(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -197,7 +196,7 @@ mod ping_pong_tests {
         assert_eq!(err, MagicError { value }.abi_encode());
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn external_static_call(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -210,7 +209,7 @@ mod ping_pong_tests {
         assert!(can_ping);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn msg_sender(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -228,7 +227,7 @@ mod ping_pong_tests {
         assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn has_code(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -237,7 +236,7 @@ mod ping_pong_tests {
         assert!(ping.sender(alice).has_pong(pong.address()));
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn contract_address(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -255,7 +254,34 @@ mod ping_pong_tests {
         assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
+    fn deref_invalidated_storage_cache(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        // This test is different from `contract_address` test, since it checks
+        // that `StorageType` contract correctly resets.
+        let mut alice_ping = ping.sender(alice);
+        let alice_pong = pong.sender(alice);
+
+        // `alice_pong.contract_address.get()` invocation will cache the value
+        // of `contract_address` for the next immutable call.
+        assert_eq!(alice_pong.contract_address.get(), Address::ZERO);
+
+        // Here `alice` calls `ping` contract and should implicitly change
+        // `pong.contract_address`.
+        _ = alice_ping
+            .ping(pong.address(), TEN)
+            .expect("should ping successfully");
+
+        // And we will check that we're not reading cached `Address::ZERO`
+        // value, but the actual one.
+        assert_eq!(alice_pong.contract_address.get(), pong.address());
+    }
+
+    #[motsu::test]
+    #[allow(unused)]
     fn contract_should_not_drop() {
         let alice = Account::random();
         let ping = Contract::<PingContract>::new();
@@ -273,6 +299,7 @@ mod ping_pong_tests {
 #[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
+    use motsu_proc as motsu;
     use stylus_sdk::{
         call::Call,
         contract, msg,
@@ -281,6 +308,13 @@ mod proxies_tests {
     };
 
     use crate::prelude::*;
+
+    const ONE: U256 = uint!(1_U256);
+    const TWO: U256 = uint!(2_U256);
+    const FOUR: U256 = uint!(4_U256);
+    const EIGHT: U256 = uint!(8_U256);
+    const TEN: U256 = uint!(10_U256);
+    const CALL_PROXY_LIMIT: U256 = uint!(50_U256);
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
@@ -303,12 +337,15 @@ mod proxies_tests {
     #[public]
     impl Proxy {
         fn call_proxy(&mut self, value: U256) -> U256 {
-            let next_proxy = self.next_proxy.get();
+            if value == CALL_PROXY_LIMIT {
+                return value;
+            }
 
             // Add one to the value.
             let value = value + ONE;
 
             // If there is no next proxy, return the value.
+            let next_proxy = self.next_proxy.get();
             if next_proxy.is_zero() {
                 value
             } else {
@@ -379,14 +416,7 @@ mod proxies_tests {
 
     unsafe impl TopLevelStorage for Proxy {}
 
-    const ONE: U256 = uint!(1_U256);
-    const TWO: U256 = uint!(2_U256);
-    const FOUR: U256 = uint!(4_U256);
-    const EIGHT: U256 = uint!(8_U256);
-
-    const TEN: U256 = uint!(10_U256);
-
-    #[motsu_proc::test]
+    #[motsu::test]
     fn call_three_proxies(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
@@ -406,7 +436,27 @@ mod proxies_tests {
         assert_eq!(result, TEN + ONE + ONE + ONE);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
+    fn call_three_proxies_with_reentrancy(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy1 -> ..
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(proxy1.address());
+
+        // Call the first proxy.
+        let result = proxy1.sender(alice).call_proxy(ONE);
+
+        // Reentrant call should stop with limit.
+        assert_eq!(result, CALL_PROXY_LIMIT);
+    }
+
+    #[motsu::test]
     fn pay_three_proxies(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
@@ -435,7 +485,7 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TEN + ONE + ONE + ONE);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn pass_proxy_with_fixed_value(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
@@ -465,7 +515,7 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TWO);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn pay_proxy_with_half_balance(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
@@ -495,8 +545,10 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TWO);
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn no_locks_with_panics() {
+        // Checks that Motsu VM locking behavior is correct when running the
+        // same test multiple times on the same thread.
         for _ in 0..1000 {
             let proxy1 = Contract::<Proxy>::new();
             let proxy2 = Contract::<Proxy>::new();
