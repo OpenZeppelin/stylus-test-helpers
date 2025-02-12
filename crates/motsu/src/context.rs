@@ -2,7 +2,7 @@
 
 use std::{
     cell::Cell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     hash::Hash,
     ops::{Deref, DerefMut},
     ptr, slice,
@@ -10,6 +10,7 @@ use std::{
 };
 
 use alloy_primitives::{Address, B256, U256};
+use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{prelude::StorageType, ArbResult};
@@ -308,6 +309,28 @@ impl VMContext {
         self.router(address).exists()
     }
 
+    /// Check if the `event` was emitted.
+    pub fn emitted<T: SolEvent>(self, event: &T) -> bool {
+        let event_log = Log::new(event);
+
+        self.storage().events.contains(&event_log)
+    }
+
+    pub(crate) unsafe fn store_log_raw(
+        self,
+        data: *const u8,
+        len: usize,
+        topics: usize,
+    ) {
+        let data = slice::from_raw_parts(data, len).to_vec();
+        self.store_log(data, topics);
+    }
+
+    fn store_log(self, data: Vec<u8>, topics: usize) {
+        let event = Log { data, topics };
+        self.storage().events.insert(event);
+    }
+
     /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
         self.storage().balances.get(&address).copied().unwrap_or_default()
@@ -463,10 +486,39 @@ struct VMContextStorage {
     contract_data: HashMap<Address, ContractStorage>,
     /// Account's address to balance mapping.
     balances: HashMap<Address, U256>,
+    /// Event logs emitted during [`Context::current`].
+    events: HashSet<Log>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
+}
+
+/// Event log emitted during [`Context::current`].
+#[derive(Debug, Hash, Eq, PartialEq)]
+struct Log {
+    data: Vec<u8>,
+    topics: usize,
+}
+
+impl Log {
+    /// Create a new log from the given `sol_event`.
+    fn new<T: SolEvent>(sol_event: &T) -> Self {
+        let topics = sol_event.encode_topics();
+
+        let topics_count = T::TopicList::COUNT;
+
+        let mut data = topics.iter().map(WordToken::as_slice).fold(
+            Vec::with_capacity(32 * topics_count),
+            |mut data, topic| {
+                data.extend_from_slice(topic);
+                data
+            },
+        );
+
+        sol_event.encode_data_to(&mut data);
+        Log { data, topics: topics_count }
+    }
 }
 
 /// Contract's byte storage
@@ -705,5 +757,17 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 
     fn balance(&self) -> U256 {
         self.address().balance()
+    }
+}
+
+/// Extension for events to check if the event was emitted.
+pub trait EventLogExt {
+    /// Check if the event was emitted.
+    fn emitted(&self) -> bool;
+}
+
+impl<T: SolEvent> EventLogExt for T {
+    fn emitted(&self) -> bool {
+        VMContext::current().emitted(self)
     }
 }

@@ -158,16 +158,31 @@ mod ping_pong_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
-        contract, msg,
+        contract, evm, msg,
         prelude::{public, storage, AddressVM, SolidityError, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
     };
 
-    use crate::context::{Account, Contract};
+    use crate::{
+        context::{Account, Contract},
+        prelude::*,
+    };
 
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);
     const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
+
+    sol! {
+        /// Emitted when [`PingContract`] was called.
+        ///
+        /// * `from` - Address from which the contract was pinged.
+        /// * `value` - Value received after ping.
+        #[allow(missing_docs)]
+        event Pinged(
+            address indexed from,
+            uint256 indexed value
+        );
+    }
 
     #[storage]
     struct PingContract {
@@ -179,6 +194,8 @@ mod ping_pong_tests {
     #[public]
     impl PingContract {
         fn ping(&mut self, to: Address, value: U256) -> Result<U256, Vec<u8>> {
+            evm::log(Pinged { from: msg::sender(), value });
+
             let receiver = IPongContract::new(to);
             let call = Call::new_in(self);
             let value = receiver.pong(call, value)?;
@@ -226,6 +243,18 @@ mod ping_pong_tests {
         MagicError(MagicError),
     }
 
+    sol! {
+        /// Emitted when [`PongContract`] was called.
+        ///
+        /// * `from` - Address from which the contract was ponged.
+        /// * `value` - Value received after pong.
+        #[allow(missing_docs)]
+        event Ponged(
+            address indexed from,
+            uint256 indexed value
+        );
+    }
+
     #[storage]
     struct PongContract {
         pongs_count: StorageU256,
@@ -239,6 +268,8 @@ mod ping_pong_tests {
             if value == MAGIC_ERROR_VALUE {
                 return Err(PongError::MagicError(MagicError { value }));
             }
+
+            evm::log(Ponged { from: msg::sender(), value });
 
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + ONE);
@@ -409,6 +440,26 @@ mod ping_pong_tests {
         assert_eq!(Address::ZERO, pong2.sender(alice).ponged_from.get());
         assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
         assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
+    }
+
+    #[motsu_proc::test]
+    fn emits_event(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        _ = ping
+            .sender(alice)
+            .ping(pong.address(), TEN)
+            .expect("should ping successfully");
+
+        // Assert emitted events.
+        assert!(Pinged { from: alice.address(), value: TEN }.emitted());
+        assert!(Ponged { from: ping.address(), value: TEN }.emitted());
+
+        // Assert not emitted events
+        assert!(!Pinged { from: ping.address(), value: TEN }.emitted());
+        assert!(!Ponged { from: alice.address(), value: TEN }.emitted());
     }
 }
 
