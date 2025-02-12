@@ -12,7 +12,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     abi::Router,
-    prelude::{StorageType, TopLevelStorage},
+    prelude::{StorageType, TopLevelStorage, ValueDenier},
     ArbResult,
 };
 
@@ -82,11 +82,7 @@ impl VMRouterContext {
             .insert(
                 self,
                 VMRouterStorage {
-                    // Mutex is important since a contract type is not `Sync`.
-                    // We don't lock anything and let rust compiler know that
-                    // `RouterFactory` is `Sync` and can be shared between
-                    // threads.
-                    router: Arc::new(RouterFactory::<Mutex<ST>> {
+                    router: Arc::new(RouterFactory::<ST> {
                         phantom: PhantomData,
                     }),
                 },
@@ -132,9 +128,11 @@ struct RouterFactory<R> {
     phantom: PhantomData<R>,
 }
 
-impl<R: StorageType + VMRouter + 'static> CreateRouter
-    for RouterFactory<Mutex<R>>
-{
+// TODO#q: add safety note
+unsafe impl<R> Send for RouterFactory<R> {}
+unsafe impl<R> Sync for RouterFactory<R> {}
+
+impl<R: StorageType + VMRouter + 'static> CreateRouter for RouterFactory<R> {
     fn create(&self) -> Box<dyn VMRouter> {
         Box::new(create_default_storage_type::<R>())
     }
@@ -142,7 +140,7 @@ impl<R: StorageType + VMRouter + 'static> CreateRouter
 
 /// A trait for routing messages to the matching selector.
 #[allow(clippy::module_name_repetitions)]
-pub trait VMRouter: Send {
+pub trait VMRouter {
     /// Tries to find and execute a method for the given `selector`, returning
     /// `None` if the `selector` wasn't found.
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
@@ -150,7 +148,7 @@ pub trait VMRouter: Send {
 
 impl<R> VMRouter for R
 where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + Send,
+    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + ValueDenier,
 {
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult> {
         <Self as Router<R>>::route(self, selector, input)

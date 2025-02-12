@@ -347,3 +347,196 @@ unsafe extern "C" fn block_timestamp() -> u64 {
     // Epoch timestamp: 1st January 2025 00::00::00
     1_735_689_600
 }
+
+/// NOTE: Unimplemented missing shims
+
+/// Gets a subset of the code from the account at the given address. The
+/// semantics are identical to that of the EVM's [`EXT_CODE_COPY`] opcode, aside
+/// from one small detail: the write to the buffer `dest` will stop after the
+/// last byte is written. This is unlike the EVM, which right pads with zeros in
+/// this scenario. The return value is the number of bytes written, which allows
+/// the caller to detect if this has occurred.
+///
+/// [`EXT_CODE_COPY`]: https://www.evm.codes/#3C
+#[no_mangle]
+unsafe extern "C" fn account_code(
+    address: *const u8,
+    offset: usize,
+    size: usize,
+    dest: *mut u8,
+) -> usize {
+    0
+}
+
+/// Gets the size of the code in bytes at the given address. The semantics are
+/// equivalent to that of the EVM's [`EXT_CODESIZE`].
+///
+/// [`EXT_CODESIZE`]: https://www.evm.codes/#3B
+#[no_mangle]
+unsafe extern "C" fn account_code_size(address: *const u8) -> usize {
+    0
+}
+
+/// Gets the basefee of the current block. The semantics are equivalent to that
+/// of the EVM's [`BASEFEE`] opcode.
+///
+/// [`BASEFEE`]: https://www.evm.codes/#48
+#[no_mangle]
+unsafe extern "C" fn block_basefee(basefee: *mut u8) {}
+
+/// Gets the coinbase of the current block, which on Arbitrum chains is the L1
+/// batch poster's address. This differs from Ethereum where the validator
+/// including the transaction determines the coinbase.
+#[no_mangle]
+unsafe extern "C" fn block_coinbase(coinbase: *mut u8) {}
+
+/// Gets the gas limit of the current block. The semantics are equivalent to
+/// that of the EVM's [`GAS_LIMIT`] opcode. Note that as of the time of this
+/// writing, `evm.codes` incorrectly implies that the opcode returns the gas
+/// limit of the current transaction.  When in doubt, consult [`The Ethereum
+/// Yellow Paper`].
+///
+/// [`GAS_LIMIT`]: https://www.evm.codes/#45
+/// [`The Ethereum Yellow Paper`]: https://ethereum.github.io/yellowpaper/paper.pdf
+#[no_mangle]
+unsafe extern "C" fn block_gas_limit() -> u64 {
+    0
+}
+
+/// Gets a bounded estimate of the L1 block number at which the Sequencer
+/// sequenced the transaction. See [`Block Numbers and Time`] for more
+/// information on how this value is determined.
+///
+/// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
+#[no_mangle]
+unsafe extern "C" fn block_number() -> u64 {
+    0
+}
+
+/// Deploys a new contract using the init code provided, which the EVM executes
+/// to construct the code of the newly deployed contract. The init code must be
+/// written in EVM bytecode, but the code it deploys can be that of a Stylus
+/// program. The code returned will be treated as WASM if it begins with the
+/// EOF-inspired header `0xEFF000`. Otherwise the code will be interpreted as
+/// that of a traditional EVM-style contract. See [`Deploying Stylus Programs`]
+/// for more information on writing init code.
+///
+/// On success, this hostio returns the address of the newly created account
+/// whose address is a function of the sender and nonce. On failure the address
+/// will be `0`, `return_data_len` will store the length of the revert data, the
+/// bytes of which can be read via the `read_return_data` hostio. The semantics
+/// are equivalent to that of the EVM's [`CREATE`] opcode, which notably
+/// includes the exact address returned.
+///
+/// [`Deploying Stylus Programs`]: https://docs.arbitrum.io/stylus/quickstart
+/// [`CREATE`]: https://www.evm.codes/#f0
+#[no_mangle]
+unsafe extern "C" fn create1(
+    code: *const u8,
+    code_len: usize,
+    endowment: *const u8,
+    contract: *mut u8,
+    revert_data_len: *mut usize,
+) {
+}
+
+/// Deploys a new contract using the init code provided, which the EVM executes
+/// to construct the code of the newly deployed contract. The init code must be
+/// written in EVM bytecode, but the code it deploys can be that of a Stylus
+/// program. The code returned will be treated as WASM if it begins with the
+/// EOF-inspired header `0xEFF000`. Otherwise the code will be interpreted as
+/// that of a traditional EVM-style contract. See [`Deploying Stylus Programs`]
+/// for more information on writing init code.
+///
+/// On success, this hostio returns the address of the newly created account
+/// whose address is a function of the sender, salt, and init code. On failure
+/// the address will be `0`, `return_data_len` will store the length of the
+/// revert data, the bytes of which can be read via the `read_return_data`
+/// hostio. The semantics are equivalent to that of the EVM's `[CREATE2`]
+/// opcode, which notably includes the exact address returned.
+///
+/// [`Deploying Stylus Programs`]: https://docs.arbitrum.io/stylus/quickstart
+/// [`CREATE2`]: https://www.evm.codes/#f5
+#[no_mangle]
+unsafe extern "C" fn create2(
+    code: *const u8,
+    code_len: usize,
+    endowment: *const u8,
+    salt: *const u8,
+    contract: *mut u8,
+    revert_data_len: *mut usize,
+) {
+}
+
+/// Gets the amount of gas left after paying for the cost of this hostio. The
+/// semantics are equivalent to that of the EVM's [`GAS`] opcode.
+///
+/// [`GAS`]: https://www.evm.codes/#5a
+#[no_mangle]
+unsafe extern "C" fn evm_gas_left() -> u64 {
+    0
+}
+
+/// Gets the amount of ink remaining after paying for the cost of this hostio.
+/// The semantics are equivalent to that of the EVM's [`GAS`] opcode, except the
+/// units are in ink. See [`Ink and Gas`] for more information on Stylus's
+/// compute pricing.
+///
+/// [`GAS`]: https://www.evm.codes/#5a
+/// [`Ink and Gas`]: https://docs.arbitrum.io/stylus/concepts/gas-metering
+#[no_mangle]
+unsafe extern "C" fn evm_ink_left() -> u64 {
+    0
+}
+
+/// Whether the current call is reentrant.
+#[no_mangle]
+unsafe extern "C" fn msg_reentrant() -> bool {
+    false
+}
+
+/// The `entrypoint!` macro handles importing this hostio, which is required if
+/// the program's memory grows. Otherwise compilation through the `ArbWasm`
+/// precompile will revert. Internally the Stylus VM forces calls to this hostio
+/// whenever new WASM pages are allocated. Calls made voluntarily will
+/// unproductively consume gas.
+#[no_mangle]
+unsafe extern "C" fn pay_for_memory_grow(pages: u16) {}
+
+/// Reads the program calldata. The semantics are equivalent to that of the
+/// EVM's [`CALLDATA_COPY`] opcode when requesting the entirety of the current
+/// call's calldata.
+///
+/// [`CALLDATA_COPY`]: https://www.evm.codes/#37
+#[no_mangle]
+unsafe extern "C" fn read_args(dest: *mut u8) {}
+
+/// Gets the gas price in wei per gas, which on Arbitrum chains equals the
+/// basefee. The semantics are equivalent to that of the EVM's [`GAS_PRICE`]
+/// opcode.
+///
+/// [`GAS_PRICE`]: https://www.evm.codes/#3A
+#[no_mangle]
+unsafe extern "C" fn tx_gas_price(gas_price: *mut u8) {}
+
+/// Gets the price of ink in evm gas basis points. See [`Ink and Gas`] for more
+/// information on Stylus's compute-pricing model.
+///
+/// [`Ink and Gas`]: https://docs.arbitrum.io/stylus/concepts/gas-metering
+#[no_mangle]
+unsafe extern "C" fn tx_ink_price() -> u32 {
+    0
+}
+
+/// Gets the top-level sender of the transaction. The semantics are equivalent
+/// to that of the EVM's [`ORIGIN`] opcode.
+///
+/// [`ORIGIN`]: https://www.evm.codes/#32
+#[no_mangle]
+unsafe extern "C" fn tx_origin(origin: *mut u8) {}
+
+/// Writes the final return data. If not called before the program exists, the
+/// return data will be 0 bytes long. Note that this hostio does not cause the
+/// program to exit, which happens naturally when `user_entrypoint` returns.
+#[no_mangle]
+unsafe extern "C" fn write_result(data: *const u8, len: usize) {}

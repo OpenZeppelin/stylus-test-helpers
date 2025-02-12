@@ -159,7 +159,10 @@ mod ping_pong_tests {
         alloy_primitives::{Address, U256},
         call::Call,
         contract, msg,
-        prelude::{public, storage, AddressVM, SolidityError, TopLevelStorage},
+        prelude::{
+            public, storage, AddressVM, HostAccess, SolidityError, StorageType,
+            TopLevelStorage,
+        },
         storage::{StorageAddress, StorageU256},
     };
 
@@ -395,7 +398,7 @@ mod proxies_tests {
     use stylus_sdk::{
         call::Call,
         contract, msg,
-        prelude::{public, storage, TopLevelStorage},
+        prelude::{public, storage, HostAccess, StorageType, TopLevelStorage},
         storage::StorageAddress,
     };
 
