@@ -723,6 +723,17 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
             contract_ref: self,
         }
     }
+
+    // TODO#q: document
+    pub fn emmited(&self, event: &impl SolEvent) -> bool {
+        VMContext::current().emitted_for(&self.address, event)
+    }
+    
+    #[track_caller]
+    pub fn assert_emmited(&self, event: &impl SolEvent) {
+        // TODO#q: add pretty print for event
+        assert!(self.emmited(event), "Event was not emmited");
+    }
 }
 
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
