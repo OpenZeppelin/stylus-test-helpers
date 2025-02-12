@@ -430,12 +430,12 @@ mod ping_pong_tests {
             .expect("should ping successfully");
 
         // Assert emitted events.
-        assert!(Pinged { from: alice.address(), value: TEN }.emitted());
-        assert!(Ponged { from: ping.address(), value: TEN }.emitted());
+        assert!(Pinged { from: alice.address(), value: TEN }.emitted_at(&ping));
+        assert!(Ponged { from: ping.address(), value: TEN }.emitted_at(&pong));
 
         // Assert not emitted events
-        assert!(!Pinged { from: ping.address(), value: TEN }.emitted());
-        assert!(!Ponged { from: alice.address(), value: TEN }.emitted());
+        assert!(!Pinged { from: ping.address(), value: TEN }.emitted_at(&ping));
+        assert!(!Ponged { from: alice.address(), value: TEN }.emitted_at(&pong));
     }
 }
 

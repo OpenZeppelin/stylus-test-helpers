@@ -9,8 +9,8 @@ use std::{
     thread::ThreadId,
 };
 
-use alloy_primitives::{Address, B256, U256};
-use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
+use alloy_primitives::{Address, Bytes, LogData, B256, U256};
+use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{prelude::StorageType, ArbResult};
@@ -309,11 +309,35 @@ impl VMContext {
         self.router(address).exists()
     }
 
-    /// Check if the `event` was emitted.
-    pub fn emitted<T: SolEvent>(self, event: &T) -> bool {
-        let event_log = Log::new(event);
+    /// Check if the `event` was emitted, by the contract at `address`.
+    pub(crate) fn emitted_for<E: SolEvent>(
+        self,
+        address: &Address,
+        event: &E,
+    ) -> bool {
+        let log_data = event.encode_log_data();
 
-        self.storage().events.contains(&event_log)
+        self.storage()
+            .events
+            .get(address)
+            .is_some_and(|logs| logs.contains(&log_data))
+    }
+
+    /// Get all events of type [`E`] emitted by the contract at `address`.
+    pub(crate) fn matching_events_for<E: SolEvent>(
+        self,
+        address: &Address,
+    ) -> Vec<E> {
+        self.storage()
+            .events
+            .get(address)
+            .map(|events| {
+                events
+                    .iter()
+                    .filter_map(|log| E::decode_log_data(log, true).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub(crate) unsafe fn store_log_raw(
@@ -322,13 +346,29 @@ impl VMContext {
         len: usize,
         topics: usize,
     ) {
-        let data = slice::from_raw_parts(data, len).to_vec();
+        let data = slice::from_raw_parts(data, len);
         self.store_log(data, topics);
     }
 
-    fn store_log(self, data: Vec<u8>, topics: usize) {
-        let event = Log { data, topics };
-        self.storage().events.insert(event);
+    fn store_log(self, data: &[u8], topics_number: usize) {
+        let topics: Vec<_> = data
+            .chunks(Word::len_bytes())
+            .map(Word::from_slice)
+            .take(topics_number)
+            .collect();
+
+        let data_start = Word::len_bytes() * topics_number;
+        let data = Bytes::copy_from_slice(&data[data_start..]);
+
+        let log_data = LogData::new(topics, data).unwrap();
+
+        let mut storage = self.storage();
+        let contract_address = storage.contract_address.expect("contract_address should be set");
+        storage
+            .events
+            .entry(contract_address)
+            .or_default()
+            .push(log_data);
     }
 
     /// Get the balance of account at `address`.
@@ -482,19 +522,21 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
+    // TODO#q: use approach with enums: HashMap<Address, AccountStorage>
     /// Contract's address to mock data storage mapping.
     contract_data: HashMap<Address, ContractStorage>,
     /// Account's address to balance mapping.
     balances: HashMap<Address, U256>,
     /// Event logs emitted during [`Context::current`].
-    events: HashSet<Log>,
+    events: HashMap<Address, Vec<LogData>>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
 }
 
-/// Event log emitted during [`Context::current`].
+// TODO#q: drop `Log`
+/*/// Event log emitted during [`Context::current`].
 #[derive(Debug, Hash, Eq, PartialEq)]
 struct Log {
     data: Vec<u8>,
@@ -519,7 +561,7 @@ impl Log {
         sol_event.encode_data_to(&mut data);
         Log { data, topics: topics_count }
     }
-}
+}*/
 
 /// Contract's byte storage
 type ContractStorage = HashMap<Bytes32, Bytes32>;
@@ -763,11 +805,12 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 /// Extension for events to check if the event was emitted.
 pub trait EventLogExt {
     /// Check if the event was emitted.
-    fn emitted(&self) -> bool;
+    fn emitted_at<ST: StorageType>(&self, contract: &Contract<ST>) -> bool;
 }
 
 impl<T: SolEvent> EventLogExt for T {
-    fn emitted(&self) -> bool {
-        VMContext::current().emitted(self)
+    fn emitted_at<ST: StorageType>(&self, contract: &Contract<ST>) -> bool {
+        // TODO#q: do we need EventLogExt?
+        VMContext::current().emitted_for(&contract.address, self)
     }
 }
