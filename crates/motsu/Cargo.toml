@@ -13,6 +13,7 @@ const-hex.workspace = true
 once_cell.workspace = true
 tiny-keccak.workspace = true
 stylus-sdk.workspace = true
+stylus-test.workspace = true
 motsu-proc.workspace = true
 dashmap.workspace = true
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
