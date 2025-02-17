@@ -12,7 +12,8 @@ use std::{
 use alloy_primitives::{Address, B256, U256};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{prelude::StorageType, ArbResult};
+use stylus_sdk::{host::VM, prelude::StorageType, ArbResult};
+use stylus_test::TestVM;
 
 use crate::{
     router::{VMRouter, VMRouterContext},
@@ -634,7 +635,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
 /// `0` offset.
 pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
-    unsafe { ST::new(U256::ZERO, 0) }
+    unsafe { ST::new(U256::ZERO, 0, VM { host: Box::new(TestVM::new()) }) }
 }
 
 /// Account used to call contracts.
