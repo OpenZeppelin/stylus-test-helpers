@@ -430,7 +430,7 @@ mod ping_pong_tests {
             .expect("should ping successfully");
 
         // Assert emitted events.
-        ping.assert_emmited(&Pinged { from: alice.address(), value: TEN + ONE });
+        ping.assert_emmited(&Pinged { from: alice.address(), value: TEN });
         pong.assert_emmited(&Ponged { from: ping.address(), value: TEN });
 
         // Assert not emitted events

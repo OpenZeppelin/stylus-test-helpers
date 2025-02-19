@@ -535,34 +535,6 @@ struct VMContextStorage {
     return_data_size: Option<usize>,
 }
 
-// TODO#q: drop `Log`
-/*/// Event log emitted during [`Context::current`].
-#[derive(Debug, Hash, Eq, PartialEq)]
-struct Log {
-    data: Vec<u8>,
-    topics: usize,
-}
-
-impl Log {
-    /// Create a new log from the given `sol_event`.
-    fn new<T: SolEvent>(sol_event: &T) -> Self {
-        let topics = sol_event.encode_topics();
-
-        let topics_count = T::TopicList::COUNT;
-
-        let mut data = topics.iter().map(WordToken::as_slice).fold(
-            Vec::with_capacity(32 * topics_count),
-            |mut data, topic| {
-                data.extend_from_slice(topic);
-                data
-            },
-        );
-
-        sol_event.encode_data_to(&mut data);
-        Log { data, topics: topics_count }
-    }
-}*/
-
 /// Contract's byte storage
 type ContractStorage = HashMap<Bytes32, Bytes32>;
 pub(crate) const WORD_BYTES: usize = 32;
@@ -821,7 +793,7 @@ pub trait EventLogExt {
 
 impl<T: SolEvent> EventLogExt for T {
     fn emitted_at<ST: StorageType>(&self, contract: &Contract<ST>) -> bool {
-        // TODO#q: do we need EventLogExt?
+        // TODO#q: drop EventLogExt?
         VMContext::current().emitted_for(&contract.address, self)
     }
 }
