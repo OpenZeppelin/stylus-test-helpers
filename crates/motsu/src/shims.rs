@@ -70,7 +70,7 @@ unsafe extern "C" fn native_keccak256(
 ///
 /// # Panics
 ///
-/// May panic if unable to lock `STORAGE`.
+/// * If unable to lock `STORAGE`.
 #[no_mangle]
 unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
     VMContext::current().get_bytes_raw(key, out);
@@ -90,7 +90,7 @@ unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 ///
 /// # Panics
 ///
-/// May panic if unable to lock `STORAGE`.
+/// * If unable to lock `STORAGE`.
 #[no_mangle]
 unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
     VMContext::current().set_bytes_raw(key, value);
@@ -122,7 +122,7 @@ unsafe extern "C" fn storage_flush_cache(_: bool) {
 ///
 /// # Panics
 ///
-/// May panic if fails to parse `MSG_SENDER` as an address.
+/// * If fails to parse `MSG_SENDER` as an address.
 #[no_mangle]
 unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
@@ -143,7 +143,7 @@ unsafe extern "C" fn msg_value(value: *mut u8) {
 ///
 /// # Panics
 ///
-/// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
+/// * If fails to parse `CONTRACT_ADDRESS` as an address.
 #[no_mangle]
 unsafe extern "C" fn contract_address(address: *mut u8) {
     let contract_address = VMContext::current()
@@ -189,7 +189,7 @@ unsafe extern "C" fn emit_log(data: *const u8, len: usize, topics: usize) {
 ///
 /// # Panics
 ///
-/// May panic if fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
+/// * If fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
 #[no_mangle]
 unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     let code_hash = if VMContext::current().has_code_raw(address) {

@@ -1,16 +1,17 @@
 //! Unit-testing context for Stylus contracts.
 
+use core::fmt::Debug;
 use std::{
     cell::Cell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
     ptr, slice,
     thread::ThreadId,
 };
 
-use alloy_primitives::{Address, B256, U256};
-use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList};
+use alloy_primitives::{Address, Bytes, LogData, B256, U256};
+use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{keccak_const::Keccak256, prelude::StorageType, ArbResult};
@@ -61,9 +62,10 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
-            .contract_data
+            .contracts
             .get(&contract_address)
             .expect("contract receiver should have a storage initialised")
+            .data
             .get(key)
             .copied()
             .unwrap_or_default()
@@ -81,9 +83,10 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
-            .contract_data
+            .contracts
             .get_mut(&contract_address)
             .expect("contract receiver should have a storage initialised")
+            .data
             .insert(key, value);
     }
 
@@ -141,8 +144,8 @@ impl VMContext {
         if MOTSU_VM
             .entry(self)
             .or_default()
-            .contract_data
-            .insert(contract_address, HashMap::new())
+            .contracts
+            .insert(contract_address, ContractStorage::default())
             .is_some()
         {
             panic!("contract storage already initialized for contract_address `{contract_address}`");
@@ -157,10 +160,10 @@ impl VMContext {
     /// test [`VMContext`].
     fn reset_storage(self, contract_address: Address) {
         let mut storage = self.storage();
-        storage.contract_data.remove(&contract_address);
+        storage.contracts.remove(&contract_address);
 
         // if no more contracts left,
-        if storage.contract_data.is_empty() {
+        if storage.contracts.is_empty() {
             // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
@@ -248,9 +251,8 @@ impl VMContext {
         // We should do backup before transferring value, to have balances
         // reverted in case of failure.
         let storage = self.storage();
-        let contract_data = storage.contract_data.clone_data();
+        let contract_data = storage.contracts.clone_data();
         let balances = storage.balances.clone_data();
-        let events = storage.events.clone_data();
         drop(storage);
 
         // Transfer value sent by message sender.
@@ -268,9 +270,8 @@ impl VMContext {
         if result.is_err() {
             // Recover from backups.
             let mut storage = self.storage();
-            storage.contract_data.restore_from_data(contract_data);
+            storage.contracts.restore_from_data(contract_data);
             storage.balances.restore_from_data(balances);
-            storage.events.restore_from_data(events);
         }
 
         // Set the previous message sender and contract address back.
@@ -327,26 +328,73 @@ impl VMContext {
         self.router(address).exists()
     }
 
-    /// Check if the `event` was emitted.
-    pub fn emitted<T: SolEvent>(self, event: &T) -> bool {
-        let event_log = Log::new(event);
+    /// Check if the `event` was emitted, by the contract at `address`.
+    pub(crate) fn emitted_for<E: SolEvent>(
+        self,
+        address: &Address,
+        event: &E,
+    ) -> bool {
+        let log_data = event.encode_log_data();
 
-        self.storage().events.contains(&event_log)
+        self.storage()
+            .contracts
+            .get(address)
+            .is_some_and(|contract| contract.events.contains(&log_data))
     }
 
+    /// Get all events of type [`E`] emitted by the contract at `address`.
+    pub(crate) fn matching_events_for<E: SolEvent>(
+        self,
+        address: &Address,
+    ) -> Vec<E> {
+        self.storage()
+            .contracts
+            .get(address)
+            .map(|contract| {
+                contract
+                    .events
+                    .iter()
+                    .filter_map(|log| E::decode_log_data(log, true).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Store the raw event log `data`, `len` and `topics` number in the
+    /// storage.
     pub(crate) unsafe fn store_log_raw(
         self,
         data: *const u8,
         len: usize,
         topics: usize,
     ) {
-        let data = slice::from_raw_parts(data, len).to_vec();
+        let data = slice::from_raw_parts(data, len);
         self.store_log(data, topics);
     }
 
-    fn store_log(self, data: Vec<u8>, topics: usize) {
-        let event = Log { data, topics };
-        self.storage().events.insert(event);
+    /// Store the event log `data` and `topics_number` in the storage.
+    fn store_log(self, data: &[u8], topics_number: usize) {
+        let topics: Vec<_> = data
+            .chunks(Word::len_bytes())
+            .map(Word::from_slice)
+            .take(topics_number)
+            .collect();
+
+        let data_start = Word::len_bytes() * topics_number;
+        let data = Bytes::copy_from_slice(&data[data_start..]);
+
+        let log_data =
+            LogData::new(topics, data).expect("should create new LogData");
+
+        let mut storage = self.storage();
+        let contract_address =
+            storage.contract_address.expect("contract_address should be set");
+        storage
+            .contracts
+            .entry(contract_address)
+            .or_default()
+            .events
+            .push(log_data);
     }
 
     /// Get the balance of account at `address`.
@@ -435,24 +483,21 @@ impl VMContext {
 
     pub(crate) fn reset_backup(self) {
         let mut storage = self.storage();
-        storage.contract_data.reset_backup();
+        storage.contracts.reset_backup();
         storage.balances.reset_backup();
-        storage.events.reset_backup();
     }
 
     pub(crate) fn restore_from_backup(self) {
         let mut storage = self.storage();
-        storage.contract_data.restore_from_backup();
+        storage.contracts.restore_from_backup();
         storage.balances.restore_from_backup();
-        storage.events.restore_from_backup();
     }
 
     /// NOTE: Should create backup before transfering the value
     fn create_backup(self) {
         let mut storage = self.storage();
-        storage.contract_data.create_backup();
+        storage.contracts.create_backup();
         storage.balances.create_backup();
-        storage.events.create_backup();
     }
 
     /// Get reference to the storage for the current test thread.
@@ -524,48 +569,27 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    // TODO#q: move contract_data, balances, events to VMPersistentStorage
-    /// Contract's address to mock data storage mapping.
-    contract_data: Backuped<HashMap<Address, ContractStorage>>,
-    /// Account's address to balance mapping.
+    /// Contract's address to [`ContractStorage`] mapping.
+    contracts: Backuped<HashMap<Address, ContractStorage>>,
+    /// Account's address to balance [`U256`] mapping.
     balances: Backuped<HashMap<Address, U256>>,
-    /// Event logs emitted during [`Context::current`].
-    events: Backuped<HashSet<Log>>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
 }
 
-/// Event log emitted during [`Context::current`].
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
-struct Log {
-    data: Vec<u8>,
-    topics: usize,
-}
-
-impl Log {
-    /// Create a new log from the given `sol_event`.
-    fn new<T: SolEvent>(sol_event: &T) -> Self {
-        let topics = sol_event.encode_topics();
-
-        let topics_count = T::TopicList::COUNT;
-
-        let mut data = topics.iter().map(WordToken::as_slice).fold(
-            Vec::with_capacity(32 * topics_count),
-            |mut data, topic| {
-                data.extend_from_slice(topic);
-                data
-            },
-        );
-
-        sol_event.encode_data_to(&mut data);
-        Log { data, topics: topics_count }
-    }
+/// Contract's account storage.
+#[derive(Default)]
+struct ContractStorage {
+    /// Contract's byte storage
+    data: ContractData,
+    /// Event logs emitted by the contract.
+    events: Vec<LogData>,
 }
 
 /// Contract's byte storage
-type ContractStorage = HashMap<Bytes32, Bytes32>;
+type ContractData = HashMap<Bytes32, Bytes32>;
 pub(crate) const WORD_BYTES: usize = 32;
 pub(crate) type Bytes32 = [u8; WORD_BYTES];
 
@@ -728,6 +752,35 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
             contract_ref: self,
         }
     }
+
+    /// Check if the `event` was emitted, by the contract `self`.
+    pub fn emitted<E: SolEvent>(&self, event: &E) -> bool {
+        VMContext::current().emitted_for(&self.address, event)
+    }
+
+    /// Assert that the `event` was emitted, by the contract `self`.
+    /// Event type `E` should implement [`Debug`].
+    ///
+    /// # Panics
+    ///
+    /// * If the event was not emitted, panic and include all matching emitted
+    ///   events (if any) in the error message.
+    #[track_caller]
+    pub fn assert_emitted<E: SolEvent + Debug>(&self, event: &E) {
+        let context = VMContext::current();
+        if context.emitted_for(&self.address, event) {
+            return;
+        }
+
+        let panic_msg = "event was not emitted";
+        let matching_events = context.matching_events_for::<E>(&self.address);
+
+        if matching_events.is_empty() {
+            panic!("{panic_msg}, no matching events found")
+        } else {
+            panic!("{panic_msg}, matching events: {matching_events:?}")
+        }
+    }
 }
 
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
@@ -804,18 +857,6 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 
     fn balance(&self) -> U256 {
         self.address().balance()
-    }
-}
-
-/// Extension for events to check if the event was emitted.
-pub trait EventLogExt {
-    /// Check if the event was emitted.
-    fn emitted(&self) -> bool;
-}
-
-impl<T: SolEvent> EventLogExt for T {
-    fn emitted(&self) -> bool {
-        VMContext::current().emitted(self)
     }
 }
 

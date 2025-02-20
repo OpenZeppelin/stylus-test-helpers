@@ -10,29 +10,98 @@
 //! ## Usage
 //!
 //! Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
-//! to get access to VM affordances.
-//!
-//! Note that we require contracts to implement
-//! `stylus_sdk::prelude::StorageType`. This trait is typically implemented by
-//! default with `stylus_proc::sol_storage` or `stylus_proc::storage` macros.
+//! to get access to VM affordances:
 //!
 //! ```rust
 //! #[cfg(test)]
 //! mod tests {
-//!     use openzeppelin_stylus::token::erc20::Erc20;
-//!     use motsu::prelude::{Account, Contract};
+//!     use motsu::prelude::*;
 //!     use stylus_sdk::alloy_primitives::{Address, U256};
 //!
 //!     #[motsu::test]
 //!     fn reads_balance(
 //!         contract: Contract<Erc20>,
 //!         alice: Account,
-//!     ) {  
-//!         let balance = contract.sender(alice).balance_of(Address::ZERO); // Access storage.
+//!     ) {
+//!         // Access storage.
+//!         let balance = contract.sender(alice).balance_of(Address::ZERO);
 //!         assert_eq!(balance, U256::ZERO);
 //!     }
 //! }
 //! ```
+//!
+//! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
+//! to a contract, and should accept an [`crate::prelude::Account`] or an
+//! [`stylus_sdk::alloy_primitives::Address`] as an argument.
+//!
+//! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
+//! pass additional value to the contract.
+//! To make a payable call work, user should be funded with
+//! [`crate::prelude::Funding::fund`] method (there is no funding by default),
+//! like in example below:
+//!
+//! ```rust
+//!  use motsu::prelude::*;
+//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
+//!
+//!  #[motsu::test]
+//!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
+//!     let one = uint!(1_U256);
+//!     let ten = uint!(10_U256);
+//!
+//!     // Initialize the proxy contract.
+//!     proxy.sender(alice).init(Address::ZERO);
+//!
+//!     // Fund alice.
+//!     alice.fund(ten);
+//!
+//!     // Call the contract.
+//!     proxy.sender_and_value(alice, one).pay_proxy();
+//!
+//!     // Assert that alice lost one wei and the proxy gained one wei.
+//!     assert_eq!(alice.balance(), ten - one);
+//!     assert_eq!(proxy.balance(), one);
+//!  }
+//! ```
+//!
+//! Multiple external calls are supported in Motsu.
+//! Assuming `Proxy` is a contract that exposes `#[public]` function
+//! `Proxy::call_proxy`, where it adds `one` to the passed argument and calls
+//! next `Proxy` contract at the address provided during initialization.
+//! The following test case can emulate a call chain of three `Proxy` contracts:
+//!
+//! ```rust
+//!  use motsu::prelude::*;
+//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
+//!
+//!  #[motsu::test]
+//!  fn call_three_proxies(
+//!     proxy1: Contract<Proxy>,
+//!     proxy2: Contract<Proxy>,
+//!     proxy3: Contract<Proxy>,
+//!     alice: Account,
+//!  ) {
+//!     let one = uint!(1_U256);
+//!     let ten = uint!(10_U256);
+//!
+//!     // Set up a chain of three proxies.
+//!     // With the given call chain: proxy1 -> proxy2 -> proxy3.
+//!     proxy1.sender(alice).init(proxy2.address());
+//!     proxy2.sender(alice).init(proxy3.address());
+//!     proxy3.sender(alice).init(Address::ZERO);
+//!
+//!     // Call the first proxy.
+//!     let result = proxy1.sender(alice).call_proxy(ten);
+//!
+//!     // The value is incremented by 1 for each proxy.
+//!     assert_eq!(result, ten + one + one + one);
+//!  }
+//! ```
+//!
+//! It is possible to check emitted events by specific contract with
+//! [`crate::prelude::Contract::emitted`] method. And assert with
+//! [`crate::prelude::Contract::assert_emitted`] that will print all matching
+//! events in case of failed assertion.
 //!
 //! Annotating a test function that accepts no parameters will make
 //! [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
@@ -47,9 +116,39 @@
 //! }
 //! ```
 //!
+//! **Important:** To use a contract in tests, you must ensure it implements the
+//! unsafe trait [`stylus_sdk::prelude::TopLevelStorage`]. While this trait is
+//! automatically derived for contracts marked with
+//! [`stylus_sdk::prelude::entrypoint`], you'll need to implement it manually
+//! for any contract without this attribute:
+//!
+//! ```rust
+//! use stylus_sdk::{
+//!     storage::{StorageMap, StorageU256, StorageAddress},
+//!     prelude::*,
+//!     alloy_primitives::Address,
+//! };
+//!
+//! // Entry point attribute is missing. We should implement `TopLevelStorage` ourselves.
+//! // #[entrypoint]
+//! #[storage]
+//! pub struct Erc20 {
+//!     balances: StorageMap<Address, StorageU256>,
+//!     allowances: StorageMap<Address, StorageMap<Address, StorageU256>>,
+//!     total_supply: StorageU256,
+//! }
+//!
+//! unsafe impl TopLevelStorage for Erc20 {}
+//! ```
+//!
+//! **Important:** For `motsu` to work correctly, `stylus-sdk` should **not**
+//! have a default `hostio-caching` feature enabled.
+//!
 //! [test_attribute]: crate::test
 #[cfg(test)]
 extern crate alloc;
+extern crate core;
+
 mod context;
 pub mod prelude;
 mod revert;
@@ -73,10 +172,11 @@ mod ping_pong_tests {
         storage::{StorageAddress, StorageU256},
     };
 
-    use crate::{
-        context::{Account, Contract},
-        prelude::*,
-    };
+    use crate::context::{Account, Contract};
+
+    const ONE: U256 = uint!(1_U256);
+    const TEN: U256 = uint!(10_U256);
+    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
 
     sol! {
         /// Emitted when [`PingContract`] was called.
@@ -84,15 +184,12 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was pinged.
         /// * `value` - Value received after ping.
         #[allow(missing_docs)]
+        #[derive(Debug)]
         event Pinged(
             address indexed from,
             uint256 indexed value
         );
     }
-
-    const ONE: U256 = uint!(1_U256);
-    const TEN: U256 = uint!(10_U256);
-    const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
 
     #[storage]
     struct PingContract {
@@ -159,6 +256,7 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was ponged.
         /// * `value` - Value received after pong.
         #[allow(missing_docs)]
+        #[derive(Debug)]
         event Ponged(
             address indexed from,
             uint256 indexed value
@@ -314,21 +412,45 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
-    #[allow(unused)]
-    fn contract_should_not_drop() {
-        let alice = Account::random();
-        let ping = Contract::<PingContract>::new();
-        let mut ping = ping.sender(alice);
-        let pong = Contract::<PongContract>::new();
-        let pong_address = pong.address();
-        let pong = pong.sender(alice);
+    #[should_panic(expected = "contract storage already initialized")]
+    fn storage_duplicate_contract() {
+        let addr = Address::random();
 
-        _ = ping
-            .ping(pong_address, TEN)
-            .expect("contract ping should not drop");
+        // First contract instance
+        let _ping1 = Contract::<PingContract>::new_at(addr);
+
+        // Attempting to create a second instance at the same address while
+        // first exists should panic
+        let _ping2 = Contract::<PingContract>::new_at(addr);
     }
 
-    #[motsu_proc::test]
+    // Although the same address is very unlikely to be reused on the actual
+    // chain, this is still an allowed "feature" of motsu, so we "document" the
+    // behavior with this unit test.
+    #[motsu::test]
+    fn storage_cleanup(alice: Account, addr: Address) {
+        // First contract
+        let pong1 = Contract::<PongContract>::new_at(addr);
+
+        pong1.sender(alice).pong(U256::ZERO).expect("should pong");
+
+        assert_eq!(alice.address(), pong1.sender(alice).ponged_from.get());
+        assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
+        assert_eq!(addr, pong1.sender(alice).contract_address.get());
+
+        // Drop first contract
+        drop(pong1);
+
+        // Second contract at the same address
+        let pong2 = Contract::<PongContract>::new_at(addr);
+
+        // Should have fresh state
+        assert_eq!(Address::ZERO, pong2.sender(alice).ponged_from.get());
+        assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
+        assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
+    }
+
+    #[motsu::test]
     fn emits_event(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -340,12 +462,18 @@ mod ping_pong_tests {
             .expect("should ping successfully");
 
         // Assert emitted events.
-        assert!(Pinged { from: alice.address(), value: TEN }.emitted());
-        assert!(Ponged { from: ping.address(), value: TEN }.emitted());
+        ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
+        pong.assert_emitted(&Ponged { from: ping.address(), value: TEN });
 
         // Assert not emitted events
-        assert!(!Pinged { from: ping.address(), value: TEN }.emitted());
-        assert!(!Ponged { from: alice.address(), value: TEN }.emitted());
+        assert!(!ping.emitted(&Pinged { from: ping.address(), value: TEN }));
+        assert!(!pong.emitted(&Ponged { from: alice.address(), value: TEN }));
+        assert!(
+            !ping.emitted(&Pinged { from: alice.address(), value: TEN + ONE })
+        );
+        assert!(
+            !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
+        );
     }
 }
 

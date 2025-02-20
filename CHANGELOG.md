@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Event assertions `Contract::emitted` and `Contract::assert_emitted` #34
 
 ### Changed (Breaking)
 
 
-## [0.4.0] - 2025-02-06
+## [0.4.0] - 2025-02-11
 
 ### Added
 
