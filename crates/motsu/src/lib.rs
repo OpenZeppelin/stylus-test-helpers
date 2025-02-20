@@ -408,18 +408,42 @@ mod ping_pong_tests {
     }
 
     #[motsu::test]
-    #[allow(unused)]
-    fn contract_should_not_drop() {
-        let alice = Account::random();
-        let ping = Contract::<PingContract>::new();
-        let mut ping = ping.sender(alice);
-        let pong = Contract::<PongContract>::new();
-        let pong_address = pong.address();
-        let pong = pong.sender(alice);
+    #[should_panic(expected = "contract storage already initialized")]
+    fn storage_duplicate_contract() {
+        let addr = Address::random();
 
-        _ = ping
-            .ping(pong_address, TEN)
-            .expect("contract ping should not drop");
+        // First contract instance
+        let _ping1 = Contract::<PingContract>::new_at(addr);
+
+        // Attempting to create second instance at same address while first
+        // exists should panic
+        let _ping2 = Contract::<PingContract>::new_at(addr);
+    }
+
+    // Although the same address is very unlikely to be reused on the actual
+    // chain, this is still an allowed "feature" of motsu, so we "document" the
+    // behavior with this unit test.
+    #[motsu::test]
+    fn storage_cleanup(alice: Account, addr: Address) {
+        // First contract
+        let pong1 = Contract::<PongContract>::new_at(addr);
+
+        pong1.sender(alice).pong(U256::ZERO).expect("should pong");
+
+        assert_eq!(alice.address(), pong1.sender(alice).ponged_from.get());
+        assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
+        assert_eq!(addr, pong1.sender(alice).contract_address.get());
+
+        // Drop first contract
+        drop(pong1);
+
+        // Second contract at same address
+        let pong2 = Contract::<PongContract>::new_at(addr);
+
+        // Should have fresh state
+        assert_eq!(Address::ZERO, pong2.sender(alice).ponged_from.get());
+        assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
+        assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
     }
 
     #[motsu_proc::test]
