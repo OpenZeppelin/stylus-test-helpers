@@ -98,6 +98,11 @@ fn call_three_proxies(
 }
 ```
 
+It is possible to check emitted events by specific contract with 
+`Contract::emitted` method.
+And assert with `Contract::assert_emitted` that will print all matching 
+events in case of failed assertion.
+
 Annotating a test function that accepts no parameters will make
 `#[motsu::test]` behave the same as `#[test]`.
 
