@@ -655,6 +655,7 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
         // `msg_value`.
         self.set_call_params();
 
+        // TODO#q: we should not transfer value in pure functions
         // Transfer value (if any) from the `msg_sender` to `contract_address`,
         // that was set on the previous step.
         VMContext::current().transfer_value();
