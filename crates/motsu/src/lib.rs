@@ -129,7 +129,7 @@
 //!     alloy_primitives::Address,
 //! };
 //!
-//! // Entry point is not implemented, so we should implement `TopLevelStorage` ourselves.
+//! // Entry point attribute is missing. We should implement `TopLevelStorage` ourselves.
 //! // #[entrypoint]
 //! #[storage]
 //! pub struct Erc20 {

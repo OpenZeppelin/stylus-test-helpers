@@ -118,7 +118,7 @@ mod tests {
 
 **Important:** To use a contract in tests, you must ensure it implements the
 unsafe trait `stylus_sdk::prelude::TopLevelStorage`.
-While this trait is automatically derived for contracts marked with`#[entrypoint]`,
+While this trait is automatically derived for contracts marked with `#[entrypoint]`,
 you'll need to implement it manually for any contract without this attribute:
 
 ```rust
@@ -128,7 +128,7 @@ you'll need to implement it manually for any contract without this attribute:
     alloy_primitives::Address,
 };
 
-// Entry point is not implemented, so we should implement `TopLevelStorage` ourselves.
+// Entry point attribute is missing. We should implement `TopLevelStorage` ourselves.
 // #[entrypoint]
 #[storage]
 pub struct Erc20 {
