@@ -791,11 +791,13 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         let panic_msg = "event was not emitted";
         let matching_events = context.matching_events_for::<E>(&self.address);
 
-        if matching_events.is_empty() {
-            panic!("{panic_msg}, no matching events found")
+        let mut panic_msg = if matching_events.is_empty() {
+            format!("{panic_msg}, no matching events found")
         } else {
-            panic!("{panic_msg}, matching events: {matching_events:?}")
-        }
+            format!("{panic_msg}, matching events: {matching_events:?}")
+        };
+        VMContext::current().substitute_tags_at(&mut panic_msg);
+        panic!("{}", panic_msg);
     }
 }
 
