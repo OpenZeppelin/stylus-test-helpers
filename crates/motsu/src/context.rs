@@ -493,11 +493,25 @@ impl VMContext {
         storage.balances.restore_from_backup();
     }
 
-    /// NOTE: Should create backup before transfering the value
+    /// NOTE#q: Should create backup before transfering the value
     fn create_backup(self) {
         let mut storage = self.storage();
         storage.contracts.create_backup();
         storage.balances.create_backup();
+    }
+
+    /// Set string `tag` for the account at `address`.
+    fn set_tag(self, address: Address, tag: String) {
+        self.storage().tags.insert(address, tag);
+    }
+
+    /// Substitute account addresses in the `msg` with the corresponding tags.
+    fn substitute_tags_at(self, msg: &mut String) {
+        let storage = self.storage();
+        for (address, tag) in &storage.tags {
+            let address = format!("{address:?}");
+            *msg = msg.replace(&address, tag);
+        }
     }
 
     /// Get reference to the storage for the current test thread.
@@ -569,14 +583,16 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    /// Contract's address to [`ContractStorage`] mapping.
-    contracts: Backuped<HashMap<Address, ContractStorage>>,
-    /// Account's address to balance [`U256`] mapping.
-    balances: Backuped<HashMap<Address, U256>>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
+    /// Contract's address to [`ContractStorage`] mapping.
+    contracts: Backuped<HashMap<Address, ContractStorage>>,
+    /// Account's address to balance [`U256`] mapping.
+    balances: Backuped<HashMap<Address, U256>>,
+    /// Account's address to tag mapping.
+    tags: HashMap<Address, String>,
 }
 
 /// Contract's account storage.
@@ -868,8 +884,9 @@ pub trait DeriveFromTag {
 impl DeriveFromTag for Address {
     fn from_tag(tag: &str) -> Self {
         let hash = Keccak256::new().update(tag.as_bytes()).finalize();
-        // TODO#q: store tag here
-        Address::from_slice(&hash[..20])
+        let address = Address::from_slice(&hash[..20]);
+        VMContext::current().set_tag(address, tag.to_string());
+        address
     }
 }
 
