@@ -367,7 +367,8 @@ impl VMContext {
         let data_start = Word::len_bytes() * topics_number;
         let data = Bytes::copy_from_slice(&data[data_start..]);
 
-        let log_data = LogData::new(topics, data).unwrap();
+        let log_data =
+            LogData::new(topics, data).expect("should create new LogData");
 
         let mut storage = self.storage();
         let contract_address =
@@ -721,8 +722,8 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
     ///
     /// # Panics
     ///
-    /// If the event was not emitted, panic and include all matching emitted
-    /// events (if any) in the error message.
+    /// * If the event was not emitted, panic and include all matching emitted
+    ///   events (if any) in the error message.
     #[track_caller]
     pub fn assert_emitted<E: SolEvent + Debug>(&self, event: &E) {
         let context = VMContext::current();
