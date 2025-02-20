@@ -165,10 +165,7 @@ mod ping_pong_tests {
         storage::{StorageAddress, StorageU256},
     };
 
-    use crate::{
-        context::{Account, Contract},
-        prelude::*,
-    };
+    use crate::context::{Account, Contract};
 
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);

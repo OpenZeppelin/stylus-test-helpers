@@ -520,7 +520,6 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    // TODO#q: use approach with enums: HashMap<Address, AccountStorage>
     /// Contract's address to mock data storage mapping.
     contract_data: HashMap<Address, ContractStorage>,
     /// Account's address to balance mapping.
