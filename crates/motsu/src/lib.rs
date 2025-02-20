@@ -142,6 +142,8 @@
 //! [test_attribute]: crate::test
 #[cfg(test)]
 extern crate alloc;
+extern crate core;
+
 mod context;
 pub mod prelude;
 mod router;
