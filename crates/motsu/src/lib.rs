@@ -178,6 +178,7 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was pinged.
         /// * `value` - Value received after ping.
         #[allow(missing_docs)]
+        #[derive(Debug)]
         event Pinged(
             address indexed from,
             uint256 indexed value
@@ -249,6 +250,7 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was ponged.
         /// * `value` - Value received after pong.
         #[allow(missing_docs)]
+        #[derive(Debug)]
         event Ponged(
             address indexed from,
             uint256 indexed value
@@ -430,13 +432,21 @@ mod ping_pong_tests {
             .expect("should ping successfully");
 
         // Assert emitted events.
-        ping.assert_emmited(&Pinged { from: alice.address(), value: TEN });
-        pong.assert_emmited(&Ponged { from: ping.address(), value: TEN });
+        ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
+        pong.assert_emitted(&Ponged { from: ping.address(), value: TEN });
 
         // Assert not emitted events
-        assert!(!ping.emmited(&Pinged { from: ping.address(), value: TEN }));
-        assert!(!pong.emmited(&Ponged { from: alice.address(), value: TEN }));
+        assert!(!ping.emitted(&Pinged { from: ping.address(), value: TEN }));
+        assert!(!pong.emitted(&Ponged { from: alice.address(), value: TEN }));
+        assert!(
+            !ping.emitted(&Pinged { from: alice.address(), value: TEN + ONE })
+        );
+        assert!(
+            !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
+        );
     }
+
+    // TODO#q: add panic test case
 }
 
 #[cfg(test)]

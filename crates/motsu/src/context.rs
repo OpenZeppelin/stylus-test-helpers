@@ -1,8 +1,9 @@
 //! Unit-testing context for Stylus contracts.
 
+use core::fmt::Debug;
 use std::{
     cell::Cell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
     ptr, slice,
@@ -10,7 +11,7 @@ use std::{
 };
 
 use alloy_primitives::{Address, Bytes, LogData, B256, U256};
-use alloy_sol_types::{abi::token::WordToken, SolEvent, TopicList, Word};
+use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{prelude::StorageType, ArbResult};
@@ -363,12 +364,9 @@ impl VMContext {
         let log_data = LogData::new(topics, data).unwrap();
 
         let mut storage = self.storage();
-        let contract_address = storage.contract_address.expect("contract_address should be set");
-        storage
-            .events
-            .entry(contract_address)
-            .or_default()
-            .push(log_data);
+        let contract_address =
+            storage.contract_address.expect("contract_address should be set");
+        storage.events.entry(contract_address).or_default().push(log_data);
     }
 
     /// Get the balance of account at `address`.
@@ -696,15 +694,36 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         }
     }
 
-    // TODO#q: document
-    pub fn emmited(&self, event: &impl SolEvent) -> bool {
+    // TODO#q: add AsRef for event
+
+    /// Check if the `event` was emitted, by the contract `self`.
+    pub fn emitted(&self, event: &impl SolEvent) -> bool {
         VMContext::current().emitted_for(&self.address, event)
     }
-    
+
+    /// Assert that the `event` was emitted, by the contract `self`.
+    /// Event type `E` should implement [`Debug`].
+    ///
+    /// # Panics
+    ///
+    /// If the event was not emitted, panic and include all matching emitted
+    /// events (if any) in the error message.
     #[track_caller]
-    pub fn assert_emmited(&self, event: &impl SolEvent) {
-        // TODO#q: add pretty print for event
-        assert!(self.emmited(event), "Event was not emmited");
+    pub fn assert_emitted<E: SolEvent + Debug>(&self, event: &E) {
+        let context = VMContext::current();
+        if context.emitted_for(&self.address, event) {
+            return;
+        }
+
+        let panic_msg = "event was not emitted";
+        let matching_events: Vec<E> =
+            context.matching_events_for(&self.address);
+
+        if matching_events.is_empty() {
+            panic!("{panic_msg}, no matching events found")
+        } else {
+            panic!("{panic_msg}, matching events: {matching_events:?}")
+        }
     }
 }
 
@@ -782,18 +801,5 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 
     fn balance(&self) -> U256 {
         self.address().balance()
-    }
-}
-
-/// Extension for events to check if the event was emitted.
-pub trait EventLogExt {
-    /// Check if the event was emitted.
-    fn emitted_at<ST: StorageType>(&self, contract: &Contract<ST>) -> bool;
-}
-
-impl<T: SolEvent> EventLogExt for T {
-    fn emitted_at<ST: StorageType>(&self, contract: &Contract<ST>) -> bool {
-        // TODO#q: drop EventLogExt?
-        VMContext::current().emitted_for(&contract.address, self)
     }
 }
