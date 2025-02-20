@@ -99,8 +99,9 @@
 //! ```
 //!
 //! It is possible to check emitted events by specific contract with
-//! [`Contract::emitted`] method. And assert with [`Contract::assert_emitted`]
-//! that will print all matching events in case of failed assertion.
+//! [`crate::prelude::Contract::emitted`] method. And assert with
+//! [`crate::prelude::Contract::assert_emitted`] that will print all matching
+//! events in case of failed assertion.
 //!
 //! Annotating a test function that accepts no parameters will make
 //! [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
@@ -154,8 +155,6 @@ mod router;
 mod shims;
 mod storage_access;
 pub use motsu_proc::test;
-
-use crate::context::Contract;
 
 #[cfg(test)]
 mod ping_pong_tests {
