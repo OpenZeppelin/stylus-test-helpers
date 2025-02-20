@@ -341,6 +341,8 @@ impl VMContext {
             .unwrap_or_default()
     }
 
+    /// Store the raw event log `data`, `len` and `topics` number in the
+    /// storage.
     pub(crate) unsafe fn store_log_raw(
         self,
         data: *const u8,
@@ -351,6 +353,7 @@ impl VMContext {
         self.store_log(data, topics);
     }
 
+    /// Store the event log `data` and `topics_number` in the storage.
     fn store_log(self, data: &[u8], topics_number: usize) {
         let topics: Vec<_> = data
             .chunks(Word::len_bytes())
