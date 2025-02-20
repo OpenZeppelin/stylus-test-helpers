@@ -5,6 +5,8 @@ use std::ops::{Deref, DerefMut};
 
 use crate::context::VMContext;
 
+// TODO#q: document ResultExt
+
 pub trait ResultExt<T, E: fmt::Debug> {
     fn motsu_unwrap(self) -> T;
     fn motsu_unwrap_err(self) -> E;
@@ -66,6 +68,7 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 }
 
 // TODO#q: document `Backuped`
+// TODO#q: rename to Backuped -> Backup
 
 #[derive(Default)]
 pub(crate) struct Backuped<D: Clone + Default> {
@@ -96,6 +99,7 @@ impl<D: Clone + Default> Backuped<D> {
 
     /// Should be called when transaction was successful.
     pub(crate) fn reset_backup(&mut self) {
+        // TODO#q: describe it better
         // To not copy backup another time.
         _ = self.backup.take();
     }

@@ -647,6 +647,8 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        // TODO#q: do we need to backup and transfer value with immutable
+        // storage access?
         VMContext::current().create_backup();
 
         // Set parameters for call such as `msg_sender`, `contract_address`,
