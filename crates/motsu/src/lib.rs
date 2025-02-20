@@ -446,7 +446,7 @@ mod ping_pong_tests {
         assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
     }
 
-    #[motsu_proc::test]
+    #[motsu::test]
     fn emits_event(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
@@ -471,8 +471,6 @@ mod ping_pong_tests {
             !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
         );
     }
-
-    // TODO#q: add panic test case
 }
 
 #[cfg(test)]
