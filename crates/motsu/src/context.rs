@@ -502,7 +502,7 @@ impl VMContext {
 
     /// Set string `tag` for the account at `address`.
     fn set_tag(self, address: Address, tag: String) {
-        self.storage().tags.insert(address, tag);
+        MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
     /// Substitute account addresses in the `msg` with the corresponding tags.

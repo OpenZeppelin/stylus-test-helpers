@@ -163,7 +163,6 @@ mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
     use alloy_sol_types::{sol, SolError};
-    use motsu_proc as motsu;
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
@@ -172,7 +171,8 @@ mod ping_pong_tests {
         storage::{StorageAddress, StorageU256},
     };
 
-    use crate::context::{Account, Contract};
+    use crate as motsu;
+    use crate::prelude::*;
 
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);
@@ -480,7 +480,6 @@ mod ping_pong_tests {
 #[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
-    use motsu_proc as motsu;
     use stylus_sdk::{
         call::Call,
         contract, msg,
@@ -488,6 +487,7 @@ mod proxies_tests {
         storage::StorageAddress,
     };
 
+    use crate as motsu;
     use crate::prelude::*;
 
     const ONE: U256 = uint!(1_U256);
