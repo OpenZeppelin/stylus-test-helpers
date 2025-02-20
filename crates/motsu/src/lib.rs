@@ -37,7 +37,7 @@
 //! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
 //! pass additional value to the contract.
 //! To make a payable call work, user should be funded with
-//! [`crate::prelude::Account::fund`] method (there is no funding by default),
+//! [`crate::prelude::Funding::fund`] method (there is no funding by default),
 //! like in example below:
 //!
 //! ```rust
