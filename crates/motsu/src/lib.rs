@@ -417,7 +417,7 @@ mod ping_pong_tests {
         // First contract instance
         let _ping1 = Contract::<PingContract>::new_at(addr);
 
-        // Attempting to create second instance at same address while first
+        // Attempting to create a second instance at the same address while first
         // exists should panic
         let _ping2 = Contract::<PingContract>::new_at(addr);
     }
@@ -439,7 +439,7 @@ mod ping_pong_tests {
         // Drop first contract
         drop(pong1);
 
-        // Second contract at same address
+        // Second contract at the same address
         let pong2 = Contract::<PongContract>::new_at(addr);
 
         // Should have fresh state
