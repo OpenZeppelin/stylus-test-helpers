@@ -694,8 +694,6 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         }
     }
 
-    // TODO#q: add AsRef for event
-
     /// Check if the `event` was emitted, by the contract `self`.
     pub fn emitted<E: SolEvent>(&self, event: &E) -> bool {
         VMContext::current().emitted_for(&self.address, event)
