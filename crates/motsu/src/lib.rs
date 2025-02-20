@@ -417,8 +417,8 @@ mod ping_pong_tests {
         // First contract instance
         let _ping1 = Contract::<PingContract>::new_at(addr);
 
-        // Attempting to create a second instance at the same address while first
-        // exists should panic
+        // Attempting to create a second instance at the same address while
+        // first exists should panic
         let _ping2 = Contract::<PingContract>::new_at(addr);
     }
 
