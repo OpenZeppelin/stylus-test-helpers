@@ -878,8 +878,9 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     }
 }
 
-// TODO#q: add docs for DeriveFromTag
+/// Deterministically derive from a string representation.
 pub trait DeriveFromTag {
+    /// Deterministically derive inner address of `Self` from a string `tag`.
     fn from_tag(tag: &str) -> Self;
 }
 
