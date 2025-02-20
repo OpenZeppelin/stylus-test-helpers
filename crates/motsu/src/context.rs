@@ -580,7 +580,7 @@ struct VMContextStorage {
 }
 
 /// Contract's account storage.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct ContractStorage {
     /// Contract's byte storage
     data: ContractData,
