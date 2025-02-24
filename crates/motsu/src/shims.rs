@@ -348,8 +348,6 @@ unsafe extern "C" fn block_timestamp() -> u64 {
     1_735_689_600
 }
 
-/// NOTE: Unimplemented missing shims
-
 /// Gets a subset of the code from the account at the given address. The
 /// semantics are identical to that of the EVM's [`EXT_CODE_COPY`] opcode, aside
 /// from one small detail: the write to the buffer `dest` will stop after the
