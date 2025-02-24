@@ -147,7 +147,6 @@
 //! [test_attribute]: crate::test
 #[cfg(test)]
 extern crate alloc;
-extern crate core;
 
 mod context;
 pub mod prelude;
@@ -177,10 +176,10 @@ mod ping_pong_tests {
     const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
 
     sol! {
-        /// Emitted when [`PingContract`] was called.
+        /// Emitted when [`PingContract`] is called.
         ///
         /// * `from` - Address from which the contract was pinged.
-        /// * `value` - Value received after ping.
+        /// * `value` - Value received when pinged.
         #[allow(missing_docs)]
         #[derive(Debug)]
         event Pinged(
@@ -249,10 +248,10 @@ mod ping_pong_tests {
     }
 
     sol! {
-        /// Emitted when [`PongContract`] was called.
+        /// Emitted when [`PongContract`] is called.
         ///
         /// * `from` - Address from which the contract was ponged.
-        /// * `value` - Value received after pong.
+        /// * `value` - Value received when ponged.
         #[allow(missing_docs)]
         #[derive(Debug)]
         event Ponged(
@@ -414,11 +413,11 @@ mod ping_pong_tests {
     fn storage_duplicate_contract() {
         let addr = Address::random();
 
-        // First contract instance
+        // Create the first contract instance.
         let _ping1 = Contract::<PingContract>::new_at(addr);
 
-        // Attempting to create a second instance at the same address while
-        // first exists should panic
+        // Attempt to create the second instance at the same address should
+        // fail.
         let _ping2 = Contract::<PingContract>::new_at(addr);
     }
 
@@ -473,6 +472,8 @@ mod ping_pong_tests {
             !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
         );
     }
+
+    // TODO: add panic assertions for emitted events
 }
 
 #[cfg(test)]
