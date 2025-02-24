@@ -5,11 +5,11 @@ use proc_macro::TokenStream;
 ///
 /// Note that it's defined before the module declarations.
 macro_rules! error {
-    ($tokens:expr, $($msg:expr),+ $(,)?) => {{
+    ($tokens:expr_2021, $($msg:expr_2021),+ $(,)?) => {{
         let error = syn::Error::new(syn::spanned::Spanned::span(&$tokens), format!($($msg),+));
         return error.to_compile_error().into();
     }};
-    (@ $tokens:expr, $($msg:expr),+ $(,)?) => {{
+    (@ $tokens:expr_2021, $($msg:expr_2021),+ $(,)?) => {{
         return Err(syn::Error::new(syn::spanned::Spanned::span(&$tokens), format!($($msg),+)))
     }};
 }

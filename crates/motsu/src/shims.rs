@@ -44,19 +44,21 @@ const CA_CODEHASH: &[u8; 66] =
 ///
 /// [`keccak256`]: https://en.wikipedia.org/wiki/SHA-3
 /// [`SHA3`]: https://www.evm.codes/#20
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn native_keccak256(
     bytes: *const u8,
     len: usize,
     output: *mut u8,
 ) {
-    let mut hasher = Keccak::v256();
+    unsafe {
+        let mut hasher = Keccak::v256();
 
-    let data = slice::from_raw_parts(bytes, len);
-    hasher.update(data);
+        let data = slice::from_raw_parts(bytes, len);
+        hasher.update(data);
 
-    let output = slice::from_raw_parts_mut(output, WORD_BYTES);
-    hasher.finalize(output);
+        let output = slice::from_raw_parts_mut(output, WORD_BYTES);
+        hasher.finalize(output);
+    }
 }
 
 /// Reads a 32-byte value from permanent storage.
@@ -71,9 +73,11 @@ unsafe extern "C" fn native_keccak256(
 /// # Panics
 ///
 /// May panic if unable to lock `STORAGE`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
-    VMContext::current().get_bytes_raw(key, out);
+    unsafe {
+        VMContext::current().get_bytes_raw(key, out);
+    }
 }
 
 /// Writes a 32-byte value to the permanent storage cache.
@@ -91,9 +95,11 @@ unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 /// # Panics
 ///
 /// May panic if unable to lock `STORAGE`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
-    VMContext::current().set_bytes_raw(key, value);
+    unsafe {
+        VMContext::current().set_bytes_raw(key, value);
+    }
 }
 
 /// Persists any dirty values in the storage cache to the EVM state trie,
@@ -101,7 +107,7 @@ unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
 /// of [`SSTORE`].
 ///
 /// [`SSTORE`]: https://www.evm.codes/#55
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn storage_flush_cache(_: bool) {
     // No-op: we don't use the cache in our unit-tests.
 }
@@ -123,17 +129,22 @@ unsafe extern "C" fn storage_flush_cache(_: bool) {
 /// # Panics
 ///
 /// May panic if fails to parse `MSG_SENDER` as an address.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn msg_sender(sender: *mut u8) {
-    let msg_sender =
-        VMContext::current().msg_sender().expect("msg_sender should be set");
-    write_address(sender, msg_sender);
+    unsafe {
+        let msg_sender = VMContext::current()
+            .msg_sender()
+            .expect("msg_sender should be set");
+        write_address(sender, msg_sender);
+    }
 }
 
 /// Get the ETH value (U256) in wei sent to the program.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn msg_value(value: *mut u8) {
-    VMContext::current().msg_value_raw(value);
+    unsafe {
+        VMContext::current().msg_value_raw(value);
+    }
 }
 
 /// Gets the address of the current program. The semantics are equivalent to
@@ -144,19 +155,21 @@ unsafe extern "C" fn msg_value(value: *mut u8) {
 /// # Panics
 ///
 /// May panic if fails to parse `CONTRACT_ADDRESS` as an address.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn contract_address(address: *mut u8) {
-    let contract_address = VMContext::current()
-        .contract_address()
-        .expect("contract_address should be set");
-    write_address(address, contract_address);
+    unsafe {
+        let contract_address = VMContext::current()
+            .contract_address()
+            .expect("contract_address should be set");
+        write_address(address, contract_address);
+    }
 }
 
 /// Gets the chain ID of the current chain. The semantics are equivalent to
 /// that of the EVM's [`CHAINID`] opcode.
 ///
 /// [`CHAINID`]: https://www.evm.codes/#46
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn chainid() -> u64 {
     CHAIN_ID
 }
@@ -173,7 +186,7 @@ unsafe extern "C" fn chainid() -> u64 {
 /// [`LOG2`]: https://www.evm.codes/#a2
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
     // No-op: we don't check for events in our unit-tests.
 }
@@ -190,29 +203,33 @@ unsafe extern "C" fn emit_log(_: *const u8, _: usize, _: usize) {
 /// # Panics
 ///
 /// May panic if fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
-    let code_hash = if VMContext::current().has_code_raw(address) {
-        CA_CODEHASH
-    } else {
-        EOA_CODEHASH
-    };
+    unsafe {
+        let code_hash = if VMContext::current().has_code_raw(address) {
+            CA_CODEHASH
+        } else {
+            EOA_CODEHASH
+        };
 
-    let account_codehash =
-        const_hex::const_decode_to_array::<WORD_BYTES>(code_hash).unwrap();
+        let account_codehash =
+            const_hex::const_decode_to_array::<WORD_BYTES>(code_hash).unwrap();
 
-    write_bytes32(dest, account_codehash);
+        write_bytes32(dest, account_codehash);
+    }
 }
 
 /// Gets the ETH balance in wei of the account at the given address.
 /// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
 ///
 /// [`BALANCE`]: https://www.evm.codes/#31
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
-    let address = read_address(address);
-    let balance = VMContext::current().balance(address);
-    write_u256(dest, balance);
+    unsafe {
+        let address = read_address(address);
+        let balance = VMContext::current().balance(address);
+        write_u256(dest, balance);
+    }
 }
 
 /// Returns the length of the last EVM call or deployment return result, or `0`
@@ -222,7 +239,7 @@ unsafe extern "C" fn account_balance(address: *const u8, dest: *mut u8) {
 /// opcode.
 ///
 /// [`RETURN_DATA_SIZE`]: https://www.evm.codes/#3d
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn return_data_size() -> usize {
     VMContext::current().return_data_size()
 }
@@ -236,13 +253,13 @@ unsafe extern "C" fn return_data_size() -> usize {
 /// Returns the number of bytes written.
 ///
 /// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn read_return_data(
     dest: *mut u8,
     _offset: usize,
     size: usize,
 ) -> usize {
-    VMContext::current().read_return_data_raw(dest, size)
+    unsafe { VMContext::current().read_return_data_raw(dest, size) }
 }
 
 /// Calls the contract at the given address with options for passing value and
@@ -259,7 +276,7 @@ unsafe extern "C" fn read_return_data(
 /// `u64::MAX` gas can be used to send as much as possible.
 ///
 /// [`CALL`]: https://www.evm.codes/#f1
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn call_contract(
     contract: *const u8,
     calldata: *const u8,
@@ -268,13 +285,15 @@ unsafe extern "C" fn call_contract(
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    VMContext::current().call_contract_with_value_raw(
-        contract,
-        calldata,
-        calldata_len,
-        value,
-        return_data_len,
-    )
+    unsafe {
+        VMContext::current().call_contract_with_value_raw(
+            contract,
+            calldata,
+            calldata_len,
+            value,
+            return_data_len,
+        )
+    }
 }
 
 /// Static calls the contract at the given address, with the option to limit the
@@ -291,7 +310,7 @@ unsafe extern "C" fn call_contract(
 /// be used to send as much as possible.
 ///
 /// [`STATIC_CALL`]: https://www.evm.codes/#FA
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn static_call_contract(
     contract: *const u8,
     calldata: *const u8,
@@ -299,12 +318,14 @@ unsafe extern "C" fn static_call_contract(
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    VMContext::current().call_contract_raw(
-        contract,
-        calldata,
-        calldata_len,
-        return_data_len,
-    )
+    unsafe {
+        VMContext::current().call_contract_raw(
+            contract,
+            calldata,
+            calldata_len,
+            return_data_len,
+        )
+    }
 }
 
 /// Delegate calls the contract at the given address, with the option to limit
@@ -321,7 +342,7 @@ unsafe extern "C" fn static_call_contract(
 /// be used to send as much as possible.
 ///
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#F4
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn delegate_call_contract(
     contract: *const u8,
     calldata: *const u8,
@@ -329,12 +350,14 @@ unsafe extern "C" fn delegate_call_contract(
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    VMContext::current().call_contract_raw(
-        contract,
-        calldata,
-        calldata_len,
-        return_data_len,
-    )
+    unsafe {
+        VMContext::current().call_contract_raw(
+            contract,
+            calldata,
+            calldata_len,
+            return_data_len,
+        )
+    }
 }
 
 /// Gets a bounded estimate of the Unix timestamp at which the Sequencer
@@ -342,7 +365,7 @@ unsafe extern "C" fn delegate_call_contract(
 /// information on how this value is determined.
 ///
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn block_timestamp() -> u64 {
     // Epoch timestamp: 1st January 2025 00::00::00
     1_735_689_600

@@ -48,9 +48,11 @@ impl VMContext {
 
     /// Get the raw value at `key` in storage and write it to `value`.
     pub(crate) unsafe fn get_bytes_raw(self, key: *const u8, value: *mut u8) {
-        let key = read_bytes32(key);
+        unsafe {
+            let key = read_bytes32(key);
 
-        write_bytes32(value, self.get_bytes(&key));
+            write_bytes32(value, self.get_bytes(&key));
+        }
     }
 
     /// Get the value at `key` in storage.
@@ -69,8 +71,10 @@ impl VMContext {
 
     /// Set the raw value at `key` in storage to `value`.
     pub(crate) unsafe fn set_bytes_raw(self, key: *const u8, value: *const u8) {
-        let (key, value) = (read_bytes32(key), read_bytes32(value));
-        self.set_bytes(key, value);
+        unsafe {
+            let (key, value) = (read_bytes32(key), read_bytes32(value));
+            self.set_bytes(key, value);
+        }
     }
 
     /// Set the value at `key` in storage to `value`.
@@ -116,8 +120,10 @@ impl VMContext {
 
     /// Write the value sent to the contract to `output`.
     pub(crate) unsafe fn msg_value_raw(self, output: *mut u8) {
-        let value: U256 = self.msg_value().unwrap_or_default();
-        write_u256(output, value);
+        unsafe {
+            let value: U256 = self.msg_value().unwrap_or_default();
+            write_u256(output, value);
+        }
     }
 
     /// Get the value sent to the contract as [`U256`].
@@ -176,11 +182,13 @@ impl VMContext {
         calldata_len: usize,
         return_data_size: *mut usize,
     ) -> u8 {
-        let address = read_address(address);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
+        unsafe {
+            let address = read_address(address);
+            let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input, None);
-        self.process_arb_result_raw(result, return_data_size)
+            let result = self.call_contract(address, selector, &input, None);
+            self.process_arb_result_raw(result, return_data_size)
+        }
     }
 
     /// Call the contract at raw `address` with the given raw `calldata` and
@@ -193,12 +201,15 @@ impl VMContext {
         value: *const u8,
         return_data_size: *mut usize,
     ) -> u8 {
-        let address = read_address(address);
-        let value = read_u256(value);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
+        unsafe {
+            let address = read_address(address);
+            let value = read_u256(value);
+            let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input, Some(value));
-        self.process_arb_result_raw(result, return_data_size)
+            let result =
+                self.call_contract(address, selector, &input, Some(value));
+            self.process_arb_result_raw(result, return_data_size)
+        }
     }
 
     /// Based on `result`, set the return data.
@@ -208,16 +219,18 @@ impl VMContext {
         result: ArbResult,
         return_data_size: *mut usize,
     ) -> u8 {
-        match result {
-            Ok(res) => {
-                return_data_size.write(res.len());
-                self.set_return_data(res);
-                0
-            }
-            Err(err) => {
-                return_data_size.write(err.len());
-                self.set_return_data(err);
-                1
+        unsafe {
+            match result {
+                Ok(res) => {
+                    return_data_size.write(res.len());
+                    self.set_return_data(res);
+                    0
+                }
+                Err(err) => {
+                    return_data_size.write(err.len());
+                    self.set_return_data(err);
+                    1
+                }
             }
         }
     }
@@ -278,9 +291,11 @@ impl VMContext {
         dest: *mut u8,
         size: usize,
     ) -> usize {
-        let data = self.return_data();
-        ptr::copy(data.as_ptr(), dest, size);
-        data.len()
+        unsafe {
+            let data = self.return_data();
+            ptr::copy(data.as_ptr(), dest, size);
+            data.len()
+        }
     }
 
     /// Return data's size in bytes from the last contract call.
@@ -298,8 +313,10 @@ impl VMContext {
 
     /// Check if the contract at raw `address` has code.
     pub(crate) unsafe fn has_code_raw(self, address: *const u8) -> bool {
-        let address = read_address(address);
-        self.has_code(address)
+        unsafe {
+            let address = read_address(address);
+            self.has_code(address)
+        }
     }
 
     /// Check if the contract at `address` has code.
@@ -403,38 +420,50 @@ impl VMContext {
 
 /// Read the word from location pointed by `ptr`.
 pub(crate) unsafe fn read_bytes32(ptr: *const u8) -> Bytes32 {
-    let mut res = Bytes32::default();
-    ptr::copy(ptr, res.as_mut_ptr(), WORD_BYTES);
-    res
+    unsafe {
+        let mut res = Bytes32::default();
+        ptr::copy(ptr, res.as_mut_ptr(), WORD_BYTES);
+        res
+    }
 }
 
 /// Write the word `bytes` to the location pointed by `ptr`.
 pub(crate) unsafe fn write_bytes32(ptr: *mut u8, bytes: Bytes32) {
-    ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
+    unsafe {
+        ptr::copy(bytes.as_ptr(), ptr, WORD_BYTES);
+    }
 }
 
 /// Read the [`Address`] from the raw pointer.
 pub(crate) unsafe fn read_address(ptr: *const u8) -> Address {
-    let address_bytes = slice::from_raw_parts(ptr, 20);
-    Address::from_slice(address_bytes)
+    unsafe {
+        let address_bytes = slice::from_raw_parts(ptr, 20);
+        Address::from_slice(address_bytes)
+    }
 }
 
 /// Write the [`Address`] `address` to the location pointed by `ptr`.
 pub(crate) unsafe fn write_address(ptr: *mut u8, address: Address) {
-    ptr::copy(address.as_ptr(), ptr, 20);
+    unsafe {
+        ptr::copy(address.as_ptr(), ptr, 20);
+    }
 }
 
 /// Read the [`U256`] from the raw pointer.
 pub(crate) unsafe fn read_u256(ptr: *const u8) -> U256 {
-    let mut data = B256::ZERO;
-    ptr::copy(ptr, data.as_mut_ptr(), 32);
-    data.into()
+    unsafe {
+        let mut data = B256::ZERO;
+        ptr::copy(ptr, data.as_mut_ptr(), 32);
+        data.into()
+    }
 }
 
 /// Write the [`U256`] `value` to the location pointed by `ptr`.
 pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
-    let bytes: B256 = value.into();
-    ptr::copy(bytes.as_ptr(), ptr, 32);
+    unsafe {
+        let bytes: B256 = value.into();
+        ptr::copy(bytes.as_ptr(), ptr, 32);
+    }
 }
 
 /// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
@@ -443,11 +472,13 @@ unsafe fn decode_calldata(
     calldata: *const u8,
     calldata_len: usize,
 ) -> (u32, Vec<u8>) {
-    let calldata = slice::from_raw_parts(calldata, calldata_len);
-    let selector =
-        u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
-    let input = calldata[4..].to_vec();
-    (selector, input)
+    unsafe {
+        let calldata = slice::from_raw_parts(calldata, calldata_len);
+        let selector =
+            u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
+        let input = calldata[4..].to_vec();
+        (selector, input)
+    }
 }
 
 /// Main storage for Motsu test VM.
