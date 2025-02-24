@@ -1,8 +1,6 @@
 //! Router context for external calls mocks.
 
-use std::{
-    borrow::BorrowMut, marker::PhantomData, sync::Arc, thread::ThreadId,
-};
+use std::{borrow::BorrowMut, marker::PhantomData, thread::ThreadId};
 
 use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
@@ -63,12 +61,12 @@ impl VMRouterContext {
         input: &[u8],
     ) -> Option<ArbResult> {
         let storage = self.storage();
-        let router = Arc::clone(&storage.router);
+        let mut router = storage.router_factory.create();
 
         // Drop the storage reference to avoid a panic on lock.
         drop(storage);
 
-        router.create_and_route(selector, input)
+        router.route(selector, input)
     }
 
     /// Initialise contract router for the current test thread and
@@ -79,7 +77,7 @@ impl VMRouterContext {
             .insert(
                 self,
                 VMRouterStorage {
-                    router: Arc::new(RouterFactory::<ST> {
+                    router_factory: Box::new(RouterFactory::<ST> {
                         phantom: PhantomData,
                     }),
                 },
@@ -99,25 +97,13 @@ impl VMRouterContext {
 /// Metadata related to the router of an external contract.
 struct VMRouterStorage {
     // Contract's router.
-    router: Arc<dyn CreateVMRouter>,
+    router_factory: Box<dyn CreateVMRouter>,
 }
 
 /// A trait for router's creation.
 trait CreateVMRouter: Send + Sync {
     /// Instantiate a new router.
     fn create(&self) -> Box<dyn VMRouter>;
-
-    /// Instantiate a new router and instantly route a message to the matching
-    /// selector.
-    ///
-    /// Returns `None` if the `selector` wasn't found.
-    fn create_and_route(
-        &self,
-        selector: u32,
-        input: &[u8],
-    ) -> Option<ArbResult> {
-        self.create().route(selector, input)
-    }
 }
 
 /// A factory for router creation.
@@ -125,11 +111,10 @@ struct RouterFactory<R> {
     phantom: PhantomData<R>,
 }
 
-// SAFETY:
-// We used `PhantomData` and lied to rust compiler that `RouterFactory` contains
-// type `R`.
-// In fact, it is a void type that contains neither types nor references (that
-// cannot be safely shared or sent between threads).
+// SAFETY: We used `PhantomData` and lied to rust compiler that `RouterFactory`
+// contains type `R`.
+// In fact, it is a void type that contains neither types nor references, and
+// can be safely shared or sent between threads.
 // We will cheat rust the second time and explicitly implement `Send` and `Sync`
 // for `RouterFactory`.
 unsafe impl<R> Send for RouterFactory<R> {}
