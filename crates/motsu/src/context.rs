@@ -375,8 +375,8 @@ impl VMContext {
             storage.contract_address.expect("contract_address should be set");
         storage
             .contracts
-            .entry(contract_address)
-            .or_default()
+            .get_mut(&contract_address)
+            .expect("contract should have a storage initialised")
             .events
             .push(log_data);
     }
