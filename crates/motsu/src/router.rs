@@ -1,10 +1,7 @@
 //! Router context for external calls mocks.
 
 use std::{
-    borrow::BorrowMut,
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-    thread::ThreadId,
+    borrow::BorrowMut, marker::PhantomData, sync::Arc, thread::ThreadId,
 };
 
 use alloy_primitives::Address;
@@ -102,11 +99,11 @@ impl VMRouterContext {
 /// Metadata related to the router of an external contract.
 struct VMRouterStorage {
     // Contract's router.
-    router: Arc<dyn CreateRouter>,
+    router: Arc<dyn CreateVMRouter>,
 }
 
 /// A trait for router's creation.
-trait CreateRouter: Send + Sync {
+trait CreateVMRouter: Send + Sync {
     /// Instantiate a new router.
     fn create(&self) -> Box<dyn VMRouter>;
 
@@ -128,11 +125,17 @@ struct RouterFactory<R> {
     phantom: PhantomData<R>,
 }
 
-// TODO#q: add safety note
+// SAFETY:
+// We used `PhantomData` and lied to rust compiler that `RouterFactory` contains
+// type `R`.
+// In fact, it is a void type that contains neither types nor references (that
+// cannot be safely shared or sent between threads).
+// We will cheat rust the second time and explicitly implement `Send` and `Sync`
+// for `RouterFactory`.
 unsafe impl<R> Send for RouterFactory<R> {}
 unsafe impl<R> Sync for RouterFactory<R> {}
 
-impl<R: StorageType + VMRouter + 'static> CreateRouter for RouterFactory<R> {
+impl<R: StorageType + VMRouter + 'static> CreateVMRouter for RouterFactory<R> {
     fn create(&self) -> Box<dyn VMRouter> {
         Box::new(create_default_storage_type::<R>())
     }
