@@ -358,10 +358,10 @@ unsafe extern "C" fn block_timestamp() -> u64 {
 /// [`EXT_CODE_COPY`]: https://www.evm.codes/#3C
 #[no_mangle]
 unsafe extern "C" fn account_code(
-    address: *const u8,
-    offset: usize,
-    size: usize,
-    dest: *mut u8,
+    _address: *const u8,
+    _offset: usize,
+    _size: usize,
+    _dest: *mut u8,
 ) -> usize {
     0
 }
@@ -371,7 +371,7 @@ unsafe extern "C" fn account_code(
 ///
 /// [`EXT_CODESIZE`]: https://www.evm.codes/#3B
 #[no_mangle]
-unsafe extern "C" fn account_code_size(address: *const u8) -> usize {
+unsafe extern "C" fn account_code_size(_address: *const u8) -> usize {
     0
 }
 
@@ -380,13 +380,13 @@ unsafe extern "C" fn account_code_size(address: *const u8) -> usize {
 ///
 /// [`BASEFEE`]: https://www.evm.codes/#48
 #[no_mangle]
-unsafe extern "C" fn block_basefee(basefee: *mut u8) {}
+unsafe extern "C" fn block_basefee(_basefee: *mut u8) {}
 
 /// Gets the coinbase of the current block, which on Arbitrum chains is the L1
 /// batch poster's address. This differs from Ethereum where the validator
 /// including the transaction determines the coinbase.
 #[no_mangle]
-unsafe extern "C" fn block_coinbase(coinbase: *mut u8) {}
+unsafe extern "C" fn block_coinbase(_coinbase: *mut u8) {}
 
 /// Gets the gas limit of the current block. The semantics are equivalent to
 /// that of the EVM's [`GAS_LIMIT`] opcode. Note that as of the time of this
@@ -430,11 +430,11 @@ unsafe extern "C" fn block_number() -> u64 {
 /// [`CREATE`]: https://www.evm.codes/#f0
 #[no_mangle]
 unsafe extern "C" fn create1(
-    code: *const u8,
-    code_len: usize,
-    endowment: *const u8,
-    contract: *mut u8,
-    revert_data_len: *mut usize,
+    _code: *const u8,
+    _code_len: usize,
+    _endowment: *const u8,
+    _contract: *mut u8,
+    _revert_data_len: *mut usize,
 ) {
 }
 
@@ -457,12 +457,12 @@ unsafe extern "C" fn create1(
 /// [`CREATE2`]: https://www.evm.codes/#f5
 #[no_mangle]
 unsafe extern "C" fn create2(
-    code: *const u8,
-    code_len: usize,
-    endowment: *const u8,
-    salt: *const u8,
-    contract: *mut u8,
-    revert_data_len: *mut usize,
+    _code: *const u8,
+    _code_len: usize,
+    _endowment: *const u8,
+    _salt: *const u8,
+    _contract: *mut u8,
+    _revert_data_len: *mut usize,
 ) {
 }
 
@@ -499,7 +499,7 @@ unsafe extern "C" fn msg_reentrant() -> bool {
 /// whenever new WASM pages are allocated. Calls made voluntarily will
 /// unproductively consume gas.
 #[no_mangle]
-unsafe extern "C" fn pay_for_memory_grow(pages: u16) {}
+unsafe extern "C" fn pay_for_memory_grow(_pages: u16) {}
 
 /// Reads the program calldata. The semantics are equivalent to that of the
 /// EVM's [`CALLDATA_COPY`] opcode when requesting the entirety of the current
@@ -507,7 +507,7 @@ unsafe extern "C" fn pay_for_memory_grow(pages: u16) {}
 ///
 /// [`CALLDATA_COPY`]: https://www.evm.codes/#37
 #[no_mangle]
-unsafe extern "C" fn read_args(dest: *mut u8) {}
+unsafe extern "C" fn read_args(_dest: *mut u8) {}
 
 /// Gets the gas price in wei per gas, which on Arbitrum chains equals the
 /// basefee. The semantics are equivalent to that of the EVM's [`GAS_PRICE`]
@@ -515,7 +515,7 @@ unsafe extern "C" fn read_args(dest: *mut u8) {}
 ///
 /// [`GAS_PRICE`]: https://www.evm.codes/#3A
 #[no_mangle]
-unsafe extern "C" fn tx_gas_price(gas_price: *mut u8) {}
+unsafe extern "C" fn tx_gas_price(_gas_price: *mut u8) {}
 
 /// Gets the price of ink in evm gas basis points. See [`Ink and Gas`] for more
 /// information on Stylus's compute-pricing model.
@@ -531,10 +531,10 @@ unsafe extern "C" fn tx_ink_price() -> u32 {
 ///
 /// [`ORIGIN`]: https://www.evm.codes/#32
 #[no_mangle]
-unsafe extern "C" fn tx_origin(origin: *mut u8) {}
+unsafe extern "C" fn tx_origin(_origin: *mut u8) {}
 
 /// Writes the final return data. If not called before the program exists, the
 /// return data will be 0 bytes long. Note that this hostio does not cause the
 /// program to exit, which happens naturally when `user_entrypoint` returns.
 #[no_mangle]
-unsafe extern "C" fn write_result(data: *const u8, len: usize) {}
+unsafe extern "C" fn write_result(_data: *const u8, _len: usize) {}

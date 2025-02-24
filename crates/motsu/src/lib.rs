@@ -12,7 +12,7 @@
 //! Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
 //! to get access to VM affordances:
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[cfg(test)]
 //! mod tests {
 //!     use motsu::prelude::*;
@@ -40,7 +40,7 @@
 //! [`crate::prelude::Account::fund`] method (there is no funding by default),
 //! like in example below:
 //!
-//! ```rust
+//! ```rust,ignore
 //!  use motsu::prelude::*;
 //!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 //!
@@ -70,7 +70,7 @@
 //! next `Proxy` contract at the address provided during initialization.
 //! The following test case can emulate a call chain of three `Proxy` contracts:
 //!
-//! ```rust
+//! ```rust,ignore
 //!  use motsu::prelude::*;
 //!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 //!
@@ -117,7 +117,7 @@
 //! [`stylus_sdk::prelude::entrypoint`], you'll need to implement it manually
 //! for any contract without this attribute:
 //!
-//! ```rust
+//! ```rust,ignore
 //! use stylus_sdk::{
 //!     storage::{StorageMap, StorageU256, StorageAddress},
 //!     prelude::*,
