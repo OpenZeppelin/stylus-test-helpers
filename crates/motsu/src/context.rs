@@ -248,6 +248,7 @@ impl VMContext {
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
+        // TODO#q: we should always revert in static call
         // We should do backup before transferring value, to have balances
         // reverted in case of failure.
         let storage = self.storage();
@@ -403,7 +404,7 @@ impl VMContext {
     }
 
     /// Transfer value from the message sender to the contract.
-    /// No-op if `msg_sender` or `contract_address` weren't set.
+    /// No-op if `msg_sender`, `contract_address` or `msg_value` weren't set.
     ///
     /// # Panics
     ///
@@ -416,15 +417,15 @@ impl VMContext {
         let Some(contract_address) = storage.contract_address else {
             return;
         };
+        let Some(msg_value) = storage.msg_value else {
+            return;
+        };
 
-        // We should transfer the value only if it is set.
-        if let Some(msg_value) = storage.msg_value {
-            // Drop storage to avoid a panic on lock.
-            drop(storage);
+        // Drop storage to avoid a panic on lock.
+        drop(storage);
 
-            // Transfer and panic if there is not enough funds.
-            self.transfer(msg_sender, contract_address, msg_value);
-        }
+        // Transfer and panic if there is not enough funds.
+        self.transfer(msg_sender, contract_address, msg_value);
     }
 
     /// Transfer `value` from `from` account to `to` account.
@@ -433,6 +434,10 @@ impl VMContext {
     ///
     /// * If there is not enough funds to transfer.
     fn transfer(self, from: Address, to: Address, value: U256) {
+        if value.is_zero() {
+            return;
+        }
+
         // Transfer and panic if there is not enough funds.
         self.checked_transfer(from, to, value)
             .unwrap_or_else(|| panic!("{from} account should have enough funds to transfer {value} value"));
@@ -800,7 +805,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         } else {
             format!("{panic_msg}, matching events: {matching_events:?}")
         };
-        VMContext::current().substitute_tags_at(&mut panic_msg);
+        context.substitute_tags_at(&mut panic_msg);
         panic!("{}", panic_msg);
     }
 }

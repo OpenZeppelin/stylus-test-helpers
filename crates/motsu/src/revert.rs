@@ -68,7 +68,6 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 }
 
 // TODO#q: document `Backuped`
-// TODO#q: rename to Backuped -> Backup
 
 #[derive(Default)]
 pub(crate) struct Backuped<D: Clone + Default> {
