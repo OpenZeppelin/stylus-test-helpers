@@ -5,13 +5,44 @@ use std::ops::{Deref, DerefMut};
 
 use crate::context::VMContext;
 
-// TODO#q: document ResultExt
-
+/// Motsu extension trait for [`Result`].
+///
+/// Allows transaction reverts and provides call metadata for error messages.
+#[allow(clippy::missing_errors_doc)]
 pub trait ResultExt<T, E: fmt::Debug> {
+    /// Returns contained `Ok` value, consuming the `self` value.
+    ///
+    /// # Panics
+    ///
+    /// * if the value is `Err`, with a panic message including call metadata.
     fn motsu_unwrap(self) -> T;
+
+    /// Returns contained `Err` value, consuming the `self` value and reverts
+    /// transaction.
+    ///
+    /// # Panics
+    ///
+    /// * if the value is `Ok`, with a panic message including call metadata.
     fn motsu_unwrap_err(self) -> E;
+
+    /// Returns contained `Ok` value, consuming the `self` value.
+    ///
+    /// # Panics
+    ///
+    /// * if the value is `Err`, with a panic message including custom `msg` and
+    ///   call metadata.
     fn motsu_expect(self, msg: &str) -> T;
+
+    /// Returns contained `Err` value, consuming the `self` value and reverts
+    /// transaction.
+    ///
+    /// # Panics
+    /// * if the value is `Ok`, with a panic message including custom `msg` and
+    ///   call metadata.
     fn motsu_expect_err(self, msg: &str) -> E;
+
+    /// Returns `self` without any changes and reverts transaction in case of
+    /// `Err` value.
     fn motsu_res(self) -> Result<T, E>;
 }
 
@@ -60,7 +91,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
         }
     }
 
-    fn motsu_res(self) -> std::result::Result<T, E> {
+    fn motsu_res(self) -> Result<T, E> {
         match self {
             Ok(_) => {
                 VMContext::current().reset_backup();
@@ -74,6 +105,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 }
 
 impl VMContext {
+    /// Returns a panic message for calls with expected errors.
     fn panic_msg(self) -> String {
         let msg_sender = self.msg_sender().expect("msg_sender should be set");
         let contract_address =
@@ -86,6 +118,8 @@ impl VMContext {
         self.replace_with_tags(panic_msg)
     }
 
+    /// Returns a panic message for calls without expected errors.
+    /// Unexpected error `err` will be included into the panic message.
     fn panic_msg_with_err<E: fmt::Debug>(self, err: E) -> String {
         let msg_sender = self.msg_sender().expect("msg_sender should be set");
         let contract_address =
@@ -97,8 +131,8 @@ impl VMContext {
     }
 }
 
-// TODO#q: document `Backuped`
-
+/// A wrapper that allows to back up and restore data.
+/// Used for transaction revert.
 #[derive(Default)]
 pub(crate) struct Backuped<D: Clone + Default> {
     data: D,

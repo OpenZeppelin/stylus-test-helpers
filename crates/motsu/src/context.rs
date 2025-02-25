@@ -101,8 +101,6 @@ impl VMContext {
         self.storage().msg_sender
     }
 
-    // TODO#q: may be add fmt_msg_sender
-
     /// Replace the address of the contract, and return the previous address if
     /// any.
     fn replace_contract_address(self, address: Address) -> Option<Address> {
