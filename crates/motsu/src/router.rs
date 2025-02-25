@@ -111,12 +111,12 @@ struct RouterFactory<R> {
     phantom: PhantomData<R>,
 }
 
-// SAFETY: We used `PhantomData` and lied to rust compiler that `RouterFactory`
-// contains type `R`.
-// In fact, it is a void type that contains neither types nor references, and
-// can be safely shared or sent between threads.
+// SAFETY: We used `PhantomData` and lied to rust compiler that
+// [`RouterFactory`] contains type `R`.
+// In fact, it is a void type that contains neither other types nor references
+// and can be safely shared or sent between threads.
 // We will cheat rust the second time and explicitly implement `Send` and `Sync`
-// for `RouterFactory`.
+// for [`RouterFactory`].
 unsafe impl<R> Send for RouterFactory<R> {}
 unsafe impl<R> Sync for RouterFactory<R> {}
 
