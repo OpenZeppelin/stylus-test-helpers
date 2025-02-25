@@ -37,7 +37,7 @@
 //! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
 //! pass additional value to the contract.
 //! To make a payable call work, user should be funded with
-//! [`crate::prelude::Account::fund`] method (there is no funding by default),
+//! [`crate::prelude::Funding::fund`] method (there is no funding by default),
 //! like in example below:
 //!
 //! ```rust
@@ -98,6 +98,11 @@
 //!  }
 //! ```
 //!
+//! It is possible to check emitted events by specific contract with
+//! [`crate::prelude::Contract::emitted`] method. And assert with
+//! [`crate::prelude::Contract::assert_emitted`] that will print all matching
+//! events in case of failed assertion.
+//!
 //! Annotating a test function that accepts no parameters will make
 //! [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
 //!
@@ -124,7 +129,7 @@
 //!     alloy_primitives::Address,
 //! };
 //!
-//! // Entry point is not implemented, so we should implement `TopLevelStorage` ourselves.
+//! // Entry point attribute is missing. We should implement `TopLevelStorage` ourselves.
 //! // #[entrypoint]
 //! #[storage]
 //! pub struct Erc20 {
@@ -142,6 +147,7 @@
 //! [test_attribute]: crate::test
 #[cfg(test)]
 extern crate alloc;
+
 mod context;
 pub mod prelude;
 mod router;
@@ -158,7 +164,7 @@ mod ping_pong_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::Call,
-        contract, msg,
+        contract, evm, msg,
         prelude::{public, storage, AddressVM, SolidityError, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
     };
@@ -168,6 +174,19 @@ mod ping_pong_tests {
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);
     const MAGIC_ERROR_VALUE: U256 = uint!(42_U256);
+
+    sol! {
+        /// Emitted when [`PingContract`] is called.
+        ///
+        /// * `from` - Address from which the contract was pinged.
+        /// * `value` - Value received when pinged.
+        #[allow(missing_docs)]
+        #[derive(Debug)]
+        event Pinged(
+            address indexed from,
+            uint256 indexed value
+        );
+    }
 
     #[storage]
     struct PingContract {
@@ -179,6 +198,8 @@ mod ping_pong_tests {
     #[public]
     impl PingContract {
         fn ping(&mut self, to: Address, value: U256) -> Result<U256, Vec<u8>> {
+            evm::log(Pinged { from: msg::sender(), value });
+
             let receiver = IPongContract::new(to);
             let call = Call::new_in(self);
             let value = receiver.pong(call, value)?;
@@ -226,6 +247,19 @@ mod ping_pong_tests {
         MagicError(MagicError),
     }
 
+    sol! {
+        /// Emitted when [`PongContract`] is called.
+        ///
+        /// * `from` - Address from which the contract was ponged.
+        /// * `value` - Value received when ponged.
+        #[allow(missing_docs)]
+        #[derive(Debug)]
+        event Ponged(
+            address indexed from,
+            uint256 indexed value
+        );
+    }
+
     #[storage]
     struct PongContract {
         pongs_count: StorageU256,
@@ -239,6 +273,8 @@ mod ping_pong_tests {
             if value == MAGIC_ERROR_VALUE {
                 return Err(PongError::MagicError(MagicError { value }));
             }
+
+            evm::log(Ponged { from: msg::sender(), value });
 
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + ONE);
@@ -377,11 +413,11 @@ mod ping_pong_tests {
     fn storage_duplicate_contract() {
         let addr = Address::random();
 
-        // First contract instance
+        // Create the first contract instance.
         let _ping1 = Contract::<PingContract>::new_at(addr);
 
-        // Attempting to create second instance at same address while first
-        // exists should panic
+        // Attempt to create the second instance at the same address should
+        // fail.
         let _ping2 = Contract::<PingContract>::new_at(addr);
     }
 
@@ -402,7 +438,7 @@ mod ping_pong_tests {
         // Drop first contract
         drop(pong1);
 
-        // Second contract at same address
+        // Second contract at the same address
         let pong2 = Contract::<PongContract>::new_at(addr);
 
         // Should have fresh state
@@ -410,6 +446,34 @@ mod ping_pong_tests {
         assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
         assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
     }
+
+    #[motsu::test]
+    fn emits_event(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        _ = ping
+            .sender(alice)
+            .ping(pong.address(), TEN)
+            .expect("should ping successfully");
+
+        // Assert emitted events.
+        ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
+        pong.assert_emitted(&Ponged { from: ping.address(), value: TEN });
+
+        // Assert not emitted events
+        assert!(!ping.emitted(&Pinged { from: ping.address(), value: TEN }));
+        assert!(!pong.emitted(&Ponged { from: alice.address(), value: TEN }));
+        assert!(
+            !ping.emitted(&Pinged { from: alice.address(), value: TEN + ONE })
+        );
+        assert!(
+            !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
+        );
+    }
+
+    // TODO: add panic assertions for emitted events
 }
 
 #[cfg(test)]
