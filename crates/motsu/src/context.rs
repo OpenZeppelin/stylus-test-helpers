@@ -512,10 +512,11 @@ impl VMContext {
         MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
-    /// Substitute account addresses in the `msg` with the corresponding tags.
-    fn substitute_tags_at(self, msg: &mut String) {
+    /// Substitute account addresses in the `msg` with corresponding tags.
+    pub(crate) fn replace_with_tags(self, msg: &mut String) {
         let storage = self.storage();
         for (address, tag) in &storage.tags {
+            // Debug formatting reveals non-checksumed address.
             let address = format!("{address:?}");
             *msg = msg.replace(&address, tag);
         }
@@ -807,7 +808,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         } else {
             format!("{panic_msg}, matching events: {matching_events:?}")
         };
-        context.substitute_tags_at(&mut panic_msg);
+        context.replace_with_tags(&mut panic_msg);
         panic!("{}", panic_msg);
     }
 }
