@@ -12,17 +12,14 @@ pub trait ResultExt<T, E: fmt::Debug> {
     fn motsu_unwrap_err(self) -> E;
     fn motsu_expect(self, msg: &str) -> T;
     fn motsu_expect_err(self, msg: &str) -> E;
-    // TODO#q: motsu_res(self)
+    fn motsu_res(self) -> Result<T, E>;
 }
 
 impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     #[track_caller]
     fn motsu_unwrap(self) -> T {
-        match self {
-            Ok(value) => {
-                VMContext::current().reset_backup();
-                value
-            }
+        match self.motsu_res() {
+            Ok(value) => value,
             Err(err) => {
                 let panic_msg = VMContext::current().panic_msg_with_err(err);
                 panic!("{panic_msg}");
@@ -32,25 +29,19 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 
     #[track_caller]
     fn motsu_unwrap_err(self) -> E {
-        match self {
+        match self.motsu_res() {
             Ok(_value) => {
                 let panic_msg = VMContext::current().panic_msg();
                 panic!("{panic_msg}");
             }
-            Err(err) => {
-                VMContext::current().restore_from_backup();
-                err
-            }
+            Err(err) => err,
         }
     }
 
     #[track_caller]
     fn motsu_expect(self, msg: &str) -> T {
-        match self {
-            Ok(value) => {
-                VMContext::current().reset_backup();
-                value
-            }
+        match self.motsu_res() {
+            Ok(value) => value,
             Err(err) => {
                 let panic_msg = VMContext::current().panic_msg_with_err(err);
                 panic!("{msg}: {panic_msg}");
@@ -60,16 +51,25 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 
     #[track_caller]
     fn motsu_expect_err(self, msg: &str) -> E {
-        match self {
+        match self.motsu_res() {
             Ok(_value) => {
                 let panic_msg = VMContext::current().panic_msg();
                 panic!("{msg}: {panic_msg}");
             }
-            Err(err) => {
+            Err(err) => err,
+        }
+    }
+
+    fn motsu_res(self) -> std::result::Result<T, E> {
+        match self {
+            Ok(_) => {
+                VMContext::current().reset_backup();
+            }
+            Err(_) => {
                 VMContext::current().restore_from_backup();
-                err
             }
         }
+        self
     }
 }
 

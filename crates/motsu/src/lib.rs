@@ -301,10 +301,8 @@ mod ping_pong_tests {
         alice: Account,
     ) {
         let value = TEN;
-        let ponged_value = ping
-            .sender(alice)
-            .ping(pong.address(), value)
-            .expect("should ping successfully");
+        let ponged_value =
+            ping.sender(alice).ping(pong.address(), value).motsu_unwrap();
 
         assert_eq!(ponged_value, value + ONE);
         assert_eq!(ping.sender(alice).pings_count.get(), ONE);
@@ -318,10 +316,8 @@ mod ping_pong_tests {
         alice: Account,
     ) {
         let value = MAGIC_ERROR_VALUE;
-        let err = ping
-            .sender(alice)
-            .ping(pong.address(), value)
-            .expect_err("should fail to ping");
+        let err =
+            ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
         assert_eq!(err, MagicError { value }.abi_encode());
     }
@@ -332,10 +328,8 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        let can_ping = ping
-            .sender(alice)
-            .can_ping(pong.address())
-            .expect("should ping successfully");
+        let can_ping =
+            ping.sender(alice).can_ping(pong.address()).motsu_unwrap();
         assert!(can_ping);
     }
 
@@ -348,10 +342,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
 
-        _ = ping
-            .sender(alice)
-            .ping(pong.address(), TEN)
-            .expect("should ping successfully");
+        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
         assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
@@ -375,10 +366,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
 
-        _ = ping
-            .sender(alice)
-            .ping(pong.address(), TEN)
-            .expect("should ping successfully");
+        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
         assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
@@ -401,9 +389,7 @@ mod ping_pong_tests {
 
         // Here `alice` calls `ping` contract and should implicitly change
         // `pong.contract_address`.
-        _ = alice_ping
-            .ping(pong.address(), TEN)
-            .expect("should ping successfully");
+        _ = alice_ping.ping(pong.address(), TEN).motsu_unwrap();
 
         // And we will check that we're not reading cached `Address::ZERO`
         // value, but the actual one.
@@ -455,10 +441,7 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        _ = ping
-            .sender(alice)
-            .ping(pong.address(), TEN)
-            .expect("should ping successfully");
+        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Assert emitted events.
         ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
@@ -476,6 +459,8 @@ mod ping_pong_tests {
     }
 
     // TODO#q: add panic assertions for emitted events
+
+    // TODO#q: add transaction revert tests
 }
 
 #[cfg(test)]
