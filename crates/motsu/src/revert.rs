@@ -15,9 +15,6 @@ pub trait ResultExt<T, E: fmt::Debug> {
     // TODO#q: motsu_res(self)
 }
 
-// TODO#q: Don't print debug information about the error.
-// `E` should implement `Into<Vec<u8>>`
-
 impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     #[track_caller]
     fn motsu_unwrap(self) -> T {
@@ -27,17 +24,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                 value
             }
             Err(err) => {
-                // TODO#q: unify with motsu_expect
-                let context = VMContext::current();
-                let msg_sender =
-                    context.msg_sender().expect("msg_sender should be set");
-                let contract_address = context
-                    .contract_address()
-                    .expect("contract_address should be set");
-
-                let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
-
-                let panic_msg = context.replace_with_tags(panic_msg);
+                let panic_msg = VMContext::current().panic_msg_with_err(err);
                 panic!("{panic_msg}");
             }
         }
@@ -47,17 +34,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_unwrap_err(self) -> E {
         match self {
             Ok(_value) => {
-                // TODO#q: unify with motsu_expect_err
-                let context = VMContext::current();
-                let msg_sender =
-                    context.msg_sender().expect("msg_sender should be set");
-                let contract_address = context
-                    .contract_address()
-                    .expect("contract_address should be set");
-
-                let panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
-
-                let panic_msg = context.replace_with_tags(panic_msg);
+                let panic_msg = VMContext::current().panic_msg();
                 panic!("{panic_msg}");
             }
             Err(err) => {
@@ -75,16 +52,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                 value
             }
             Err(err) => {
-                let context = VMContext::current();
-                let msg_sender =
-                    context.msg_sender().expect("msg_sender should be set");
-                let contract_address = context
-                    .contract_address()
-                    .expect("contract_address should be set");
-
-                let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
-
-                let panic_msg = context.replace_with_tags(panic_msg);
+                let panic_msg = VMContext::current().panic_msg_with_err(err);
                 panic!("{msg}: {panic_msg}");
             }
         }
@@ -94,16 +62,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_expect_err(self, msg: &str) -> E {
         match self {
             Ok(_value) => {
-                let context = VMContext::current();
-                let msg_sender =
-                    context.msg_sender().expect("msg_sender should be set");
-                let contract_address = context
-                    .contract_address()
-                    .expect("contract_address should be set");
-
-                let panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
-
-                let panic_msg = context.replace_with_tags(panic_msg);
+                let panic_msg = VMContext::current().panic_msg();
                 panic!("{msg}: {panic_msg}");
             }
             Err(err) => {
@@ -111,6 +70,30 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                 err
             }
         }
+    }
+}
+
+impl VMContext {
+    fn panic_msg(self) -> String {
+        let msg_sender = self.msg_sender().expect("msg_sender should be set");
+        let contract_address =
+            self.contract_address().expect("contract_address should be set");
+
+        let panic_msg = format!(
+            "account {msg_sender:?} should fail to call {contract_address:?}"
+        );
+
+        self.replace_with_tags(panic_msg)
+    }
+
+    fn panic_msg_with_err<E: fmt::Debug>(self, err: E) -> String {
+        let msg_sender = self.msg_sender().expect("msg_sender should be set");
+        let contract_address =
+            self.contract_address().expect("contract_address should be set");
+
+        let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
+
+        self.replace_with_tags(panic_msg)
     }
 }
 
