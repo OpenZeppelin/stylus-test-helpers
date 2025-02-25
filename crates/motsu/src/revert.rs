@@ -1,4 +1,4 @@
-// TODO#q: add docs
+// TODO#q: add docs (optimistic behaviour)
 
 use core::fmt;
 use std::ops::{Deref, DerefMut};
@@ -12,6 +12,7 @@ pub trait ResultExt<T, E: fmt::Debug> {
     fn motsu_unwrap_err(self) -> E;
     fn motsu_expect(self, msg: &str) -> T;
     fn motsu_expect_err(self, msg: &str) -> E;
+    // TODO#q: motsu_res(self)
 }
 
 // TODO#q: Don't print debug information about the error.
@@ -34,9 +35,9 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                     .contract_address()
                     .expect("contract_address should be set");
 
-                let mut panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
+                let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
 
-                context.replace_with_tags(&mut panic_msg);
+                let panic_msg = context.replace_with_tags(panic_msg);
                 panic!("{panic_msg}");
             }
         }
@@ -54,9 +55,9 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                     .contract_address()
                     .expect("contract_address should be set");
 
-                let mut panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
+                let panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
 
-                context.replace_with_tags(&mut panic_msg);
+                let panic_msg = context.replace_with_tags(panic_msg);
                 panic!("{panic_msg}");
             }
             Err(err) => {
@@ -81,9 +82,9 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                     .contract_address()
                     .expect("contract_address should be set");
 
-                let mut panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
+                let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
 
-                context.replace_with_tags(&mut panic_msg);
+                let panic_msg = context.replace_with_tags(panic_msg);
                 panic!("{msg}: {panic_msg}");
             }
         }
@@ -100,9 +101,9 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                     .contract_address()
                     .expect("contract_address should be set");
 
-                let mut panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
+                let panic_msg = format!("account {msg_sender:?} should fail to call {contract_address:?}");
 
-                context.replace_with_tags(&mut panic_msg);
+                let panic_msg = context.replace_with_tags(panic_msg);
                 panic!("{msg}: {panic_msg}");
             }
             Err(err) => {
@@ -136,27 +137,28 @@ impl<D: Clone + Default> DerefMut for Backuped<D> {
 }
 
 impl<D: Clone + Default> Backuped<D> {
-    /// Should be called before starting call between contracts.
+    /// Should be used before starting external call between contracts.
     pub(crate) fn clone_data(&self) -> D {
         self.data.clone()
     }
 
-    /// Should be called when transaction was successful.
+    /// Should be used when transaction was successful.
     pub(crate) fn reset_backup(&mut self) {
         _ = self.backup.take();
     }
 
-    /// Should be called when transaction failed.
+    /// Should be used when transaction failed.
     pub(crate) fn restore_from_backup(&mut self) {
         self.data = self.backup.take().expect("unable revert transaction");
     }
 
-    /// Should be called when call between contracts failed.
-    pub(crate) fn restore_from_data(&mut self, data: D) {
-        self.data = data;
+    /// Should be used when external call between contracts failed, to restore
+    /// from `backup` persisted on the callstack.
+    pub(crate) fn restore_from(&mut self, backup: D) {
+        self.data = backup;
     }
 
-    /// Should be called when we start a new transaction.
+    /// Should be used when we start a new transaction.
     pub(crate) fn create_backup(&mut self) {
         let _ = self.backup.insert(self.data.clone());
     }

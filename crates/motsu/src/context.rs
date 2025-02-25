@@ -273,8 +273,8 @@ impl VMContext {
         if result.is_err() {
             // Recover from backups.
             let mut storage = self.storage();
-            storage.contracts.restore_from_data(contract_data);
-            storage.balances.restore_from_data(balances);
+            storage.contracts.restore_from(contract_data);
+            storage.balances.restore_from(balances);
         }
 
         // Set the previous message sender and contract address back.
@@ -487,6 +487,7 @@ impl VMContext {
     }
 
     // TODO#q: document the following functions
+    // TODO#q: move the following functions to revert file
 
     pub(crate) fn reset_backup(self) {
         let mut storage = self.storage();
@@ -507,19 +508,21 @@ impl VMContext {
         storage.balances.create_backup();
     }
 
-    /// Set string `tag` for the account at `address`.
+    /// Set string `tag` for `address`.
     fn set_tag(self, address: Address, tag: String) {
         MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
-    /// Substitute account addresses in the `msg` with corresponding tags.
-    pub(crate) fn replace_with_tags(self, msg: &mut String) {
+    /// Replaces addresses in the `msg` with corresponding tags (if any).
+    pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
         let storage = self.storage();
         for (address, tag) in &storage.tags {
-            // Debug formatting reveals non-checksumed address.
+            // We need debug formatting, since it reveals non-checksumed
+            // address.
             let address = format!("{address:?}");
-            *msg = msg.replace(&address, tag);
+            msg = msg.replace(&address, tag);
         }
+        msg
     }
 
     /// Get reference to the storage for the current test thread.
@@ -803,12 +806,12 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         let panic_msg = "event was not emitted";
         let matching_events = context.matching_events_for::<E>(&self.address);
 
-        let mut panic_msg = if matching_events.is_empty() {
+        let panic_msg = if matching_events.is_empty() {
             format!("{panic_msg}, no matching events found")
         } else {
             format!("{panic_msg}, matching events: {matching_events:?}")
         };
-        context.replace_with_tags(&mut panic_msg);
+        let panic_msg = context.replace_with_tags(panic_msg);
         panic!("{}", panic_msg);
     }
 }
