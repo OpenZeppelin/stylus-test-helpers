@@ -1,18 +1,13 @@
 //! Router context for external calls mocks.
 
-use std::{
-    borrow::BorrowMut,
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-    thread::ThreadId,
-};
+use std::{borrow::BorrowMut, marker::PhantomData, thread::ThreadId};
 
 use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     abi::Router,
-    prelude::{StorageType, TopLevelStorage},
+    prelude::{StorageType, TopLevelStorage, ValueDenier},
     ArbResult,
 };
 
@@ -66,12 +61,12 @@ impl VMRouterContext {
         input: &[u8],
     ) -> Option<ArbResult> {
         let storage = self.storage();
-        let router = Arc::clone(&storage.router);
+        let mut router = storage.router_factory.create();
 
         // Drop the storage reference to avoid a panic on lock.
         drop(storage);
 
-        router.create_and_route(selector, input)
+        router.route(selector, input)
     }
 
     /// Initialise contract router for the current test thread and
@@ -82,11 +77,7 @@ impl VMRouterContext {
             .insert(
                 self,
                 VMRouterStorage {
-                    // Mutex is important since a contract type is not `Sync`.
-                    // We don't lock anything and let rust compiler know that
-                    // `RouterFactory` is `Sync` and can be shared between
-                    // threads.
-                    router: Arc::new(RouterFactory::<Mutex<ST>> {
+                    router_factory: Box::new(RouterFactory::<ST> {
                         phantom: PhantomData,
                     }),
                 },
@@ -106,25 +97,13 @@ impl VMRouterContext {
 /// Metadata related to the router of an external contract.
 struct VMRouterStorage {
     // Contract's router.
-    router: Arc<dyn CreateRouter>,
+    router_factory: Box<dyn CreateVMRouter>,
 }
 
 /// A trait for router's creation.
-trait CreateRouter: Send + Sync {
+trait CreateVMRouter: Send + Sync {
     /// Instantiate a new router.
     fn create(&self) -> Box<dyn VMRouter>;
-
-    /// Instantiate a new router and instantly route a message to the matching
-    /// selector.
-    ///
-    /// Returns `None` if the `selector` wasn't found.
-    fn create_and_route(
-        &self,
-        selector: u32,
-        input: &[u8],
-    ) -> Option<ArbResult> {
-        self.create().route(selector, input)
-    }
 }
 
 /// A factory for router creation.
@@ -132,9 +111,16 @@ struct RouterFactory<R> {
     phantom: PhantomData<R>,
 }
 
-impl<R: StorageType + VMRouter + 'static> CreateRouter
-    for RouterFactory<Mutex<R>>
-{
+// SAFETY: We used `PhantomData` and lied to rust compiler that
+// [`RouterFactory`] contains type `R`.
+// In fact, it is a void type that contains neither other types nor references
+// and can be safely shared or sent between threads.
+// We will cheat rust the second time and explicitly implement `Send` and `Sync`
+// for [`RouterFactory`].
+unsafe impl<R> Send for RouterFactory<R> {}
+unsafe impl<R> Sync for RouterFactory<R> {}
+
+impl<R: StorageType + VMRouter + 'static> CreateVMRouter for RouterFactory<R> {
     fn create(&self) -> Box<dyn VMRouter> {
         Box::new(create_default_storage_type::<R>())
     }
@@ -142,7 +128,7 @@ impl<R: StorageType + VMRouter + 'static> CreateRouter
 
 /// A trait for routing messages to the matching selector.
 #[allow(clippy::module_name_repetitions)]
-pub trait VMRouter: Send {
+pub trait VMRouter {
     /// Tries to find and execute a method for the given `selector`, returning
     /// `None` if the `selector` wasn't found.
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
@@ -150,7 +136,7 @@ pub trait VMRouter: Send {
 
 impl<R> VMRouter for R
 where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + Send,
+    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + ValueDenier,
 {
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult> {
         <Self as Router<R>>::route(self, selector, input)
