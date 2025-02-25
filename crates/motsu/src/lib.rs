@@ -475,7 +475,7 @@ mod ping_pong_tests {
         );
     }
 
-    // TODO: add panic assertions for emitted events
+    // TODO#q: add panic assertions for emitted events
 }
 
 #[cfg(test)]
