@@ -391,8 +391,8 @@ impl VMContext {
             storage.contract_address.expect("contract_address should be set");
         storage
             .contracts
-            .entry(contract_address)
-            .or_default()
+            .get_mut(&contract_address)
+            .expect("contract should have a storage initialised")
             .events
             .push(log_data);
     }
@@ -778,12 +778,13 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
     }
 
     /// Assert that the `event` was emitted, by the contract `self`.
-    /// Event type `E` should implement [`Debug`].
+    /// In contrast to [`Self::emitted`] event type `E` should implement
+    /// [`Debug`].
     ///
     /// # Panics
     ///
-    /// * If the event was not emitted, panic and include all matching emitted
-    ///   events (if any) in the error message.
+    /// * If the event was not emitted, includes all matching emitted events (if
+    ///   any) in the error message.
     #[track_caller]
     pub fn assert_emitted<E: SolEvent + Debug>(&self, event: &E) {
         let context = VMContext::current();

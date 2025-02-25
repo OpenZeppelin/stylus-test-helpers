@@ -67,10 +67,6 @@ unsafe extern "C" fn native_keccak256(
 /// semantics, then, are equivalent to that of the EVM's [`SLOAD`] opcode.
 ///
 /// [`SLOAD`]: https://www.evm.codes/#54
-///
-/// # Panics
-///
-/// * If unable to lock `STORAGE`.
 #[no_mangle]
 unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
     VMContext::current().get_bytes_raw(key, out);
@@ -87,10 +83,6 @@ unsafe extern "C" fn storage_load_bytes32(key: *const u8, out: *mut u8) {
 /// persist it.
 ///
 /// [`SSTORE`]: https://www.evm.codes/#55
-///
-/// # Panics
-///
-/// * If unable to lock `STORAGE`.
 #[no_mangle]
 unsafe extern "C" fn storage_cache_bytes32(key: *const u8, value: *const u8) {
     VMContext::current().set_bytes_raw(key, value);
@@ -119,10 +111,6 @@ unsafe extern "C" fn storage_flush_cache(_: bool) {
 /// [`CALLER`]: https://www.evm.codes/#33
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#f4
 /// [aliasing]: https://developer.arbitrum.io/arbos/l1-to-l2-messaging#address-aliasing
-///
-/// # Panics
-///
-/// * If fails to parse `MSG_SENDER` as an address.
 #[no_mangle]
 unsafe extern "C" fn msg_sender(sender: *mut u8) {
     let msg_sender =
@@ -186,10 +174,6 @@ unsafe extern "C" fn emit_log(data: *const u8, len: usize, topics: usize) {
 ///     c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`.
 ///
 /// [`EXT_CODEHASH`]: https://www.evm.codes/#3F
-///
-/// # Panics
-///
-/// * If fails to parse `ACCOUNT_CODEHASH` as a keccack hash.
 #[no_mangle]
 unsafe extern "C" fn account_codehash(address: *const u8, dest: *mut u8) {
     let code_hash = if VMContext::current().has_code_raw(address) {
