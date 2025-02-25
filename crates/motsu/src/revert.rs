@@ -19,7 +19,7 @@ pub trait ResultExt<T, E: fmt::Debug> {
 // TODO#q: Don't print debug information about the error.
 // `E` should implement `Into<Vec<u8>>`
 
-impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
+impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     #[track_caller]
     fn motsu_unwrap(self) -> T {
         match self {
@@ -27,7 +27,10 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                 VMContext::current().reset_backup();
                 value
             }
-            Err(err) => panic!("failed to call contract: {err:?}",),
+            Err(err) => {
+                // account alice failed to call erc20:
+                panic!("failed to call contract: {err:?}",)
+            }
         }
     }
 
@@ -35,7 +38,8 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_unwrap_err(self) -> E {
         match self {
             Ok(value) => {
-                panic!("expected failure calling contract: {value:?}")
+                // account alice should fail to call erc20:
+                panic!("expected failure calling contract")
             }
             Err(err) => {
                 VMContext::current().restore_from_backup();
@@ -51,14 +55,20 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
                 VMContext::current().reset_backup();
                 value
             }
-            Err(err) => panic!("failed to call contract: {msg:?}: {err:?}"),
+            Err(err) => {
+                // account alice failed to call erc20:
+                panic!("failed to call contract: {msg:?}: {err:?}");
+            }
         }
     }
 
     #[track_caller]
     fn motsu_expect_err(self, msg: &str) -> E {
         match self {
-            Ok(value) => panic!("expected failure calling contract: {msg:?}"),
+            Ok(value) => {
+                //  account alice should fail to call erc20:
+                panic!("expected failure calling contract: {msg:?}")
+            }
             Err(err) => {
                 VMContext::current().restore_from_backup();
                 err
@@ -72,7 +82,6 @@ impl<T: fmt::Debug, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
 #[derive(Default)]
 pub(crate) struct Backuped<D: Clone + Default> {
     data: D,
-    // TODO#q: do we need an optional backup?
     backup: Option<D>,
 }
 
@@ -98,14 +107,12 @@ impl<D: Clone + Default> Backuped<D> {
 
     /// Should be called when transaction was successful.
     pub(crate) fn reset_backup(&mut self) {
-        // TODO#q: describe it better
-        // To not copy backup another time.
         _ = self.backup.take();
     }
 
     /// Should be called when transaction failed.
     pub(crate) fn restore_from_backup(&mut self) {
-        self.data = self.backup.clone().expect("unable revert transaction");
+        self.data = self.backup.take().expect("unable revert transaction");
     }
 
     /// Should be called when call between contracts failed.
@@ -113,7 +120,7 @@ impl<D: Clone + Default> Backuped<D> {
         self.data = data;
     }
 
-    /// Should be called when we start a new transaction
+    /// Should be called when we start a new transaction.
     pub(crate) fn create_backup(&mut self) {
         let _ = self.backup.insert(self.data.clone());
     }
