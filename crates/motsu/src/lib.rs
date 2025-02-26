@@ -459,18 +459,17 @@ mod ping_pong_tests {
     }
 
     // TODO#q: add panic assertions for emitted events
-
-    // TODO#q: add transaction revert tests
 }
 
 #[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
+    use alloy_sol_types::sol;
     use stylus_sdk::{
-        call::Call,
+        call::{Call, MethodError},
         contract, msg,
-        prelude::{public, storage, TopLevelStorage},
-        storage::StorageAddress,
+        prelude::{public, storage, SolidityError, TopLevelStorage},
+        storage::{StorageAddress, StorageU256},
     };
 
     use crate as motsu;
@@ -478,15 +477,19 @@ mod proxies_tests {
 
     const ONE: U256 = uint!(1_U256);
     const TWO: U256 = uint!(2_U256);
+    const THREE: U256 = uint!(3_U256);
     const FOUR: U256 = uint!(4_U256);
     const EIGHT: U256 = uint!(8_U256);
     const TEN: U256 = uint!(10_U256);
     const CALL_PROXY_LIMIT: U256 = uint!(50_U256);
+    const MAGIC_ERROR_VALUE: U256 = THREE;
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
             #[allow(missing_docs)]
             function callProxy(uint256 value) external returns (uint256);
+            #[allow(missing_docs)]
+            function tryCallProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
             function payProxy() external payable;
             #[allow(missing_docs)]
@@ -499,6 +502,23 @@ mod proxies_tests {
     #[storage]
     struct Proxy {
         next_proxy: StorageAddress,
+        received_value: StorageU256,
+    }
+
+    sol! {
+        #[derive(Debug)]
+        #[allow(missing_docs)]
+        error ProxyError(uint256 value);
+
+        #[derive(Debug)]
+        #[allow(missing_docs)]
+        error UnknownError();
+    }
+
+    #[derive(SolidityError, Debug)]
+    pub enum Error {
+        ProxyError(ProxyError),
+        UnknownError(UnknownError),
     }
 
     #[public]
@@ -521,6 +541,45 @@ mod proxies_tests {
                 let call = Call::new_in(self);
                 proxy.call_proxy(call, value).expect("should call proxy")
             }
+        }
+
+        fn try_call_proxy(&mut self, value: U256) -> Result<U256, Error> {
+            // Set received value
+            self.received_value.set(value);
+
+            // If there is no next proxy, return the value.
+            let next_proxy = self.next_proxy.get();
+            if next_proxy.is_zero() {
+                return Ok(value);
+            }
+
+            // Add one to the value.
+            let value = value + ONE;
+
+            // Otherwise, call the next proxy.
+            let result = match IProxy::new(next_proxy)
+                .try_call_proxy(Call::new_in(self), value)
+            {
+                Ok(value) => Ok(value),
+                Err(err) => {
+                    // Handle `ProxyError` and return `Ok` with the value.
+                    let expected_err = ProxyError { value: MAGIC_ERROR_VALUE };
+                    if err.encode() == expected_err.clone().encode() {
+                        Ok(value)
+                    } else {
+                        Err(Error::UnknownError(UnknownError {}))
+                    }
+                }
+            };
+
+            // Return error for specific value.
+            if self.received_value.get() == MAGIC_ERROR_VALUE {
+                return Err(Error::ProxyError(ProxyError {
+                    value: MAGIC_ERROR_VALUE,
+                }));
+            }
+
+            result
         }
 
         #[payable]
@@ -601,6 +660,29 @@ mod proxies_tests {
 
         // The value is incremented by 1 for each proxy.
         assert_eq!(result, TEN + ONE + ONE + ONE);
+    }
+
+    #[motsu::test]
+    fn try_call_and_revert(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        proxy4: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3.
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(proxy4.address());
+        proxy4.sender(alice).init(Address::ZERO);
+
+        let result = proxy1.sender(alice).try_call_proxy(ONE).motsu_unwrap();
+        assert_eq!(result, MAGIC_ERROR_VALUE);
+        assert_eq!(proxy1.sender(alice).received_value.get(), ONE);
+        assert_eq!(proxy2.sender(alice).received_value.get(), TWO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
     }
 
     #[motsu::test]
