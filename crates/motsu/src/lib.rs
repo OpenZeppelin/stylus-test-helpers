@@ -482,7 +482,7 @@ mod proxies_tests {
     const EIGHT: U256 = uint!(8_U256);
     const TEN: U256 = uint!(10_U256);
     const CALL_PROXY_LIMIT: U256 = uint!(50_U256);
-    const MAGIC_ERROR_VALUE: U256 = THREE;
+    const MAGIC_ERROR_VALUE: U256 = FOUR;
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
@@ -508,7 +508,7 @@ mod proxies_tests {
     sol! {
         #[derive(Debug)]
         #[allow(missing_docs)]
-        error ProxyError(uint256 value);
+        error ProxyError();
 
         #[derive(Debug)]
         #[allow(missing_docs)]
@@ -544,13 +544,14 @@ mod proxies_tests {
         }
 
         fn try_call_proxy(&mut self, value: U256) -> Result<U256, Error> {
-            // Set received value
+            // Set received value.
             self.received_value.set(value);
 
-            // If there is no next proxy, return the value.
+            // If there is no next proxy, return `ProxyError` to check how
+            // revert of `received_value` works.
             let next_proxy = self.next_proxy.get();
             if next_proxy.is_zero() {
-                return Ok(value);
+                return Err(Error::ProxyError(ProxyError {}));
             }
 
             // Add one to the value.
@@ -563,7 +564,7 @@ mod proxies_tests {
                 Ok(value) => Ok(value),
                 Err(err) => {
                     // Handle `ProxyError` and return `Ok` with the value.
-                    let expected_err = ProxyError { value: MAGIC_ERROR_VALUE };
+                    let expected_err = ProxyError {};
                     if err.encode() == expected_err.clone().encode() {
                         Ok(value)
                     } else {
@@ -572,11 +573,9 @@ mod proxies_tests {
                 }
             };
 
-            // Return error for specific value.
+            // Return error for specific "magic" value.
             if self.received_value.get() == MAGIC_ERROR_VALUE {
-                return Err(Error::ProxyError(ProxyError {
-                    value: MAGIC_ERROR_VALUE,
-                }));
+                return Err(Error::ProxyError(ProxyError {}));
             }
 
             result
@@ -677,11 +676,35 @@ mod proxies_tests {
         proxy3.sender(alice).init(proxy4.address());
         proxy4.sender(alice).init(Address::ZERO);
 
+        let err = proxy1
+            .sender(alice)
+            .try_call_proxy(MAGIC_ERROR_VALUE)
+            .motsu_unwrap_err();
+        assert!(matches!(err, Error::ProxyError(_)));
+        assert_eq!(proxy1.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
+        let result = proxy1.sender(alice).try_call_proxy(THREE).motsu_unwrap();
+        assert_eq!(result, MAGIC_ERROR_VALUE);
+        assert_eq!(proxy1.sender(alice).received_value.get(), THREE);
+        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
+        let result = proxy1.sender(alice).try_call_proxy(TWO).motsu_unwrap();
+        assert_eq!(result, MAGIC_ERROR_VALUE);
+        assert_eq!(proxy1.sender(alice).received_value.get(), TWO);
+        assert_eq!(proxy2.sender(alice).received_value.get(), THREE);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
         let result = proxy1.sender(alice).try_call_proxy(ONE).motsu_unwrap();
         assert_eq!(result, MAGIC_ERROR_VALUE);
         assert_eq!(proxy1.sender(alice).received_value.get(), ONE);
         assert_eq!(proxy2.sender(alice).received_value.get(), TWO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), THREE);
         assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
     }
 
