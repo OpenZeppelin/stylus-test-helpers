@@ -272,11 +272,11 @@ mod ping_pong_tests {
     #[public]
     impl PongContract {
         fn pong(&mut self, value: U256) -> Result<U256, PongError> {
+            evm::log(Ponged { from: msg::sender(), value });
+
             if value == MAGIC_ERROR_VALUE {
                 return Err(PongError::MagicError(MagicError { value }));
             }
-
-            evm::log(Ponged { from: msg::sender(), value });
 
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + ONE);
@@ -458,7 +458,40 @@ mod ping_pong_tests {
         );
     }
 
-    // TODO#q: add panic assertions for emitted events
+    #[motsu::test]
+    #[should_panic(
+        expected = "event was not emitted, matching events: [Pinged { from: alice, value: 10 }]"
+    )]
+    fn asserted_emitted_event(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+
+        // Check panic assertion.
+        ping.assert_emitted(&Pinged { from: ping.address(), value: TEN });
+    }
+
+    #[motsu::test]
+    #[should_panic(
+        expected = "event was not emitted, no matching events found"
+    )]
+    fn assert_reverts_emitted_event(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        let value = MAGIC_ERROR_VALUE;
+        _ = ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
+
+        // Both events should be emitted but then reverted.
+        assert!(!ping.emitted(&Pinged { from: alice.address(), value }));
+        assert!(!ping.emitted(&Ponged { from: ping.address(), value }));
+
+        // Check panic assertion.
+        ping.assert_emitted(&Pinged { from: alice.address(), value });
+    }
 }
 
 #[cfg(test)]
