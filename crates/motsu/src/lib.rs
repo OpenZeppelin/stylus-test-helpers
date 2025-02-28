@@ -526,6 +526,8 @@ mod proxies_tests {
             #[allow(missing_docs)]
             function payProxy() external payable;
             #[allow(missing_docs)]
+            function tryPayProxy() external payable;
+            #[allow(missing_docs)]
             function passProxyWithFixedValue(uint256 pass_value) external payable;
             #[allow(missing_docs)]
             function payProxyWithHalfBalance() external payable;
@@ -628,6 +630,42 @@ mod proxies_tests {
                 let call = Call::new_in(self).value(value);
                 proxy.pay_proxy(call).expect("should pay proxy");
             }
+        }
+
+        #[payable]
+        fn try_pay_proxy(&mut self) -> Result<(), Error> {
+            // If there is no next proxy, return `ProxyError` to check how
+            // revert of `received_value` works.
+            let next_proxy = self.next_proxy.get();
+            if next_proxy.is_zero() {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            // Add one to the value.
+            let value = msg::value() + ONE;
+
+            // Otherwise, call the next proxy.
+            let result = match IProxy::new(next_proxy)
+                .try_pay_proxy(Call::new_in(self).value(value))
+            {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    // Handle `ProxyError` and return `Ok` with the value.
+                    let expected_err = ProxyError {};
+                    if err.encode() == expected_err.clone().encode() {
+                        Ok(())
+                    } else {
+                        Err(Error::UnknownError(UnknownError {}))
+                    }
+                }
+            };
+
+            // Return error for specific "magic" value.
+            if msg::value() == MAGIC_ERROR_VALUE {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            result
         }
 
         #[payable]
