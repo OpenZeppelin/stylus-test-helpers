@@ -248,7 +248,6 @@ impl VMContext {
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
-        // TODO#q: we should always revert in static call
         // We should do backup before transferring value, to have balances
         // reverted in case of failure.
         let storage = self.storage();
@@ -484,22 +483,24 @@ impl VMContext {
             .or_insert(value)
     }
 
-    // TODO#q: document the following functions
-    // TODO#q: move the following functions to revert file
-
+    /// Reset persistent data backup.
+    /// Used when transaction was successful.
     pub(crate) fn reset_backup(self) {
         let mut storage = self.storage();
         storage.contracts.reset_backup();
         storage.balances.reset_backup();
     }
 
+    /// Restore persistent data from backup.
+    /// Used when transaction failed.
     pub(crate) fn restore_from_backup(self) {
         let mut storage = self.storage();
         storage.contracts.restore_from_backup();
         storage.balances.restore_from_backup();
     }
 
-    /// NOTE#q: Should create backup before transfering the value
+    /// Create a backup of the storage.
+    /// Used when transaction starts.
     fn create_backup(self) {
         let mut storage = self.storage();
         storage.contracts.create_backup();
@@ -511,7 +512,8 @@ impl VMContext {
         MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
-    /// Replaces addresses in the `msg` with corresponding tags (if any).
+    /// Replaces non-checksumed addresses in the `msg` with corresponding tags
+    /// (if any).
     pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
         let storage = self.storage();
         for (address, tag) in &storage.tags {
@@ -656,15 +658,12 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        // TODO#q: do we need to backup and transfer value with immutable
-        // storage access?
         VMContext::current().create_backup();
 
         // Set parameters for call such as `msg_sender`, `contract_address`,
         // `msg_value`.
         self.set_call_params();
 
-        // TODO#q: we should not transfer value in pure functions
         // Transfer value (if any) from the `msg_sender` to `contract_address`,
         // that was set on the previous step.
         VMContext::current().transfer_value();

@@ -164,7 +164,7 @@ mod ping_pong_tests {
     use alloy_sol_types::{sol, SolError};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::Call,
+        call::{Call, MethodError},
         contract, evm, msg,
         prelude::{public, storage, AddressVM, SolidityError, TopLevelStorage},
         storage::{StorageAddress, StorageU256},
@@ -190,6 +190,21 @@ mod ping_pong_tests {
         );
     }
 
+    sol! {
+        #[derive(Debug)]
+        #[allow(missing_docs)]
+        error MagicError(uint256 value);
+        #[derive(Debug)]
+        #[allow(missing_docs)]
+        error UnknownError();
+    }
+
+    #[derive(SolidityError, Debug)]
+    pub enum PingError {
+        MagicError(MagicError),
+        UnknownError(UnknownError),
+    }
+
     #[storage]
     struct PingContract {
         pings_count: StorageU256,
@@ -199,12 +214,23 @@ mod ping_pong_tests {
 
     #[public]
     impl PingContract {
-        fn ping(&mut self, to: Address, value: U256) -> Result<U256, Vec<u8>> {
+        fn ping(
+            &mut self,
+            to: Address,
+            value: U256,
+        ) -> Result<U256, PingError> {
             evm::log(Pinged { from: msg::sender(), value });
 
             let receiver = IPongContract::new(to);
             let call = Call::new_in(self);
-            let value = receiver.pong(call, value)?;
+            let value = receiver.pong(call, value).map_err(|err| {
+                let expected = MagicError { value };
+                if expected.clone().encode() == err.encode() {
+                    PingError::MagicError(expected)
+                } else {
+                    PingError::UnknownError(UnknownError {})
+                }
+            })?;
 
             let pings_count = self.pings_count.get();
             self.pings_count.set(pings_count + ONE);
@@ -236,12 +262,6 @@ mod ping_pong_tests {
             #[allow(missing_docs)]
             function canPong() external view returns (bool);
         }
-    }
-
-    sol! {
-        #[derive(Debug)]
-        #[allow(missing_docs)]
-        error MagicError(uint256 value);
     }
 
     #[derive(SolidityError, Debug)]
@@ -319,7 +339,18 @@ mod ping_pong_tests {
         let err =
             ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
-        assert_eq!(err, MagicError { value }.abi_encode());
+        assert!(matches!(err, PingError::MagicError(MagicError { value })));
+    }
+
+    #[motsu::test]
+    #[should_panic = "account alice failed to call ping: MagicError(MagicError { value: 42 })"]
+    fn external_call_panic(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Account,
+    ) {
+        let value = MAGIC_ERROR_VALUE;
+        _ = ping.sender(alice).ping(pong.address(), value).motsu_unwrap();
     }
 
     #[motsu::test]
@@ -485,7 +516,7 @@ mod ping_pong_tests {
         let value = MAGIC_ERROR_VALUE;
         _ = ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
-        // Both events should be emitted but then reverted.
+        // Both events should not be emitted after revert.
         assert!(!ping.emitted(&Pinged { from: alice.address(), value }));
         assert!(!ping.emitted(&Ponged { from: ping.address(), value }));
 
@@ -515,7 +546,6 @@ mod proxies_tests {
     const EIGHT: U256 = uint!(8_U256);
     const TEN: U256 = uint!(10_U256);
     const CALL_PROXY_LIMIT: U256 = uint!(50_U256);
-    const MAGIC_ERROR_VALUE: U256 = FOUR;
 
     stylus_sdk::stylus_proc::sol_interface! {
         interface IProxy {
@@ -578,44 +608,6 @@ mod proxies_tests {
             }
         }
 
-        fn try_call_proxy(&mut self, value: U256) -> Result<U256, Error> {
-            // Set received value.
-            self.received_value.set(value);
-
-            // If there is no next proxy, return `ProxyError` to check how
-            // revert of `received_value` works.
-            let next_proxy = self.next_proxy.get();
-            if next_proxy.is_zero() {
-                return Err(Error::ProxyError(ProxyError {}));
-            }
-
-            // Add one to the value.
-            let value = value + ONE;
-
-            // Otherwise, call the next proxy.
-            let result = match IProxy::new(next_proxy)
-                .try_call_proxy(Call::new_in(self), value)
-            {
-                Ok(value) => Ok(value),
-                Err(err) => {
-                    // Handle `ProxyError` and return `Ok` with the value.
-                    let expected_err = ProxyError {};
-                    if err.encode() == expected_err.clone().encode() {
-                        Ok(value)
-                    } else {
-                        Err(Error::UnknownError(UnknownError {}))
-                    }
-                }
-            };
-
-            // Return error for specific "magic" value.
-            if self.received_value.get() == MAGIC_ERROR_VALUE {
-                return Err(Error::ProxyError(ProxyError {}));
-            }
-
-            result
-        }
-
         #[payable]
         fn pay_proxy(&mut self) {
             let next_proxy = self.next_proxy.get();
@@ -633,50 +625,14 @@ mod proxies_tests {
         }
 
         #[payable]
-        fn try_pay_proxy(&mut self) -> Result<(), Error> {
-            // If there is no next proxy, return `ProxyError` to check how
-            // revert of `received_value` works.
-            let next_proxy = self.next_proxy.get();
-            if next_proxy.is_zero() {
-                return Err(Error::ProxyError(ProxyError {}));
-            }
-
-            // Add one to the value.
-            let value = msg::value() + ONE;
-
-            // Otherwise, call the next proxy.
-            let result = match IProxy::new(next_proxy)
-                .try_pay_proxy(Call::new_in(self).value(value))
-            {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    // Handle `ProxyError` and return `Ok` with the value.
-                    let expected_err = ProxyError {};
-                    if err.encode() == expected_err.clone().encode() {
-                        Ok(())
-                    } else {
-                        Err(Error::UnknownError(UnknownError {}))
-                    }
-                }
-            };
-
-            // Return error for specific "magic" value.
-            if msg::value() == MAGIC_ERROR_VALUE {
-                return Err(Error::ProxyError(ProxyError {}));
-            }
-
-            result
-        }
-
-        #[payable]
-        fn pass_proxy_with_fixed_value(&mut self, this_value: U256) {
+        fn pass_proxy_with_fixed_value(&self, this_value: U256) {
             let next_proxy = self.next_proxy.get();
 
             // If there is a next proxy.
             if !next_proxy.is_zero() {
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(this_value);
+                let call = Call::new().value(this_value);
                 let value_for_next_next_proxy = this_value / TWO;
                 proxy
                     .pass_proxy_with_fixed_value(
@@ -701,6 +657,90 @@ mod proxies_tests {
                     .pay_proxy_with_half_balance(call)
                     .expect("should pass half the value to the next proxy");
             }
+        }
+
+        /// Accept `value` as an argument and call the next proxy with `ONE +
+        /// value`.
+        /// Tries to recover transaction if [`Error::ProxyError`] received.
+        ///
+        /// # Errors
+        ///
+        /// * If `value` is `FOUR` or there is no next proxy, returns
+        ///   [`Error::ProxyError`].
+        /// * If unknown error received from the next proxy, returns
+        ///   [`Error::UnknownError`].
+        fn try_call_proxy(&mut self, value: U256) -> Result<U256, Error> {
+            // Set the received value to check how revert works.
+            self.received_value.set(value);
+
+            let next_proxy = self.next_proxy.get();
+            if next_proxy.is_zero() {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            let value = value + ONE;
+
+            let result = match IProxy::new(next_proxy)
+                .try_call_proxy(Call::new_in(self), value)
+            {
+                Ok(value) => Ok(value),
+                Err(err) => {
+                    // Handle `ProxyError` and return `Ok` with the value.
+                    let expected_err = ProxyError {};
+                    if err.encode() == expected_err.clone().encode() {
+                        Ok(value)
+                    } else {
+                        Err(Error::UnknownError(UnknownError {}))
+                    }
+                }
+            };
+
+            if self.received_value.get() == FOUR {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            result
+        }
+
+        /// Accept payment and pay to the next proxy with `ONE + msg
+        /// value`.
+        /// Tries to recover transaction if [`Error::ProxyError`] received.
+        ///
+        /// # Errors
+        ///
+        /// * If msg value is `FOUR` or there is no next proxy, returns
+        ///   [`Error::ProxyError`].
+        /// * If unknown error received from the next proxy, returns
+        ///   [`Error::UnknownError`].
+        #[payable]
+        fn try_pay_proxy(&mut self) -> Result<(), Error> {
+            let next_proxy = self.next_proxy.get();
+            if next_proxy.is_zero() {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            let value = msg::value() + ONE;
+
+            let result = match IProxy::new(next_proxy)
+                .try_pay_proxy(Call::new_in(self).value(value))
+            {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    // Handle `ProxyError` and return `Ok`.
+                    let expected_err = ProxyError {};
+                    if err.encode() == expected_err.clone().encode() {
+                        Ok(())
+                    } else {
+                        Err(Error::UnknownError(UnknownError {}))
+                    }
+                }
+            };
+
+            if msg::value() == FOUR {
+                return Err(Error::ProxyError(ProxyError {}));
+            }
+
+            result
         }
     }
 
@@ -730,53 +770,6 @@ mod proxies_tests {
 
         // The value is incremented by 1 for each proxy.
         assert_eq!(result, TEN + ONE + ONE + ONE);
-    }
-
-    #[motsu::test]
-    fn try_call_and_revert(
-        proxy1: Contract<Proxy>,
-        proxy2: Contract<Proxy>,
-        proxy3: Contract<Proxy>,
-        proxy4: Contract<Proxy>,
-        alice: Account,
-    ) {
-        // Set up a chain of three proxies.
-        // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
-
-        let err = proxy1
-            .sender(alice)
-            .try_call_proxy(MAGIC_ERROR_VALUE)
-            .motsu_unwrap_err();
-        assert!(matches!(err, Error::ProxyError(_)));
-        assert_eq!(proxy1.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
-
-        let result = proxy1.sender(alice).try_call_proxy(THREE).motsu_unwrap();
-        assert_eq!(result, MAGIC_ERROR_VALUE);
-        assert_eq!(proxy1.sender(alice).received_value.get(), THREE);
-        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
-
-        let result = proxy1.sender(alice).try_call_proxy(TWO).motsu_unwrap();
-        assert_eq!(result, MAGIC_ERROR_VALUE);
-        assert_eq!(proxy1.sender(alice).received_value.get(), TWO);
-        assert_eq!(proxy2.sender(alice).received_value.get(), THREE);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
-
-        let result = proxy1.sender(alice).try_call_proxy(ONE).motsu_unwrap();
-        assert_eq!(result, MAGIC_ERROR_VALUE);
-        assert_eq!(proxy1.sender(alice).received_value.get(), ONE);
-        assert_eq!(proxy2.sender(alice).received_value.get(), TWO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), THREE);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
     }
 
     #[motsu::test]
@@ -910,5 +903,114 @@ mod proxies_tests {
             // The value is incremented by 1 for each proxy.
             assert_eq!(result, TEN + ONE + ONE + ONE);
         }
+    }
+
+    #[motsu::test]
+    fn try_call_and_revert(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        proxy4: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(proxy4.address());
+        proxy4.sender(alice).init(Address::ZERO);
+
+        // If the argument is `FOUR`, the call should revert fully.
+        let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
+        assert!(matches!(err, Error::ProxyError(_)));
+        assert_eq!(proxy1.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
+        // If the argument is `THREE`,
+        let result = proxy1.sender(alice).try_call_proxy(THREE).motsu_unwrap();
+        assert_eq!(result, FOUR);
+        assert_eq!(proxy1.sender(alice).received_value.get(), THREE);
+        // call to the second proxy should revert.
+        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
+        // If the argument is `TWO`,
+        let result = proxy1.sender(alice).try_call_proxy(TWO).motsu_unwrap();
+        assert_eq!(result, FOUR);
+        assert_eq!(proxy1.sender(alice).received_value.get(), TWO);
+        assert_eq!(proxy2.sender(alice).received_value.get(), THREE);
+        // call to the third proxy should revert.
+        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+
+        // If the argument is `ONE`,
+        let result = proxy1.sender(alice).try_call_proxy(ONE).motsu_unwrap();
+        assert_eq!(result, FOUR);
+        assert_eq!(proxy1.sender(alice).received_value.get(), ONE);
+        assert_eq!(proxy2.sender(alice).received_value.get(), TWO);
+        assert_eq!(proxy3.sender(alice).received_value.get(), THREE);
+        // call to the fourth proxy should revert.
+        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+    }
+
+    #[motsu::test]
+    fn try_pay_and_revert(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        proxy4: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of three proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(proxy4.address());
+        proxy4.sender(alice).init(Address::ZERO);
+
+        // Fund all accounts.
+        alice.fund(TEN);
+        proxy1.fund(TEN);
+        proxy2.fund(TEN);
+        proxy3.fund(TEN);
+        proxy4.fund(TEN);
+
+        // If the msg value is `FOUR`, the call should revert fully.
+        let err = proxy1
+            .sender_and_value(alice, FOUR)
+            .try_pay_proxy()
+            .motsu_unwrap_err();
+        assert!(matches!(err, Error::ProxyError(_)));
+        assert_eq!(proxy1.balance(), TEN);
+        assert_eq!(proxy2.balance(), TEN);
+        assert_eq!(proxy3.balance(), TEN);
+        assert_eq!(proxy4.balance(), TEN);
+
+        // If the msg value is `THREE`,
+        proxy1.sender_and_value(alice, THREE).try_pay_proxy().motsu_unwrap();
+        assert_eq!(proxy1.balance(), TEN + THREE);
+        // call to the second proxy should revert.
+        assert_eq!(proxy2.balance(), TEN);
+        assert_eq!(proxy3.balance(), TEN);
+        assert_eq!(proxy4.balance(), TEN);
+
+        // If the msg value is `TWO`,
+        proxy1.sender_and_value(alice, TWO).try_pay_proxy().motsu_unwrap();
+        assert_eq!(proxy1.balance(), TEN + TWO);
+        assert_eq!(proxy2.balance(), TEN + THREE);
+        // call to the third proxy should revert.
+        assert_eq!(proxy3.balance(), TEN);
+        assert_eq!(proxy4.balance(), TEN);
+
+        // If the msg value is `ONE`,
+        proxy1.sender_and_value(alice, ONE).try_pay_proxy().motsu_unwrap();
+        assert_eq!(proxy1.balance(), TEN + ONE);
+        assert_eq!(proxy2.balance(), TEN + TWO);
+        assert_eq!(proxy3.balance(), TEN + THREE);
+        // call to the fourth proxy should revert.
+        assert_eq!(proxy4.balance(), TEN);
     }
 }

@@ -1,4 +1,10 @@
-// TODO#q: add docs (optimistic behaviour)
+//! This module contains transaction revert logic, and it is not triggered by
+//! default.
+//!
+//! To revert a transaction in case of an error result, you should call one of
+//! the following functions: [`ResultExt::motsu_unwrap`],
+//! [`ResultExt::motsu_unwrap_err`], [`ResultExt::motsu_expect`],
+//! [`ResultExt::motsu_expect_err`] or [`ResultExt::motsu_res`].
 
 use core::fmt;
 use std::ops::{Deref, DerefMut};
@@ -41,7 +47,7 @@ pub trait ResultExt<T, E: fmt::Debug> {
     ///   call metadata.
     fn motsu_expect_err(self, msg: &str) -> E;
 
-    /// Returns `self` without any changes and reverts transaction in case of
+    /// Returns `self` [`Result`] and reverts transaction in case of
     /// `Err` value.
     fn motsu_res(self) -> Result<T, E>;
 }
