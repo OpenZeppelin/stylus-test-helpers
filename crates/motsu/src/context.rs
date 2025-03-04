@@ -1,5 +1,6 @@
 //! Unit-testing context for Stylus contracts.
 
+use core::fmt::Debug;
 use std::{
     cell::Cell,
     collections::HashMap,
@@ -9,7 +10,8 @@ use std::{
     thread::ThreadId,
 };
 
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, Bytes, LogData, B256, U256};
+use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
@@ -63,9 +65,10 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
-            .contract_data
+            .contracts
             .get(&contract_address)
             .expect("contract receiver should have a storage initialised")
+            .data
             .get(key)
             .copied()
             .unwrap_or_default()
@@ -83,9 +86,10 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
-            .contract_data
+            .contracts
             .get_mut(&contract_address)
             .expect("contract receiver should have a storage initialised")
+            .data
             .insert(key, value);
     }
 
@@ -143,8 +147,8 @@ impl VMContext {
         if MOTSU_VM
             .entry(self)
             .or_default()
-            .contract_data
-            .insert(contract_address, HashMap::new())
+            .contracts
+            .insert(contract_address, ContractStorage::default())
             .is_some()
         {
             panic!("contract storage already initialized for contract_address `{contract_address}`");
@@ -159,10 +163,10 @@ impl VMContext {
     /// test [`VMContext`].
     fn reset_storage(self, contract_address: Address) {
         let mut storage = self.storage();
-        storage.contract_data.remove(&contract_address);
+        storage.contracts.remove(&contract_address);
 
         // if no more contracts left,
-        if storage.contract_data.is_empty() {
+        if storage.contracts.is_empty() {
             // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
@@ -310,6 +314,75 @@ impl VMContext {
     #[must_use]
     fn has_code(self, address: Address) -> bool {
         self.router(address).exists()
+    }
+
+    /// Check if the `event` was emitted, by the contract at `address`.
+    pub(crate) fn emitted_for<E: SolEvent>(
+        self,
+        address: &Address,
+        event: &E,
+    ) -> bool {
+        let log_data = event.encode_log_data();
+
+        self.storage()
+            .contracts
+            .get(address)
+            .is_some_and(|contract| contract.events.contains(&log_data))
+    }
+
+    /// Get all events of type [`E`] emitted by the contract at `address`.
+    pub(crate) fn matching_events_for<E: SolEvent>(
+        self,
+        address: &Address,
+    ) -> Vec<E> {
+        self.storage()
+            .contracts
+            .get(address)
+            .map(|contract| {
+                contract
+                    .events
+                    .iter()
+                    .filter_map(|log| E::decode_log_data(log, true).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Store the raw event log `data`, `len` and `topics` number in the
+    /// storage.
+    pub(crate) unsafe fn store_log_raw(
+        self,
+        data: *const u8,
+        len: usize,
+        topics: usize,
+    ) {
+        let data = slice::from_raw_parts(data, len);
+        self.store_log(data, topics);
+    }
+
+    /// Store the event log `data` and `topics_number` in the storage.
+    fn store_log(self, data: &[u8], topics_number: usize) {
+        let topics: Vec<_> = data
+            .chunks(Word::len_bytes())
+            .map(Word::from_slice)
+            .take(topics_number)
+            .collect();
+
+        let data_start = Word::len_bytes() * topics_number;
+        let data = Bytes::copy_from_slice(&data[data_start..]);
+
+        let log_data =
+            LogData::new(topics, data).expect("should create new LogData");
+
+        let mut storage = self.storage();
+        let contract_address =
+            storage.contract_address.expect("contract_address should be set");
+        storage
+            .contracts
+            .get_mut(&contract_address)
+            .expect("contract should have a storage initialised")
+            .events
+            .push(log_data);
     }
 
     /// Get the balance of account at `address`.
@@ -463,9 +536,9 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    /// Contract's address to mock data storage mapping.
-    contract_data: HashMap<Address, ContractStorage>,
-    /// Account's address to balance mapping.
+    /// Contract's address to [`ContractStorage`] mapping.
+    contracts: HashMap<Address, ContractStorage>,
+    /// Account's address to balance [`U256`] mapping.
     balances: HashMap<Address, U256>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
@@ -473,8 +546,17 @@ struct VMContextStorage {
     return_data_size: Option<usize>,
 }
 
+/// Contract's account storage.
+#[derive(Default)]
+struct ContractStorage {
+    /// Contract's byte storage
+    data: ContractData,
+    /// Event logs emitted by the contract.
+    events: Vec<LogData>,
+}
+
 /// Contract's byte storage
-type ContractStorage = HashMap<Bytes32, Bytes32>;
+type ContractData = HashMap<Bytes32, Bytes32>;
 pub(crate) const WORD_BYTES: usize = 32;
 pub(crate) type Bytes32 = [u8; WORD_BYTES];
 
@@ -631,6 +713,36 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
             msg_sender: caller_address,
             msg_value: Some(value),
             contract_ref: self,
+        }
+    }
+
+    /// Check if the `event` was emitted, by the contract `self`.
+    pub fn emitted<E: SolEvent>(&self, event: &E) -> bool {
+        VMContext::current().emitted_for(&self.address, event)
+    }
+
+    /// Assert that the `event` was emitted, by the contract `self`.
+    /// In contrast to [`Self::emitted`] event type `E` should implement
+    /// [`Debug`].
+    ///
+    /// # Panics
+    ///
+    /// * If the event was not emitted, includes all matching emitted events (if
+    ///   any) in the error message.
+    #[track_caller]
+    pub fn assert_emitted<E: SolEvent + Debug>(&self, event: &E) {
+        let context = VMContext::current();
+        if context.emitted_for(&self.address, event) {
+            return;
+        }
+
+        let panic_msg = "event was not emitted";
+        let matching_events = context.matching_events_for::<E>(&self.address);
+
+        if matching_events.is_empty() {
+            panic!("{panic_msg}, no matching events found")
+        } else {
+            panic!("{panic_msg}, matching events: {matching_events:?}")
         }
     }
 }
