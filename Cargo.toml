@@ -28,17 +28,17 @@ all = "warn"
 const-hex = { version = "1.11.1", default-features = false }
 once_cell = "1.19.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
-stylus-sdk = { version = "0.7.0", default-features = false }
+stylus-sdk = { version = "0.8.1", default-features = false }
 dashmap = "6.1.0"
 syn = { version = "2.0.58", features = ["full"] }
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
-alloy-primitives = { version = "=0.8.14", default-features = false }
-alloy-sol-types = { version = "=0.8.14", default-features = false }
+alloy-primitives = { version = "=0.8.20", default-features = false }
+alloy-sol-types = { version = "=0.8.20", default-features = false }
 
 # members
 motsu = { path = "crates/motsu" }
-motsu-proc = { path = "crates/motsu-proc", version = "0.4.0" }
+motsu-proc = { path = "crates/motsu-proc", version = "0.5.0" }
 
 [profile.release]
 codegen-units = 1

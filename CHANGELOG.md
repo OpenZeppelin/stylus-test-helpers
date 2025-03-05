@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed (Breaking)
+
+## [0.5.0] - 2025-03-05
+
+### Added
+
 - Event assertions `Contract::emitted` and `Contract::assert_emitted` #34
 
 ### Changed (Breaking)
 
+- Bump Stylus SDK to v0.8.1 #46
 
 ## [0.4.0] - 2025-02-11
 

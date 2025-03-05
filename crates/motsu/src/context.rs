@@ -14,7 +14,12 @@ use alloy_primitives::{Address, Bytes, LogData, B256, U256};
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
-use stylus_sdk::{keccak_const::Keccak256, prelude::StorageType, ArbResult};
+use stylus_sdk::{
+    keccak_const::Keccak256,
+    host::{WasmVM, VM},
+    prelude::StorageType,
+    ArbResult,
+};
 
 use crate::{
     revert::Backuped,
@@ -816,7 +821,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
 /// `0` offset.
 pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
-    unsafe { ST::new(U256::ZERO, 0) }
+    unsafe { ST::new(U256::ZERO, 0, VM { host: Box::new(WasmVM {}) }) }
 }
 
 /// Account used to call contracts.
