@@ -15,8 +15,8 @@ use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
-    keccak_const::Keccak256,
     host::{WasmVM, VM},
+    keccak_const::Keccak256,
     prelude::StorageType,
     ArbResult,
 };
