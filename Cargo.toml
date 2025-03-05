@@ -38,7 +38,7 @@ alloy-sol-types = { version = "=0.8.20", default-features = false }
 
 # members
 motsu = { path = "crates/motsu" }
-motsu-proc = { path = "crates/motsu-proc", version = "0.4.0" }
+motsu-proc = { path = "crates/motsu-proc", version = ">=0.4.0, <=0.5.0" }
 
 [profile.release]
 codegen-units = 1
