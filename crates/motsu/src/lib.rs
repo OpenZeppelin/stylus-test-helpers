@@ -145,6 +145,7 @@
 //! have a default `hostio-caching` feature enabled.
 //!
 //! [test_attribute]: crate::test
+#![allow(deprecated)]
 #[cfg(test)]
 extern crate alloc;
 
