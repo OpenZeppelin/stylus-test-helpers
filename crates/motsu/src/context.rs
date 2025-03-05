@@ -16,11 +16,13 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     host::{WasmVM, VM},
+    keccak_const::Keccak256,
     prelude::StorageType,
     ArbResult,
 };
 
 use crate::{
+    revert::Backuped,
     router::{VMRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
@@ -251,6 +253,13 @@ impl VMContext {
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
+        // We should do backup before transferring value, to have balances
+        // reverted in case of failure.
+        let storage = self.storage();
+        let contract_data = storage.contracts.clone_data();
+        let balances = storage.balances.clone_data();
+        drop(storage);
+
         // Transfer value sent by message sender.
         self.transfer_value();
 
@@ -261,6 +270,14 @@ impl VMContext {
             .unwrap_or_else(|| {
                 panic!("selector not found - selector is {selector}")
             });
+
+        // If the call was unsuccessful, we should restore the data.
+        if result.is_err() {
+            // Recover from backups.
+            let mut storage = self.storage();
+            storage.contracts.restore_from(contract_data);
+            storage.balances.restore_from(balances);
+        }
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -391,7 +408,7 @@ impl VMContext {
     }
 
     /// Transfer value from the message sender to the contract.
-    /// No-op if `msg_sender` or `contract_address` weren't set.
+    /// No-op if `msg_sender`, `contract_address` or `msg_value` weren't set.
     ///
     /// # Panics
     ///
@@ -404,15 +421,15 @@ impl VMContext {
         let Some(contract_address) = storage.contract_address else {
             return;
         };
+        let Some(msg_value) = storage.msg_value else {
+            return;
+        };
 
-        // We should transfer the value only if it is set.
-        if let Some(msg_value) = storage.msg_value {
-            // Drop storage to avoid a panic on lock.
-            drop(storage);
+        // Drop storage to avoid a panic on lock.
+        drop(storage);
 
-            // Transfer and panic if there is not enough funds.
-            self.transfer(msg_sender, contract_address, msg_value);
-        }
+        // Transfer and panic if there is not enough funds.
+        self.transfer(msg_sender, contract_address, msg_value);
     }
 
     /// Transfer `value` from `from` account to `to` account.
@@ -421,6 +438,10 @@ impl VMContext {
     ///
     /// * If there is not enough funds to transfer.
     fn transfer(self, from: Address, to: Address, value: U256) {
+        if value.is_zero() {
+            return;
+        }
+
         // Transfer and panic if there is not enough funds.
         self.checked_transfer(from, to, value)
             .unwrap_or_else(|| panic!("{from} account should have enough funds to transfer {value} value"));
@@ -465,6 +486,48 @@ impl VMContext {
             .entry(address)
             .and_modify(|v| *v += value)
             .or_insert(value)
+    }
+
+    /// Reset persistent data backup.
+    /// Used when transaction was successful.
+    pub(crate) fn reset_backup(self) {
+        let mut storage = self.storage();
+        storage.contracts.reset_backup();
+        storage.balances.reset_backup();
+    }
+
+    /// Restore persistent data from backup.
+    /// Used when transaction failed.
+    pub(crate) fn restore_from_backup(self) {
+        let mut storage = self.storage();
+        storage.contracts.restore_from_backup();
+        storage.balances.restore_from_backup();
+    }
+
+    /// Create a backup of the storage.
+    /// Used when transaction starts.
+    fn create_backup(self) {
+        let mut storage = self.storage();
+        storage.contracts.create_backup();
+        storage.balances.create_backup();
+    }
+
+    /// Set string `tag` for `address`.
+    fn set_tag(self, address: Address, tag: String) {
+        MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
+    }
+
+    /// Replaces non-checksumed addresses in the `msg` with corresponding tags
+    /// (if any).
+    pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
+        let storage = self.storage();
+        for (address, tag) in &storage.tags {
+            // We need debug formatting, since it reveals non-checksumed
+            // address.
+            let address = format!("{address:?}");
+            msg = msg.replace(&address, tag);
+        }
+        msg
     }
 
     /// Get reference to the storage for the current test thread.
@@ -536,18 +599,20 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    /// Contract's address to [`ContractStorage`] mapping.
-    contracts: HashMap<Address, ContractStorage>,
-    /// Account's address to balance [`U256`] mapping.
-    balances: HashMap<Address, U256>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
+    /// Contract's address to [`ContractStorage`] mapping.
+    contracts: Backuped<HashMap<Address, ContractStorage>>,
+    /// Account's address to balance [`U256`] mapping.
+    balances: Backuped<HashMap<Address, U256>>,
+    /// Account's address to tag mapping.
+    tags: HashMap<Address, String>,
 }
 
 /// Contract's account storage.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct ContractStorage {
     /// Contract's byte storage
     data: ContractData,
@@ -598,6 +663,8 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        VMContext::current().create_backup();
+
         // Set parameters for call such as `msg_sender`, `contract_address`,
         // `msg_value`.
         self.set_call_params();
@@ -619,6 +686,8 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        VMContext::current().create_backup();
+
         // Set parameters for call such as `msg_sender`, `contract_address`,
         // `msg_value`.
         self.set_call_params();
@@ -739,11 +808,13 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         let panic_msg = "event was not emitted";
         let matching_events = context.matching_events_for::<E>(&self.address);
 
-        if matching_events.is_empty() {
-            panic!("{panic_msg}, no matching events found")
+        let panic_msg = if matching_events.is_empty() {
+            format!("{panic_msg}, no matching events found")
         } else {
-            panic!("{panic_msg}, matching events: {matching_events:?}")
-        }
+            format!("{panic_msg}, matching events: {matching_events:?}")
+        };
+        let panic_msg = context.replace_with_tags(panic_msg);
+        panic!("{}", panic_msg);
     }
 }
 
@@ -821,5 +892,32 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 
     fn balance(&self) -> U256 {
         self.address().balance()
+    }
+}
+
+/// Deterministically derive from a string representation.
+pub trait DeriveFromTag {
+    /// Deterministically derive inner address of `Self` from a string `tag`.
+    fn from_tag(tag: &str) -> Self;
+}
+
+impl DeriveFromTag for Address {
+    fn from_tag(tag: &str) -> Self {
+        let hash = Keccak256::new().update(tag.as_bytes()).finalize();
+        let address = Address::from_slice(&hash[..20]);
+        VMContext::current().set_tag(address, tag.to_string());
+        address
+    }
+}
+
+impl DeriveFromTag for Account {
+    fn from_tag(tag: &str) -> Self {
+        Account::new_at(Address::from_tag(tag))
+    }
+}
+
+impl<ST: StorageType + VMRouter + 'static> DeriveFromTag for Contract<ST> {
+    fn from_tag(tag: &str) -> Self {
+        Contract::new_at(Address::from_tag(tag))
     }
 }
