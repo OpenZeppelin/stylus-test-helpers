@@ -26,14 +26,14 @@ Add motsu to your project's dependencies:
 motsu = "0.4.0"
 
 [dependencies]
-stylus-sdk = { version = "0.7.0", default-features = false, features = [
+stylus-sdk = { version = "0.8.1", default-features = false, features = [
   "mini-alloc",
 ] }
 ```
 
 Important: When using motsu, the stylus-sdk must be configured without
 the default `hostio-caching` feature to prevent conflicts.
-E.g., you can use `stylus-sdk` with `mini-alloc` feature 
+E.g., you can use `stylus-sdk` with `mini-alloc` feature
 without including defaults as shown above.
 
 ## Contribute
