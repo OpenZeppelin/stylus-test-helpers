@@ -2,9 +2,13 @@
 //! default.
 //!
 //! To revert a transaction in case of an error result, you should call one of
-//! the following functions: [`ResultExt::motsu_unwrap`],
-//! [`ResultExt::motsu_unwrap_err`], [`ResultExt::motsu_expect`],
-//! [`ResultExt::motsu_expect_err`] or [`ResultExt::motsu_res`].
+//! the following functions:
+//!
+//! - [`ResultExt::motsu_unwrap`]
+//! - [`ResultExt::motsu_unwrap_err`]
+//! - [`ResultExt::motsu_expect`]
+//! - [`ResultExt::motsu_expect_err`]
+//! - [`ResultExt::motsu_res`]
 
 use core::fmt;
 use std::ops::{Deref, DerefMut};
@@ -20,7 +24,7 @@ pub trait ResultExt<T, E: fmt::Debug> {
     ///
     /// # Panics
     ///
-    /// * if the value is `Err`, with a panic message including call metadata.
+    /// * If the value is `Err`, with a panic message including call metadata.
     fn motsu_unwrap(self) -> T;
 
     /// Returns contained `Err` value, consuming the `self` value and reverts
@@ -28,14 +32,14 @@ pub trait ResultExt<T, E: fmt::Debug> {
     ///
     /// # Panics
     ///
-    /// * if the value is `Ok`, with a panic message including call metadata.
+    /// * If the value is `Ok`, with a panic message including call metadata.
     fn motsu_unwrap_err(self) -> E;
 
     /// Returns contained `Ok` value, consuming the `self` value.
     ///
     /// # Panics
     ///
-    /// * if the value is `Err`, with a panic message including custom `msg` and
+    /// * If the value is `Err`, with a panic message including custom `msg` and
     ///   call metadata.
     fn motsu_expect(self, msg: &str) -> T;
 
@@ -43,12 +47,13 @@ pub trait ResultExt<T, E: fmt::Debug> {
     /// transaction.
     ///
     /// # Panics
-    /// * if the value is `Ok`, with a panic message including custom `msg` and
+    ///
+    /// * If the value is `Ok`, with a panic message including custom `msg` and
     ///   call metadata.
     fn motsu_expect_err(self, msg: &str) -> E;
 
-    /// Returns `self` [`Result`] and reverts transaction in case of
-    /// `Err` value.
+    /// Returns `self` [`Result`] and reverts the transaction in case of `Err`
+    /// value.
     fn motsu_res(self) -> Result<T, E>;
 }
 
@@ -172,6 +177,11 @@ impl<D: Clone + Default> Backuped<D> {
 
     /// Should be used when transaction failed.
     pub(crate) fn restore_from_backup(&mut self) {
+        // "Backuped" type `T` can be a more expensive type like a `HashMap`.
+        // So instead of cloning it right after transaction, we just pass
+        // ownership to the `data` field.
+        // For the last transaction (in a test case) we will have less `clone()`
+        // invocations, therefore fewer allocations.
         self.data = self.backup.take().expect("unable revert transaction");
     }
 

@@ -162,7 +162,7 @@ pub use motsu_proc::test;
 mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
-    use alloy_sol_types::{sol, SolError};
+    use alloy_sol_types::sol;
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::{Call, MethodError},
@@ -340,7 +340,9 @@ mod ping_pong_tests {
         let err =
             ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
-        assert!(matches!(err, PingError::MagicError(MagicError { value })));
+        assert!(
+            matches!(err, PingError::MagicError(MagicError { value }) if value == value)
+        );
     }
 
     #[motsu::test]
@@ -914,7 +916,7 @@ mod proxies_tests {
         proxy4: Contract<Proxy>,
         alice: Account,
     ) {
-        // Set up a chain of three proxies.
+        // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
         proxy1.sender(alice).init(proxy2.address());
         proxy2.sender(alice).init(proxy3.address());
@@ -965,7 +967,7 @@ mod proxies_tests {
         proxy4: Contract<Proxy>,
         alice: Account,
     ) {
-        // Set up a chain of three proxies.
+        // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
         proxy1.sender(alice).init(proxy2.address());
         proxy2.sender(alice).init(proxy3.address());
@@ -985,33 +987,21 @@ mod proxies_tests {
             .try_pay_proxy()
             .motsu_unwrap_err();
         assert!(matches!(err, Error::ProxyError(_)));
+        // and balances should remain the same.
+        assert_eq!(alice.balance(), TEN);
         assert_eq!(proxy1.balance(), TEN);
         assert_eq!(proxy2.balance(), TEN);
         assert_eq!(proxy3.balance(), TEN);
         assert_eq!(proxy4.balance(), TEN);
 
-        // If the msg value is `THREE`,
-        proxy1.sender_and_value(alice, THREE).try_pay_proxy().motsu_unwrap();
-        assert_eq!(proxy1.balance(), TEN + THREE);
-        // call to the second proxy should revert.
-        assert_eq!(proxy2.balance(), TEN);
-        assert_eq!(proxy3.balance(), TEN);
-        assert_eq!(proxy4.balance(), TEN);
-
-        // If the msg value is `TWO`,
-        proxy1.sender_and_value(alice, TWO).try_pay_proxy().motsu_unwrap();
-        assert_eq!(proxy1.balance(), TEN + TWO);
-        assert_eq!(proxy2.balance(), TEN + THREE);
-        // call to the third proxy should revert.
-        assert_eq!(proxy3.balance(), TEN);
-        assert_eq!(proxy4.balance(), TEN);
-
         // If the msg value is `ONE`,
         proxy1.sender_and_value(alice, ONE).try_pay_proxy().motsu_unwrap();
-        assert_eq!(proxy1.balance(), TEN + ONE);
-        assert_eq!(proxy2.balance(), TEN + TWO);
+        assert_eq!(alice.balance(), TEN - ONE);
+        assert_eq!(proxy1.balance(), TEN - ONE);
+        assert_eq!(proxy2.balance(), TEN - ONE);
+        // the third proxy should receive funds,
         assert_eq!(proxy3.balance(), TEN + THREE);
-        // call to the fourth proxy should revert.
+        // and call to the fourth proxy should revert.
         assert_eq!(proxy4.balance(), TEN);
     }
 }

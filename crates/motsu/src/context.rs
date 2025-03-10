@@ -896,12 +896,12 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 }
 
 /// Deterministically derive from a string representation.
-pub trait DeriveFromTag {
+pub trait FromTag {
     /// Deterministically derive inner address of `Self` from a string `tag`.
     fn from_tag(tag: &str) -> Self;
 }
 
-impl DeriveFromTag for Address {
+impl FromTag for Address {
     fn from_tag(tag: &str) -> Self {
         let hash = Keccak256::new().update(tag.as_bytes()).finalize();
         let address = Address::from_slice(&hash[..20]);
@@ -910,13 +910,13 @@ impl DeriveFromTag for Address {
     }
 }
 
-impl DeriveFromTag for Account {
+impl FromTag for Account {
     fn from_tag(tag: &str) -> Self {
         Account::new_at(Address::from_tag(tag))
     }
 }
 
-impl<ST: StorageType + VMRouter + 'static> DeriveFromTag for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
     fn from_tag(tag: &str) -> Self {
         Contract::new_at(Address::from_tag(tag))
     }
