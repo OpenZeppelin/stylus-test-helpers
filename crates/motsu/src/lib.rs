@@ -987,7 +987,7 @@ mod proxies_tests {
             .try_pay_proxy()
             .motsu_unwrap_err();
         assert!(matches!(err, Error::ProxyError(_)));
-        // and balances should remain the same.
+        // Balances should remain the same.
         assert_eq!(alice.balance(), TEN);
         assert_eq!(proxy1.balance(), TEN);
         assert_eq!(proxy2.balance(), TEN);

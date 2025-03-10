@@ -142,6 +142,7 @@ impl VMContext {
     }
 }
 
+// TODO#q: move to context.rs
 /// A wrapper that allows to back up and restore data.
 /// Used for transaction revert.
 #[derive(Default)]
@@ -165,16 +166,19 @@ impl<D: Clone + Default> DerefMut for Backuped<D> {
 }
 
 impl<D: Clone + Default> Backuped<D> {
+    /// Return data for backup.
     /// Should be used before starting external call between contracts.
-    pub(crate) fn clone_data(&self) -> D {
+    pub(crate) fn backup_into(&self) -> D {
         self.data.clone()
     }
 
+    /// Remove backup data.
     /// Should be used when transaction was successful.
     pub(crate) fn reset_backup(&mut self) {
         _ = self.backup.take();
     }
 
+    /// Restore data from backup removing backup.
     /// Should be used when transaction failed.
     pub(crate) fn restore_from_backup(&mut self) {
         // "Backuped" type `T` can be a more expensive type like a `HashMap`.
@@ -185,14 +189,16 @@ impl<D: Clone + Default> Backuped<D> {
         self.data = self.backup.take().expect("unable revert transaction");
     }
 
+    /// Restore data from provided `backup`.
     /// Should be used when external call between contracts failed, to restore
     /// from `backup` persisted on the callstack.
     pub(crate) fn restore_from(&mut self, backup: D) {
         self.data = backup;
     }
 
+    /// Backup data inside `self`.
     /// Should be used when we start a new transaction.
-    pub(crate) fn create_backup(&mut self) {
-        let _ = self.backup.insert(self.data.clone());
+    pub(crate) fn backup(&mut self) {
+        let _ = self.backup.insert(self.backup_into());
     }
 }
