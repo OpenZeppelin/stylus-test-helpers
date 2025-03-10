@@ -11,7 +11,6 @@
 //! - [`ResultExt::motsu_res`]
 
 use core::fmt;
-use std::ops::{Deref, DerefMut};
 
 use crate::context::VMContext;
 
@@ -139,66 +138,5 @@ impl VMContext {
         let panic_msg = format!("account {msg_sender:?} failed to call {contract_address:?}: {err:?}");
 
         self.replace_with_tags(panic_msg)
-    }
-}
-
-// TODO#q: move to context.rs
-/// A wrapper that allows to back up and restore data.
-/// Used for transaction revert.
-#[derive(Default)]
-pub(crate) struct Backuped<D: Clone + Default> {
-    data: D,
-    backup: Option<D>,
-}
-
-impl<D: Clone + Default> Deref for Backuped<D> {
-    type Target = D;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<D: Clone + Default> DerefMut for Backuped<D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
-
-impl<D: Clone + Default> Backuped<D> {
-    /// Return data for backup.
-    /// Should be used before starting external call between contracts.
-    pub(crate) fn backup_into(&self) -> D {
-        self.data.clone()
-    }
-
-    /// Remove backup data.
-    /// Should be used when transaction was successful.
-    pub(crate) fn reset_backup(&mut self) {
-        _ = self.backup.take();
-    }
-
-    /// Restore data from backup removing backup.
-    /// Should be used when transaction failed.
-    pub(crate) fn restore_from_backup(&mut self) {
-        // "Backuped" type `T` can be a more expensive type like a `HashMap`.
-        // So instead of cloning it right after transaction, we just pass
-        // ownership to the `data` field.
-        // For the last transaction (in a test case) we will have less `clone()`
-        // invocations, therefore fewer allocations.
-        self.data = self.backup.take().expect("unable revert transaction");
-    }
-
-    /// Restore data from provided `backup`.
-    /// Should be used when external call between contracts failed, to restore
-    /// from `backup` persisted on the callstack.
-    pub(crate) fn restore_from(&mut self, backup: D) {
-        self.data = backup;
-    }
-
-    /// Backup data inside `self`.
-    /// Should be used when we start a new transaction.
-    pub(crate) fn backup(&mut self) {
-        let _ = self.backup.insert(self.backup_into());
     }
 }

@@ -22,7 +22,6 @@ use stylus_sdk::{
 };
 
 use crate::{
-    revert::Backuped,
     router::{VMRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
@@ -631,6 +630,66 @@ struct ContractStorage {
 type ContractData = HashMap<Bytes32, Bytes32>;
 pub(crate) const WORD_BYTES: usize = 32;
 pub(crate) type Bytes32 = [u8; WORD_BYTES];
+
+/// A wrapper that allows to back up and restore data.
+/// Used for transaction revert.
+#[derive(Default)]
+struct Backuped<D: Clone + Default> {
+    data: D,
+    backup: Option<D>,
+}
+
+impl<D: Clone + Default> Deref for Backuped<D> {
+    type Target = D;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<D: Clone + Default> DerefMut for Backuped<D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl<D: Clone + Default> Backuped<D> {
+    /// Return data for backup.
+    /// Should be used before starting external call between contracts.
+    fn backup_into(&self) -> D {
+        self.data.clone()
+    }
+
+    /// Remove backup data.
+    /// Should be used when transaction was successful.
+    fn reset_backup(&mut self) {
+        _ = self.backup.take();
+    }
+
+    /// Restore data from backup removing backup.
+    /// Should be used when transaction failed.
+    fn restore_from_backup(&mut self) {
+        // "Backuped" type `T` can be a more expensive type like a `HashMap`.
+        // So instead of cloning it right after transaction, we just pass
+        // ownership to the `data` field.
+        // For the last transaction (in a test case) we will have less `clone()`
+        // invocations, therefore fewer allocations.
+        self.data = self.backup.take().expect("unable revert transaction");
+    }
+
+    /// Restore data from provided `backup`.
+    /// Should be used when external call between contracts failed, to restore
+    /// from `backup` persisted on the callstack.
+    fn restore_from(&mut self, backup: D) {
+        self.data = backup;
+    }
+
+    /// Backup data inside `self`.
+    /// Should be used when we start a new transaction.
+    fn backup(&mut self) {
+        let _ = self.backup.insert(self.backup_into());
+    }
+}
 
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
