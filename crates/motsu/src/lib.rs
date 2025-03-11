@@ -759,19 +759,20 @@ mod proxies_tests {
 ///
 /// #[motsu::test]
 /// fn test_chain_id() {
-///     // Default chain ID is 1 (Ethereum mainnet)
-///     assert_eq!(chain_id(), U256::from(1));
+///     // Default chain ID is 42161 (Arbitrum Nova)
+///     assert_eq!(chain_id(), U256::from(42161));
 ///
 ///     // Set chain ID to 11155111 (Sepolia testnet)
 ///     set_chain_id(U256::from(11155111));
 ///     assert_eq!(chain_id(), U256::from(11155111));
 /// }
+/// ```
 #[must_use]
 pub fn chain_id() -> U256 {
     crate::context::VMContext::current().chain_id()
 }
 
-/// Set the chain ID and return the previous value.
+/// Set the chain ID.
 ///
 /// # Examples
 ///
@@ -781,16 +782,14 @@ pub fn chain_id() -> U256 {
 ///
 /// #[motsu::test]
 /// fn test_set_chain_id() {
-///     // Default chain ID is 1 (Ethereum mainnet)
-///     assert_eq!(chain_id(), U256::from(1));
+///     // Default chain ID is 42161 (Arbitrum Nova)
+///     assert_eq!(chain_id(), U256::from(42161));
 ///
 ///     // Set chain ID to 11155111 (Sepolia testnet)
-///     let previous = set_chain_id(U256::from(11155111));
-///     assert_eq!(previous, U256::from(1));
+///     set_chain_id(U256::from(11155111));
 ///     assert_eq!(chain_id(), U256::from(11155111));
 /// }
 /// ```
-#[must_use]
-pub fn set_chain_id(chain_id: U256) -> U256 {
+pub fn set_chain_id(chain_id: U256) {
     crate::context::VMContext::current().set_chain_id(chain_id)
 }
