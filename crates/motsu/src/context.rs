@@ -301,7 +301,7 @@ impl VMContext {
     ) -> usize {
         let data = self.return_data();
         ptr::copy(data.as_ptr(), dest, size);
-        data.len()
+        data.len().min(size)
     }
 
     /// Return data's size in bytes from the last contract call.
