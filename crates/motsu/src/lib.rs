@@ -172,6 +172,7 @@ mod ping_pong_tests {
     };
 
     use crate::context::{Account, Contract};
+    use crate::{chain_id, set_chain_id};
 
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);
@@ -473,6 +474,24 @@ mod ping_pong_tests {
         assert!(
             !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
         );
+    }
+
+    // Test for chain_id functionality
+    #[motsu::test]
+    fn chain_id_functions(
+        _ping: Contract<PingContract>,
+        _alice: Account,
+    ) {
+        // Default chain ID is 42161 (Arbitrum Nova)
+        assert_eq!(chain_id(), U256::from(42161));
+
+        // Set chain ID to 11155111 (Sepolia testnet)
+        set_chain_id(U256::from(11155111));
+        assert_eq!(chain_id(), U256::from(11155111));
+
+        // Set it back to the original value
+        set_chain_id(U256::from(42161));
+        assert_eq!(chain_id(), U256::from(42161));
     }
 
     // TODO: add panic assertions for emitted events
