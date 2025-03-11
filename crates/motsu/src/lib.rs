@@ -353,7 +353,7 @@ mod ping_pong_tests {
         alice: Account,
     ) {
         let value = MAGIC_ERROR_VALUE;
-        _ = ping.sender(alice).ping(pong.address(), value).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), value).motsu_unwrap();
     }
 
     #[motsu::test]
@@ -376,7 +376,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
 
-        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
         assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
@@ -400,7 +400,7 @@ mod ping_pong_tests {
         assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
 
-        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         assert_eq!(ping.sender(alice).contract_address.get(), ping.address());
         assert_eq!(pong.sender(alice).contract_address.get(), pong.address());
@@ -423,7 +423,7 @@ mod ping_pong_tests {
 
         // Here `alice` calls `ping` contract and should implicitly change
         // `pong.contract_address`.
-        _ = alice_ping.ping(pong.address(), TEN).motsu_unwrap();
+        alice_ping.ping(pong.address(), TEN).motsu_unwrap();
 
         // And we will check that we're not reading cached `Address::ZERO`
         // value, but the actual one.
@@ -475,7 +475,7 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Assert emitted events.
         ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
@@ -501,7 +501,7 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Account,
     ) {
-        _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Check panic assertion.
         let wrong_from = ping.address();
@@ -518,7 +518,7 @@ mod ping_pong_tests {
         alice: Account,
     ) {
         let value = MAGIC_ERROR_VALUE;
-        _ = ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
+        ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
         // Both events should not be emitted after revert.
         assert!(!ping.emitted(&Pinged { from: alice.address(), value }));
