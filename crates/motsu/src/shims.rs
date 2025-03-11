@@ -146,7 +146,7 @@ unsafe extern "C" fn contract_address(address: *mut u8) {
 /// [`CHAINID`]: https://www.evm.codes/#46
 #[no_mangle]
 unsafe extern "C" fn chainid() -> u64 {
-    CHAIN_ID
+    VMContext::current().chain_id().to::<u64>()
 }
 
 /// Emits an EVM log with the given number of topics and data, the first bytes
