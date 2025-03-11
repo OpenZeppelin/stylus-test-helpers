@@ -746,6 +746,20 @@ mod proxies_tests {
 
             result
         }
+
+        fn received_value(&self) -> U256 {
+            self.received_value.get()
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn replace_received_value(
+            &mut self,
+            value: U256,
+        ) -> Result<U256, Vec<u8>> {
+            let previous = self.received_value();
+            self.received_value.set(value);
+            Ok(previous)
+        }
     }
 
     impl Proxy {
@@ -910,7 +924,53 @@ mod proxies_tests {
     }
 
     #[motsu::test]
-    fn try_call_and_revert(
+    fn try_call_and_revert_to_previous_state(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        proxy4: Contract<Proxy>,
+        alice: Account,
+    ) {
+        // Set up a chain of four proxies.
+        // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
+        proxy1.sender(alice).init(proxy2.address());
+        proxy2.sender(alice).init(proxy3.address());
+        proxy3.sender(alice).init(proxy4.address());
+        proxy4.sender(alice).init(Address::ZERO);
+
+        // Try to replace received value and process result with `motsu_res()`
+        _ = proxy1.sender(alice).replace_received_value(ONE).motsu_res();
+        _ = proxy2.sender(alice).replace_received_value(TWO).motsu_res();
+        _ = proxy3.sender(alice).replace_received_value(THREE).motsu_res();
+        _ = proxy4.sender(alice).replace_received_value(FOUR).motsu_res();
+
+        // If the argument is `FOUR`, the call should revert fully.
+        let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
+        assert!(matches!(err, Error::ProxyError(_)));
+        // And the state should be as before failed transaction.
+        assert_eq!(proxy1.sender(alice).received_value(), ONE);
+        assert_eq!(proxy2.sender(alice).received_value(), TWO);
+        assert_eq!(proxy3.sender(alice).received_value(), THREE);
+        assert_eq!(proxy4.sender(alice).received_value(), FOUR);
+
+        // Try to replace received value and do not process the result.
+        _ = proxy1.sender(alice).replace_received_value(TEN);
+        _ = proxy2.sender(alice).replace_received_value(TEN);
+        _ = proxy3.sender(alice).replace_received_value(TEN);
+        _ = proxy4.sender(alice).replace_received_value(TEN);
+
+        // If the argument is `FOUR`, the call should revert fully.
+        let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
+        assert!(matches!(err, Error::ProxyError(_)));
+        // And the state should be as before failed transaction.
+        assert_eq!(proxy1.sender(alice).received_value(), TEN);
+        assert_eq!(proxy2.sender(alice).received_value(), TEN);
+        assert_eq!(proxy3.sender(alice).received_value(), TEN);
+        assert_eq!(proxy4.sender(alice).received_value(), TEN);
+    }
+
+    #[motsu::test]
+    fn try_call_and_revert_partially(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -927,41 +987,41 @@ mod proxies_tests {
         // If the argument is `FOUR`, the call should revert fully.
         let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
         assert!(matches!(err, Error::ProxyError(_)));
-        assert_eq!(proxy1.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy1.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy2.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value(), U256::ZERO);
 
         // If the argument is `THREE`,
         let result = proxy1.sender(alice).try_call_proxy(THREE).motsu_unwrap();
         assert_eq!(result, FOUR);
-        assert_eq!(proxy1.sender(alice).received_value.get(), THREE);
+        assert_eq!(proxy1.sender(alice).received_value(), THREE);
         // call to the second proxy should revert.
-        assert_eq!(proxy2.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy2.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value(), U256::ZERO);
 
         // If the argument is `TWO`,
         let result = proxy1.sender(alice).try_call_proxy(TWO).motsu_unwrap();
         assert_eq!(result, FOUR);
-        assert_eq!(proxy1.sender(alice).received_value.get(), TWO);
-        assert_eq!(proxy2.sender(alice).received_value.get(), THREE);
+        assert_eq!(proxy1.sender(alice).received_value(), TWO);
+        assert_eq!(proxy2.sender(alice).received_value(), THREE);
         // call to the third proxy should revert.
-        assert_eq!(proxy3.sender(alice).received_value.get(), U256::ZERO);
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy3.sender(alice).received_value(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value(), U256::ZERO);
 
         // If the argument is `ONE`,
         let result = proxy1.sender(alice).try_call_proxy(ONE).motsu_unwrap();
         assert_eq!(result, FOUR);
-        assert_eq!(proxy1.sender(alice).received_value.get(), ONE);
-        assert_eq!(proxy2.sender(alice).received_value.get(), TWO);
-        assert_eq!(proxy3.sender(alice).received_value.get(), THREE);
+        assert_eq!(proxy1.sender(alice).received_value(), ONE);
+        assert_eq!(proxy2.sender(alice).received_value(), TWO);
+        assert_eq!(proxy3.sender(alice).received_value(), THREE);
         // call to the fourth proxy should revert.
-        assert_eq!(proxy4.sender(alice).received_value.get(), U256::ZERO);
+        assert_eq!(proxy4.sender(alice).received_value(), U256::ZERO);
     }
 
     #[motsu::test]
-    fn try_pay_and_revert(
+    fn try_pay_and_revert_partially(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
