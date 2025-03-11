@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added ability to get and set the Chain ID in tests via new `chain_id()` and `set_chain_id()` functions #66
+- Added ability to get and set the Chain ID in tests via new `chain_id()` and `set_chain_id()` functions #67
 
 ### Changed (Breaking)
 
