@@ -33,6 +33,8 @@ mod tests {
 }
 ```
 
+### Sender and Value
+
 Function `Contract::sender()` is necessary to trigger call
 to a contract, and should accept an `Account` or `Address` as an argument.
 
@@ -65,9 +67,11 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
 }
 ```
 
+### External Calls
+
 Multiple external calls are supported in Motsu.
 Assuming `Proxy` is a contract that exposes (`#[public]`) function `call_proxy`,
-where it adds `one` to the passed argument and calls next `Proxy` contract 
+where it adds `one` to the passed argument and calls next `Proxy` contract
 at the address provided during initialization.
 The following test case can emulate a call chain of three `Proxy` contracts:
 
@@ -98,10 +102,38 @@ fn call_three_proxies(
 }
 ```
 
-It is possible to check emitted events by specific contract with 
+### Checking Events
+
+It is possible to check emitted events by specific contract with
 `Contract::emitted` method.
-And assert with `Contract::assert_emitted` that will print all matching 
+And assert with `Contract::assert_emitted` that will print all matching
 events in case of failed assertion.
+
+### Transaction Revert
+
+To revert a transaction in case of `Result::Err`, you should call one of
+the following functions:
+
+- `ResultExt::motsu_unwrap`
+- `ResultExt::motsu_unwrap_err`
+- `ResultExt::motsu_expect`
+- `ResultExt::motsu_expect_err`
+- `ResultExt::motsu_res`
+
+```rust, ignore
+const FOUR: U256 = uint!(4_U256);
+
+// If the argument is `FOUR`, the call should revert.
+let err = proxy.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
+assert!(matches!(err, Error::ProxyError(_)));
+```
+
+Otherwise, the state of the contract including persistent storage, balances
+and emitted events won't be reverted in case of `Result::Err`.
+
+Panics in contract code are not handled as a revert and will fail the test.
+
+### Notes
 
 Annotating a test function that accepts no parameters will make
 `#[motsu::test]` behave the same as `#[test]`.
