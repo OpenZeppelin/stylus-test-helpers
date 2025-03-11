@@ -476,6 +476,19 @@ impl VMContext {
     fn router(self, address: Address) -> VMRouterContext {
         VMRouterContext::new(self.thread_id, address)
     }
+
+    /// Get the current chain ID.
+    pub(crate) fn chain_id(self) -> U256 {
+        self.storage().chain_id
+    }
+
+    /// Set the chain ID and return the previous value.
+    pub(crate) fn set_chain_id(self, chain_id: U256) -> U256 {
+        let mut storage = self.storage();
+        let previous = storage.chain_id;
+        storage.chain_id = chain_id;
+        previous
+    }
 }
 
 /// Read the word from location pointed by `ptr`.
@@ -528,7 +541,6 @@ unsafe fn decode_calldata(
 }
 
 /// Main storage for Motsu test VM.
-#[derive(Default)]
 struct VMContextStorage {
     /// Address of the message sender.
     msg_sender: Option<Address>,
@@ -544,6 +556,25 @@ struct VMContextStorage {
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
+    /// Chain ID of the current network.
+    chain_id: U256,
+}
+
+// Custom implementation of Default for VMContextStorage to initialize chain_id
+impl Default for VMContextStorage {
+    fn default() -> Self {
+        Self {
+            msg_sender: None,
+            msg_value: None,
+            contract_address: None,
+            contracts: HashMap::new(),
+            balances: HashMap::new(),
+            return_data: None,
+            return_data_size: None,
+            // Default to Ethereum mainnet chain ID (1)
+            chain_id: U256::from(1),
+        }
+    }
 }
 
 /// Contract's account storage.

@@ -155,6 +155,7 @@ mod router;
 mod shims;
 mod storage_access;
 pub use motsu_proc::test;
+use stylus_sdk::alloy_primitives::U256;
 
 #[cfg(test)]
 mod ping_pong_tests {
@@ -746,4 +747,50 @@ mod proxies_tests {
             assert_eq!(result, TEN + ONE + ONE + ONE);
         }
     }
+}
+
+/// Get the current chain ID.
+///
+/// # Examples
+///
+/// ```rust
+/// use motsu::prelude::*;
+/// use alloy_primitives::U256;
+///
+/// #[motsu::test]
+/// fn test_chain_id() {
+///     // Default chain ID is 1 (Ethereum mainnet)
+///     assert_eq!(chain_id(), U256::from(1));
+///
+///     // Set chain ID to 11155111 (Sepolia testnet)
+///     set_chain_id(U256::from(11155111));
+///     assert_eq!(chain_id(), U256::from(11155111));
+/// }
+#[must_use]
+pub fn chain_id() -> U256 {
+    crate::context::VMContext::current().chain_id()
+}
+
+/// Set the chain ID and return the previous value.
+///
+/// # Examples
+///
+/// ```rust
+/// use motsu::prelude::*;
+/// use alloy_primitives::U256;
+///
+/// #[motsu::test]
+/// fn test_set_chain_id() {
+///     // Default chain ID is 1 (Ethereum mainnet)
+///     assert_eq!(chain_id(), U256::from(1));
+///
+///     // Set chain ID to 11155111 (Sepolia testnet)
+///     let previous = set_chain_id(U256::from(11155111));
+///     assert_eq!(previous, U256::from(1));
+///     assert_eq!(chain_id(), U256::from(11155111));
+/// }
+/// ```
+#[must_use]
+pub fn set_chain_id(chain_id: U256) -> U256 {
+    crate::context::VMContext::current().set_chain_id(chain_id)
 }
