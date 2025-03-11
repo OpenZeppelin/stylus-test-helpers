@@ -504,7 +504,8 @@ mod ping_pong_tests {
         _ = ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Check panic assertion.
-        ping.assert_emitted(&Pinged { from: ping.address(), value: TEN });
+        let wrong_from = ping.address();
+        ping.assert_emitted(&Pinged { from: wrong_from, value: TEN });
     }
 
     #[motsu::test]
@@ -521,7 +522,7 @@ mod ping_pong_tests {
 
         // Both events should not be emitted after revert.
         assert!(!ping.emitted(&Pinged { from: alice.address(), value }));
-        assert!(!ping.emitted(&Ponged { from: ping.address(), value }));
+        assert!(!pong.emitted(&Ponged { from: ping.address(), value }));
 
         // Check panic assertion.
         ping.assert_emitted(&Pinged { from: alice.address(), value });
