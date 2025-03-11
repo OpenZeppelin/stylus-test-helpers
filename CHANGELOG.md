@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed (Breaking)
+
+## [0.6.0] - 2025-03-11
+
+### Added
+
 - Fixed bug with invalid size of return data from external call #68
 - No randomness in address generation anymore.
   Addresses will be derived from a string representation of the argument name #62
