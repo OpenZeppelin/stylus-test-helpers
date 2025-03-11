@@ -30,6 +30,8 @@
 //! }
 //! ```
 //!
+//! ### Sender and Value
+//!
 //! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
 //! to a contract, and should accept an [`crate::prelude::Account`] or an
 //! [`stylus_sdk::alloy_primitives::Address`] as an argument.
@@ -63,6 +65,8 @@
 //!     assert_eq!(proxy.balance(), one);
 //!  }
 //! ```
+//!
+//! ### External Calls
 //!
 //! Multiple external calls are supported in Motsu.
 //! Assuming `Proxy` is a contract that exposes `#[public]` function
@@ -98,10 +102,38 @@
 //!  }
 //! ```
 //!
+//! ### Checking Events
+//!
 //! It is possible to check emitted events by specific contract with
 //! [`crate::prelude::Contract::emitted`] method. And assert with
 //! [`crate::prelude::Contract::assert_emitted`] that will print all matching
 //! events in case of failed assertion.
+//!
+//! ### Transaction Revert
+//!
+//! To revert a transaction in case of [`Result::Err`], you should call one of
+//! the following functions:
+//!
+//! - [`crate::revert::ResultExt::motsu_unwrap`]
+//! - [`crate::revert::ResultExt::motsu_unwrap_err`]
+//! - [`crate::revert::ResultExt::motsu_expect`]
+//! - [`crate::revert::ResultExt::motsu_expect_err`]
+//! - [`crate::revert::ResultExt::motsu_res`]
+//!
+//! ```rust, ignore
+//! const FOUR: U256 = uint!(4_U256);
+//!
+//! // If the argument is `FOUR`, the call should revert.
+//! let err = proxy.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
+//! assert!(matches!(err, Error::ProxyError(_)));
+//! ```
+//!
+//! Otherwise, the state of the contract including persistent storage, balances
+//! and emitted events won't be reverted in case of [`Result::Err`].
+//!
+//! Panics in contract code are not handled as a revert and will fail the test.
+//!
+//! ### Notes
 //!
 //! Annotating a test function that accepts no parameters will make
 //! [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.

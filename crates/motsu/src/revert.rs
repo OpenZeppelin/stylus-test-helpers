@@ -1,7 +1,7 @@
 //! This module contains transaction revert logic, and it is not triggered by
 //! default.
 //!
-//! To revert a transaction in case of an error result, you should call one of
+//! To revert a transaction in case of [`Result::Err`], you should call one of
 //! the following functions:
 //!
 //! - [`ResultExt::motsu_unwrap`]
