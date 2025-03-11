@@ -478,16 +478,14 @@ impl VMContext {
     }
 
     /// Get the current chain ID.
-    pub(crate) fn chain_id(self) -> U256 {
+    pub fn chain_id(self) -> U256 {
         self.storage().chain_id
     }
 
-    /// Set the chain ID and return the previous value.
-    pub(crate) fn set_chain_id(self, chain_id: U256) -> U256 {
+    /// Set the chain ID.
+    pub fn set_chain_id(self, chain_id: U256) {
         let mut storage = self.storage();
-        let previous = storage.chain_id;
         storage.chain_id = chain_id;
-        previous
     }
 }
 
@@ -560,7 +558,6 @@ struct VMContextStorage {
     chain_id: U256,
 }
 
-// Custom implementation of Default for VMContextStorage to initialize chain_id
 impl Default for VMContextStorage {
     fn default() -> Self {
         Self {
@@ -571,8 +568,7 @@ impl Default for VMContextStorage {
             balances: HashMap::new(),
             return_data: None,
             return_data_size: None,
-            // Default to Ethereum mainnet chain ID (1)
-            chain_id: U256::from(1),
+            chain_id: U256::from(42161), // Arbitrum Nova chain ID
         }
     }
 }
