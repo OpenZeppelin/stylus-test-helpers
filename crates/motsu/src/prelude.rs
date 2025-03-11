@@ -1,6 +1,6 @@
 //! Common imports for `motsu` tests.
 pub use crate::{
-    chain_id,
-    context::{Account, Contract, ContractCall, Funding, VMContext},
+    context::{Account, Contract, ContractCall, FromTag, Funding, VMContext},
+    revert::ResultExt,
     set_chain_id,
 };

@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
+## [0.6.0] - 2025-03-11
+
+### Added
+
+- Fixed bug with invalid size of return data from external call #68
+- No randomness in address generation anymore.
+  Addresses will be derived from a string representation of the argument name #62
+- State of the contract (on-chain data, events) and account balances can be
+  reverted when call fails #62
+- String representation of address linked to a string tag (argument name),
+  that is used for error message formatting #62
+
+### Changed (Breaking)
+
 ## [0.5.0] - 2025-03-05
 
 ### Added

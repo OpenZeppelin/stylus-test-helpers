@@ -40,9 +40,9 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
     });
 
     // Collect argument initializations.
-    let arg_inits = arg_binding_and_ty.iter().map(|(_arg_binding, arg_ty)| {
+    let arg_inits = arg_binding_and_ty.iter().map(|(arg_binding, arg_ty)| {
         quote! {
-            <#arg_ty>::random()
+            <#arg_ty as motsu::prelude::FromTag>::from_tag(stringify!(#arg_binding))
         }
     });
 

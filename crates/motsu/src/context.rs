@@ -16,6 +16,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     host::{WasmVM, VM},
+    keccak_const::Keccak256,
     prelude::StorageType,
     ArbResult,
 };
@@ -65,6 +66,7 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
+            .persistent
             .contracts
             .get(&contract_address)
             .expect("contract receiver should have a storage initialised")
@@ -86,6 +88,7 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
+            .persistent
             .contracts
             .get_mut(&contract_address)
             .expect("contract receiver should have a storage initialised")
@@ -147,6 +150,7 @@ impl VMContext {
         if MOTSU_VM
             .entry(self)
             .or_default()
+            .persistent
             .contracts
             .insert(contract_address, ContractStorage::default())
             .is_some()
@@ -163,10 +167,10 @@ impl VMContext {
     /// test [`VMContext`].
     fn reset_storage(self, contract_address: Address) {
         let mut storage = self.storage();
-        storage.contracts.remove(&contract_address);
+        storage.persistent.contracts.remove(&contract_address);
 
         // if no more contracts left,
-        if storage.contracts.is_empty() {
+        if storage.persistent.contracts.is_empty() {
             // drop guard to a concurrent hash map to avoid a panic on lock,
             drop(storage);
             // and erase the test context.
@@ -251,6 +255,10 @@ impl VMContext {
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
+        // We should do backup before transferring value, to have balances
+        // reverted in case of failure.
+        let backup = self.storage().persistent.backup_into();
+
         // Transfer value sent by message sender.
         self.transfer_value();
 
@@ -261,6 +269,11 @@ impl VMContext {
             .unwrap_or_else(|| {
                 panic!("selector not found - selector is {selector}")
             });
+
+        // If the call was unsuccessful, we should restore the data.
+        if result.is_err() {
+            self.storage().persistent.restore_from(backup);
+        }
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -288,7 +301,7 @@ impl VMContext {
     ) -> usize {
         let data = self.return_data();
         ptr::copy(data.as_ptr(), dest, size);
-        data.len()
+        data.len().min(size)
     }
 
     /// Return data's size in bytes from the last contract call.
@@ -325,6 +338,7 @@ impl VMContext {
         let log_data = event.encode_log_data();
 
         self.storage()
+            .persistent
             .contracts
             .get(address)
             .is_some_and(|contract| contract.events.contains(&log_data))
@@ -336,6 +350,7 @@ impl VMContext {
         address: &Address,
     ) -> Vec<E> {
         self.storage()
+            .persistent
             .contracts
             .get(address)
             .map(|contract| {
@@ -378,6 +393,7 @@ impl VMContext {
         let contract_address =
             storage.contract_address.expect("contract_address should be set");
         storage
+            .persistent
             .contracts
             .get_mut(&contract_address)
             .expect("contract should have a storage initialised")
@@ -387,11 +403,16 @@ impl VMContext {
 
     /// Get the balance of account at `address`.
     pub(crate) fn balance(self, address: Address) -> U256 {
-        self.storage().balances.get(&address).copied().unwrap_or_default()
+        self.storage()
+            .persistent
+            .balances
+            .get(&address)
+            .copied()
+            .unwrap_or_default()
     }
 
     /// Transfer value from the message sender to the contract.
-    /// No-op if `msg_sender` or `contract_address` weren't set.
+    /// No-op if `msg_sender`, `contract_address` or `msg_value` weren't set.
     ///
     /// # Panics
     ///
@@ -404,15 +425,15 @@ impl VMContext {
         let Some(contract_address) = storage.contract_address else {
             return;
         };
+        let Some(msg_value) = storage.msg_value else {
+            return;
+        };
 
-        // We should transfer the value only if it is set.
-        if let Some(msg_value) = storage.msg_value {
-            // Drop storage to avoid a panic on lock.
-            drop(storage);
+        // Drop storage to avoid a panic on lock.
+        drop(storage);
 
-            // Transfer and panic if there is not enough funds.
-            self.transfer(msg_sender, contract_address, msg_value);
-        }
+        // Transfer and panic if there is not enough funds.
+        self.transfer(msg_sender, contract_address, msg_value);
     }
 
     /// Transfer `value` from `from` account to `to` account.
@@ -421,6 +442,10 @@ impl VMContext {
     ///
     /// * If there is not enough funds to transfer.
     fn transfer(self, from: Address, to: Address, value: U256) {
+        if value.is_zero() {
+            return;
+        }
+
         // Transfer and panic if there is not enough funds.
         self.checked_transfer(from, to, value)
             .unwrap_or_else(|| panic!("{from} account should have enough funds to transfer {value} value"));
@@ -449,7 +474,7 @@ impl VMContext {
         value: U256,
     ) -> Option<U256> {
         let mut storage = self.storage();
-        let balance = storage.balances.entry(address).or_default();
+        let balance = storage.persistent.balances.entry(address).or_default();
         if *balance < value {
             return None;
         }
@@ -461,10 +486,47 @@ impl VMContext {
     fn add_assign_balance(self, address: Address, value: U256) -> U256 {
         *self
             .storage()
+            .persistent
             .balances
             .entry(address)
             .and_modify(|v| *v += value)
             .or_insert(value)
+    }
+
+    /// Reset persistent data backup.
+    /// Used when transaction was successful.
+    pub(crate) fn reset_backup(self) {
+        self.storage().persistent.reset_backup();
+    }
+
+    /// Restore persistent data from backup.
+    /// Used when transaction failed.
+    pub(crate) fn restore_from_backup(self) {
+        self.storage().persistent.restore_from_backup();
+    }
+
+    /// Create persistent storage backup.
+    /// Used when transaction starts.
+    fn backup(self) {
+        self.storage().persistent.backup();
+    }
+
+    /// Set string `tag` for `address`.
+    fn set_tag(self, address: Address, tag: String) {
+        MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
+    }
+
+    /// Replaces non-checksumed addresses in the `msg` with corresponding tags
+    /// (if any).
+    pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
+        let storage = self.storage();
+        for (address, tag) in &storage.tags {
+            // We need debug formatting, since it reveals non-checksumed
+            // address.
+            let address = format!("{address:?}");
+            msg = msg.replace(&address, tag);
+        }
+        msg
     }
 
     /// Get reference to the storage for the current test thread.
@@ -546,14 +608,14 @@ struct VMContextStorage {
     msg_value: Option<U256>,
     /// Address of the contract that is currently receiving the message.
     contract_address: Option<Address>,
-    /// Contract's address to [`ContractStorage`] mapping.
-    contracts: HashMap<Address, ContractStorage>,
-    /// Account's address to balance [`U256`] mapping.
-    balances: HashMap<Address, U256>,
     // Output of a contract call.
     return_data: Option<Vec<u8>>,
     // Output length of a contract call.
     return_data_size: Option<usize>,
+    /// Persistent storage for Motsu test VM.
+    persistent: Backuped<PersistentStorage>,
+    /// Account's address to tag mapping.
+    tags: HashMap<Address, String>,
     /// Chain ID of the current network.
     chain_id: U256,
 }
@@ -564,17 +626,26 @@ impl Default for VMContextStorage {
             msg_sender: None,
             msg_value: None,
             contract_address: None,
-            contracts: HashMap::new(),
-            balances: HashMap::new(),
             return_data: None,
             return_data_size: None,
+            persistent: Backuped::default(),
+            tags: HashMap::default(),
             chain_id: U256::from(42161), // Arbitrum Nova chain ID
         }
     }
 }
 
+/// Persistent storage for Motsu test VM.
+#[derive(Default, Clone)]
+struct PersistentStorage {
+    /// Contract's address to [`ContractStorage`] mapping.
+    contracts: HashMap<Address, ContractStorage>,
+    /// Account's address to balance [`U256`] mapping.
+    balances: HashMap<Address, U256>,
+}
+
 /// Contract's account storage.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct ContractStorage {
     /// Contract's byte storage
     data: ContractData,
@@ -586,6 +657,66 @@ struct ContractStorage {
 type ContractData = HashMap<Bytes32, Bytes32>;
 pub(crate) const WORD_BYTES: usize = 32;
 pub(crate) type Bytes32 = [u8; WORD_BYTES];
+
+/// A wrapper that allows to back up and restore data.
+/// Used for transaction revert.
+#[derive(Default)]
+struct Backuped<D: Clone + Default> {
+    data: D,
+    backup: Option<D>,
+}
+
+impl<D: Clone + Default> Deref for Backuped<D> {
+    type Target = D;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<D: Clone + Default> DerefMut for Backuped<D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl<D: Clone + Default> Backuped<D> {
+    /// Return data for backup.
+    /// Should be used before starting external call between contracts.
+    fn backup_into(&self) -> D {
+        self.data.clone()
+    }
+
+    /// Remove backup data.
+    /// Should be used when transaction was successful.
+    fn reset_backup(&mut self) {
+        _ = self.backup.take();
+    }
+
+    /// Restore data from backup removing backup.
+    /// Should be used when transaction failed.
+    fn restore_from_backup(&mut self) {
+        // "Backuped" type `T` can be a more expensive type like a `HashMap`.
+        // So instead of cloning it right after transaction, we just pass
+        // ownership to the `data` field.
+        // For the last transaction (in a test case) we will have less `clone()`
+        // invocations, therefore fewer allocations.
+        self.data = self.backup.take().expect("unable revert transaction");
+    }
+
+    /// Restore data from provided `backup`.
+    /// Should be used when external call between contracts failed, to restore
+    /// from `backup` persisted on the callstack.
+    fn restore_from(&mut self, backup: D) {
+        self.data = backup;
+    }
+
+    /// Backup data inside `self`.
+    /// Should be used when we start a new transaction.
+    fn backup(&mut self) {
+        let _ = self.backup.insert(self.backup_into());
+    }
+}
 
 /// Contract call entity, related to the contract type `ST` and the caller's
 /// account.
@@ -625,6 +756,8 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
+        VMContext::current().backup();
+
         // Set parameters for call such as `msg_sender`, `contract_address`,
         // `msg_value`.
         self.set_call_params();
@@ -646,6 +779,8 @@ impl<ST: StorageType> Deref for ContractCall<'_, ST> {
 impl<ST: StorageType> DerefMut for ContractCall<'_, ST> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
+        VMContext::current().backup();
+
         // Set parameters for call such as `msg_sender`, `contract_address`,
         // `msg_value`.
         self.set_call_params();
@@ -766,11 +901,13 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
         let panic_msg = "event was not emitted";
         let matching_events = context.matching_events_for::<E>(&self.address);
 
-        if matching_events.is_empty() {
-            panic!("{panic_msg}, no matching events found")
+        let panic_msg = if matching_events.is_empty() {
+            format!("{panic_msg}, no matching events found")
         } else {
-            panic!("{panic_msg}, matching events: {matching_events:?}")
-        }
+            format!("{panic_msg}, matching events: {matching_events:?}")
+        };
+        let panic_msg = context.replace_with_tags(panic_msg);
+        panic!("{}", panic_msg);
     }
 }
 
@@ -848,5 +985,32 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
 
     fn balance(&self) -> U256 {
         self.address().balance()
+    }
+}
+
+/// Deterministically derive from a string representation.
+pub trait FromTag {
+    /// Deterministically derive inner address of `Self` from a string `tag`.
+    fn from_tag(tag: &str) -> Self;
+}
+
+impl FromTag for Address {
+    fn from_tag(tag: &str) -> Self {
+        let hash = Keccak256::new().update(tag.as_bytes()).finalize();
+        let address = Address::from_slice(&hash[..20]);
+        VMContext::current().set_tag(address, tag.to_string());
+        address
+    }
+}
+
+impl FromTag for Account {
+    fn from_tag(tag: &str) -> Self {
+        Account::new_at(Address::from_tag(tag))
+    }
+}
+
+impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
+    fn from_tag(tag: &str) -> Self {
+        Contract::new_at(Address::from_tag(tag))
     }
 }
