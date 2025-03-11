@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State of the contract (on-chain data, events) and account balances can be
   reverted when call fails #62
 - String representation of address linked to a string tag (argument name),
-  that is used for error messages formatting #62
+  that is used for error message formatting #62
 
 ### Changed (Breaking)
 
