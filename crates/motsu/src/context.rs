@@ -927,7 +927,7 @@ impl Account {
         let private_key_bytes = Keccak256::new().update(seed_bytes).finalize();
 
         let signing_key = SigningKey::from_slice(&private_key_bytes)
-            .expect("failed to create signing key from 32-byte private key");
+            .expect("failed to create signing key from keccak hashed seed");
         let signer = PrivateKeySigner::from_signing_key(signing_key);
 
         Self {
