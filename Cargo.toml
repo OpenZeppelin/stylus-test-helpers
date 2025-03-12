@@ -36,6 +36,7 @@ quote = "1.0.35"
 alloy-primitives = { version = "=0.8.20", default-features = false }
 alloy-sol-types = { version = "=0.8.20", default-features = false }
 alloy-signer-local = { version = "=0.7.3", default-features = false }
+alloy-signer = { version = "=0.7.3", default-features = false }
 k256 = { version = "=0.13.4", default-features = false }
 
 # members
