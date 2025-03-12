@@ -11,9 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
-### Fixed
-
-- Fixed compatibility with stylus sdk v0.8.2 #73
+- Bump Stylus SDK to v0.8.2 #46
 
 ## [0.6.0] - 2025-03-11
 
