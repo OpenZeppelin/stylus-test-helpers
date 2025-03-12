@@ -11,7 +11,6 @@ use std::{
 };
 
 use alloy_primitives::{Address, Bytes, LogData, B256, U256};
-use alloy_signer::{Result, Signature, SignerSync};
 use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
@@ -956,21 +955,6 @@ impl Account {
                 "failed to recreate signing key from valid private key",
             ),
         )
-    }
-
-    /// Sign the given hash.
-    #[must_use]
-    pub fn sign_hash(&self, hash: &B256) -> Result<Signature> {
-        self.signer().sign_hash_sync(hash)
-    }
-
-    /// Signs the hash of the provided message after prefixing it, as specified
-    /// in [EIP-191].
-    ///
-    /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
-    #[must_use]
-    pub fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        self.signer().sign_message_sync(message)
     }
 }
 
