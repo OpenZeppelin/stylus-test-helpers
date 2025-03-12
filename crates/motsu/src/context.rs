@@ -11,8 +11,10 @@ use std::{
 };
 
 use alloy_primitives::{Address, Bytes, LogData, B256, U256};
+use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
+use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     host::{WasmVM, VM},
@@ -890,10 +892,12 @@ pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
     unsafe { ST::new(U256::ZERO, 0, VM { host: Box::new(WasmVM {}) }) }
 }
 
-/// Account used to call contracts.
+/// Account that can be used to interact with contracts in test environments.
+/// Used to interact with and sign transactions for contracts.
 #[derive(Clone, Copy)]
 pub struct Account {
     address: Address,
+    private_key: B256,
 }
 
 impl From<Account> for Address {
@@ -903,22 +907,54 @@ impl From<Account> for Address {
 }
 
 impl Account {
-    /// Create a new account with the given `address`.
+    /// Creates an account with an address derived from the provided seed
+    /// string.
+    ///
+    /// The seed string is hashed with Keccak256 to generate the private key.
+    /// The same seed will always produce the same account address.
     #[must_use]
-    pub const fn new_at(address: Address) -> Self {
-        Self { address }
+    pub fn from_seed(seed: &str) -> Self {
+        Self::from_seed_bytes(seed.as_bytes())
     }
 
-    /// Create a new account with random address.
+    /// Creates an account with an address derived from the provided seed bytes.
+    ///
+    /// The seed bytes are hashed with Keccak256 to generate the private key.
+    /// The same seed will always produce the same account address.
+    #[must_use]
+    pub fn from_seed_bytes(seed_bytes: &[u8]) -> Self {
+        let private_key_bytes = Keccak256::new().update(seed_bytes).finalize();
+
+        let signing_key = SigningKey::from_slice(&private_key_bytes)
+            .expect("failed to create signing key from 32-byte private key");
+        let signer = PrivateKeySigner::from_signing_key(signing_key);
+
+        Self {
+            address: signer.address(),
+            private_key: private_key_bytes.into(),
+        }
+    }
+
+    /// Creates a new account with a randomly generated private key and address.
     #[must_use]
     pub fn random() -> Self {
-        Self::new_at(Address::random())
+        Self::from_seed_bytes(B256::random().as_slice())
     }
 
     /// Get account's address.
     #[must_use]
     pub fn address(&self) -> Address {
         self.address
+    }
+
+    /// Returns a signer that can be used to sign messages and transactions.
+    #[must_use]
+    pub fn signer(&self) -> PrivateKeySigner {
+        PrivateKeySigner::from_signing_key(
+            SigningKey::from_slice(self.private_key.as_slice()).expect(
+                "failed to recreate signing key from valid private key",
+            ),
+        )
     }
 }
 
@@ -961,28 +997,42 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     }
 }
 
-/// Deterministically derive from a string representation.
+/// Allows creating entities deterministically from a string identifier.
+///
+/// This trait enables consistent generation of addresses and contracts across
+/// test runs using meaningful string identifiers (tags).
 pub trait FromTag {
-    /// Deterministically derive inner address of `Self` from a string `tag`.
+    /// Creates an instance deterministically derived from the provided tag.
+    ///
+    /// The same tag will always produce the same entity.
     fn from_tag(tag: &str) -> Self;
 }
 
-impl FromTag for Address {
+impl FromTag for Account {
+    /// Creates an account derived from the tag string.
+    ///
+    /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
-        let hash = Keccak256::new().update(tag.as_bytes()).finalize();
-        let address = Address::from_slice(&hash[..20]);
-        VMContext::current().set_tag(address, tag.to_string());
-        address
+        let account = Account::from_seed(tag);
+        VMContext::current().set_tag(account.address(), tag.to_string());
+        account
     }
 }
 
-impl FromTag for Account {
+impl FromTag for Address {
+    /// Creates an Ethereum address derived from the tag string.
+    ///
+    /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
-        Account::new_at(Address::from_tag(tag))
+        Account::from_tag(tag).address()
     }
 }
 
 impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
+    /// Creates a contract at an address derived from the tag string.
+    ///
+    /// This allows deploying contracts to deterministic addresses for testing.
+    /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         Contract::new_at(Address::from_tag(tag))
     }
