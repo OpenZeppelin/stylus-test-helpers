@@ -923,6 +923,11 @@ impl Account {
     ///
     /// The seed string is hashed with Keccak256 to generate the private key.
     /// The same seed will always produce the same account address.
+    ///
+    /// # Panics
+    ///
+    /// * If the signing key creation fails with the keccak hash of the seed
+    ///   (shouldn't happen).
     #[must_use]
     pub fn from_seed(seed: &str) -> Self {
         Self::from_seed_bytes(seed.as_bytes())
@@ -932,6 +937,11 @@ impl Account {
     ///
     /// The seed bytes are hashed with Keccak256 to generate the private key.
     /// The same seed will always produce the same account address.
+    ///
+    /// # Panics
+    ///
+    /// * If the signing key creation fails with the keccak hash of the seed
+    ///   (shouldn't happen).
     #[must_use]
     pub fn from_seed_bytes(seed_bytes: &[u8]) -> Self {
         let private_key_bytes = Keccak256::new().update(seed_bytes).finalize();
@@ -947,6 +957,11 @@ impl Account {
     }
 
     /// Creates a new account with a randomly generated private key and address.
+    ///
+    /// # Panics
+    ///
+    /// * If the signing key creation fails with the keccak hash of the seed
+    ///   (shouldn't happen).
     #[must_use]
     pub fn random() -> Self {
         Self::from_seed_bytes(B256::random().as_slice())
@@ -959,6 +974,11 @@ impl Account {
     }
 
     /// Returns a signer that can be used to sign messages and transactions.
+    ///
+    /// # Panics
+    ///
+    /// * If the signing key creation fails with the current private key
+    ///   (shouldn't happen).
     #[must_use]
     pub fn signer(&self) -> PrivateKeySigner {
         PrivateKeySigner::from_signing_key(
