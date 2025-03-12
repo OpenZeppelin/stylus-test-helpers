@@ -29,6 +29,22 @@
 //!     }
 //! }
 //! ```
+//! You can even access the underlying account signer:
+//!
+//! ```rust,ignore
+//! #[cfg(test)]
+//! mod tests {
+//!     use motsu::prelude::*;
+//!     use alloy_signer::SignerSync;
+//!
+//!     #[motsu::test]
+//!     fn signs_message(alice: Account) {
+//!         let signer = alice.signer();
+//!         let msg = "message".as_bytes();
+//!         assert!(signer.sign_message_sync(msg).is_ok());
+//!     }
+//! }
+//! ```
 //!
 //! ### Sender and Value
 //!
