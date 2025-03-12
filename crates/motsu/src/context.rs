@@ -518,6 +518,17 @@ impl VMContext {
         MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
+    /// Get tag at `address`.
+    #[cfg(test)]
+    pub(crate) fn get_tag(self, address: Address) -> Option<String> {
+        MOTSU_VM
+            .entry(self)
+            .or_default()
+            .tags
+            .get_key_value(&address)
+            .map(|kv| kv.1.clone())
+    }
+
     /// Replaces non-checksumed addresses in the `msg` with corresponding tags
     /// (if any).
     pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
@@ -1035,5 +1046,98 @@ impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
     /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         Contract::new_at(Address::from_tag(tag))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::private::proptest::proptest;
+    use stylus_sdk::prelude::*;
+
+    use super::{Account, Address, Contract, FromTag};
+    use crate::context::VMContext;
+
+    mod account {
+        use super::*;
+
+        #[test]
+        fn account_from_seed() {
+            proptest!(|(seed: String)| {
+                let account = Account::from_seed(&seed);
+                assert!(!account.private_key.is_zero());
+                assert!(!account.address().is_zero());
+
+                // verify signer can be recreated
+                let signer = account.signer();
+                assert_eq!(account.address(), signer.address());
+            })
+        }
+
+        #[test]
+        fn account_from_seed_bytes() {
+            proptest!(|(seed: Vec<u8>)| {
+                let account = Account::from_seed_bytes(&seed);
+                assert!(!account.private_key.is_zero());
+                assert!(!account.address().is_zero());
+
+                // verify signer can be recreated
+                let signer = account.signer();
+                assert_eq!(account.address(), signer.address());
+            })
+        }
+
+        #[test]
+        fn account_random() {
+            let account = Account::random();
+            assert!(!account.private_key.is_zero());
+            assert!(!account.address().is_zero());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
+        }
+    }
+
+    mod from_tag {
+        use super::*;
+
+        #[test]
+        fn account() {
+            proptest!(|(tag: String)| {
+                let account = Account::from_tag(&tag);
+                assert!(!account.private_key.is_zero());
+                assert!(!account.address().is_zero());
+
+                assert_eq!(Some(tag), VMContext::current().get_tag(account.address()));
+            })
+        }
+
+        #[test]
+        fn address() {
+            proptest!(|(tag: String)| {
+                let address = Address::from_tag(&tag);
+                assert!(!address.is_zero());
+
+                assert_eq!(Some(tag), VMContext::current().get_tag(address));
+            })
+        }
+
+        #[storage]
+        struct SomeContract;
+
+        #[public]
+        impl SomeContract {}
+
+        unsafe impl TopLevelStorage for SomeContract {}
+
+        #[test]
+        fn contract() {
+            proptest!(|(tag: String)| {
+                let contract = Contract::<SomeContract>::from_tag(&tag);
+                assert!(!contract.address().is_zero());
+
+                assert_eq!(Some(tag), VMContext::current().get_tag(contract.address()));
+            })
+        }
     }
 }
