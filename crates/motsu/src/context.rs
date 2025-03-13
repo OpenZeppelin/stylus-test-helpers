@@ -1095,7 +1095,7 @@ impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::private::proptest::proptest;
+    use alloy_primitives::{address, b256};
     use stylus_sdk::prelude::*;
 
     use super::{Account, Address, Contract, FromTag};
@@ -1105,33 +1105,39 @@ mod tests {
         use super::*;
 
         #[test]
-        fn account_from_seed() {
-            proptest!(|(seed: String)| {
-                let account = Account::from_seed(&seed);
-                assert!(!account.private_key.is_zero());
-                assert!(!account.address().is_zero());
+        fn from_seed() {
+            let seed = "some seed";
+            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
-                // verify signer can be recreated
-                let signer = account.signer();
-                assert_eq!(account.address(), signer.address());
-            })
+            let account = Account::from_seed(&seed);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
         }
 
         #[test]
-        fn account_from_seed_bytes() {
-            proptest!(|(seed: Vec<u8>)| {
-                let account = Account::from_seed_bytes(&seed);
-                assert!(!account.private_key.is_zero());
-                assert!(!account.address().is_zero());
+        fn from_seed_bytes() {
+            let seed = [115, 111, 109, 101, 32, 115, 101, 101, 100];
+            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
-                // verify signer can be recreated
-                let signer = account.signer();
-                assert_eq!(account.address(), signer.address());
-            })
+            let account = Account::from_seed_bytes(&seed);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
         }
 
         #[test]
-        fn account_random() {
+        fn random() {
             let account = Account::random();
             assert!(!account.private_key.is_zero());
             assert!(!account.address().is_zero());
@@ -1147,23 +1153,31 @@ mod tests {
 
         #[test]
         fn account() {
-            proptest!(|(tag: String)| {
-                let account = Account::from_tag(&tag);
-                assert!(!account.private_key.is_zero());
-                assert!(!account.address().is_zero());
+            let tag = String::from("some seed");
+            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
-                assert_eq!(Some(tag), VMContext::current().get_tag(account.address()));
-            })
+            let account = Account::from_tag(&tag);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            assert_eq!(
+                Some(tag),
+                VMContext::current().get_tag(account.address())
+            );
         }
 
         #[test]
         fn address() {
-            proptest!(|(tag: String)| {
-                let address = Address::from_tag(&tag);
-                assert!(!address.is_zero());
+            let tag = String::from("some seed");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
-                assert_eq!(Some(tag), VMContext::current().get_tag(address));
-            })
+            let address = Address::from_tag(&tag);
+            assert_eq!(expected_address, address);
+
+            assert_eq!(Some(tag), VMContext::current().get_tag(address));
         }
 
         #[storage]
@@ -1176,12 +1190,17 @@ mod tests {
 
         #[test]
         fn contract() {
-            proptest!(|(tag: String)| {
-                let contract = Contract::<SomeContract>::from_tag(&tag);
-                assert!(!contract.address().is_zero());
+            let tag = String::from("contract");
+            let expected_address =
+                address!("0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6");
 
-                assert_eq!(Some(tag), VMContext::current().get_tag(contract.address()));
-            })
+            let contract = Contract::<SomeContract>::from_tag(&tag);
+            assert_eq!(expected_address, contract.address());
+
+            assert_eq!(
+                Some(tag),
+                VMContext::current().get_tag(contract.address())
+            );
         }
     }
 }
