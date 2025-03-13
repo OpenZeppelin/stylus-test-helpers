@@ -963,7 +963,7 @@ impl Account {
     /// The same seed will always produce the same account address.
     #[must_use]
     pub fn from_seed(seed: &str) -> Self {
-        Self::from_seed_bytes(seed.as_bytes())
+        Self::from_seed_slice(seed.as_bytes())
     }
 
     /// Creates an account with an address derived from the provided seed bytes.
@@ -972,8 +972,8 @@ impl Account {
     /// The same seed will always produce the same account address.
     #[allow(clippy::missing_panics_doc)]
     #[must_use]
-    pub fn from_seed_bytes(seed_bytes: &[u8]) -> Self {
-        let private_key_bytes = Keccak256::new().update(seed_bytes).finalize();
+    pub fn from_seed_slice(seed: &[u8]) -> Self {
+        let private_key_bytes = Keccak256::new().update(seed).finalize();
 
         let signing_key = SigningKey::from_slice(&private_key_bytes)
             .expect("failed to create signing key from keccak hashed seed");
@@ -988,7 +988,7 @@ impl Account {
     /// Creates a new account with a randomly generated private key and address.
     #[must_use]
     pub fn random() -> Self {
-        Self::from_seed_bytes(B256::random().as_slice())
+        Self::from_seed_slice(B256::random().as_slice())
     }
 
     /// Get account's address.
@@ -1127,7 +1127,7 @@ mod tests {
             let expected_address =
                 address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
-            let account = Account::from_seed_bytes(&seed);
+            let account = Account::from_seed_slice(&seed);
             assert_eq!(expected_private_key, account.private_key);
             assert_eq!(expected_address, account.address());
 
