@@ -1121,40 +1121,48 @@ mod proxies_tests {
     }
 }
 
-/// Tests for chain ID functionality
 #[cfg(test)]
-mod chain_id_tests {
-    use crate::context::VMContext;
-    use crate::shims;
+mod vm_tests {
+    use stylus_sdk::{block, prelude::*, testing::constants::DEFAULT_CHAIN_ID};
+
     use crate as motsu;
     use crate::prelude::*;
-    use stylus_sdk::block;
+
+    /// Default Chain ID
+    const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
+    const CUSTOM_CHAIN_ID: u64 = 12345678987654321;
+
+    #[storage]
+    struct ChainChecker;
+
+    #[public]
+    impl ChainChecker {
+        fn get_chain_id(&self) -> u64 {
+            block::chainid()
+        }
+    }
+
+    unsafe impl TopLevelStorage for ChainChecker {}
 
     #[motsu::test]
-    fn chain_id_functions(_alice: Account) {
-        // Default chain ID is 42161 (Arbitrum One)
-        assert_eq!(VMContext::current().chain_id(), 42161);
-        
-        // Verify that block::chainid() returns the same value
-        assert_eq!(block::chainid(), 42161);
+    fn chain_id(contract: Contract<ChainChecker>, alice: Account) {
+        // Default chain ID is Arbitrum One
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, DEFAULT_CHAIN_ID);
+        // Verify the correct chain ID is returned within tests too
+        assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
 
-        // Set chain ID to 11155111 (Sepolia testnet)
-        VMContext::current().set_chain_id(11155111);
-        assert_eq!(VMContext::current().chain_id(), 11155111);
-        
-        // Verify that block::chainid() also returns the updated value
-        assert_eq!(block::chainid(), 11155111);
-        
-        // Verify that the chainid() shim function also returns the updated value
-        unsafe {
-            assert_eq!(shims::chainid(), 11155111);
-        }
-        
-        // Set it back to the original value
-        VMContext::current().set_chain_id(42161);
-        assert_eq!(VMContext::current().chain_id(), 42161);
-        
-        // Verify that block::chainid() returns the original value again
-        assert_eq!(block::chainid(), 42161);
+        VMContext::current().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
+
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
+        assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
+
+        // Verify that even custom chain ID can be set
+        VMContext::current().set_chain_id(CUSTOM_CHAIN_ID);
+
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, CUSTOM_CHAIN_ID);
+        assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
     }
 }
