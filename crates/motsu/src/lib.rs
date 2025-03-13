@@ -30,6 +30,29 @@
 //! }
 //! ```
 //!
+//! ### Global Variables
+//!
+//! Motsu allows you to manipulate certain global variables that affect the execution environment:
+//!
+//! #### Chain ID
+//!
+//! You can get and set the Chain ID in tests using the `VMContext` API:
+//!
+//! ```rust,ignore
+//! use motsu::prelude::*;
+//!
+//! #[motsu::test]
+//! fn test_with_custom_chain_id(contract: Contract<MyContract>, alice: Account) {
+//!     // Default chain ID is 42161 (Arbitrum One)
+//!     
+//!     // Set chain ID to 11155111 (Sepolia testnet)
+//!     VMContext::current().set_chain_id(11155111);
+//!     
+//!     // Now any contract code that depends on the chain ID will use this value
+//!     // This is useful for testing EIP-712 signatures, ERC20Permit, etc.
+//! }
+//! ```
+//!
 //! ### Sender and Value
 //!
 //! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
@@ -189,7 +212,6 @@ mod shims;
 mod storage_access;
 
 pub use motsu_proc::test;
-use stylus_sdk::alloy_primitives::U256;
 
 #[cfg(test)]
 mod ping_pong_tests {
@@ -205,7 +227,7 @@ mod ping_pong_tests {
     };
 
     use crate as motsu;
-    use crate::{chain_id, prelude::*};
+    use crate::prelude::*;
 
     const ONE: U256 = uint!(1_U256);
     const TEN: U256 = uint!(10_U256);
@@ -559,21 +581,6 @@ mod ping_pong_tests {
 
         // Check panic assertion.
         ping.assert_emitted(&Pinged { from: alice.address(), value });
-    }
-
-    // Test for chain_id functionality
-    #[motsu::test]
-    fn chain_id_functions(_ping: Contract<PingContract>, _alice: Account) {
-        // Default chain ID is 42161 (Arbitrum Nova)
-        assert_eq!(chain_id(), U256::from(42161));
-
-        // Set chain ID to 11155111 (Sepolia testnet)
-        set_chain_id(U256::from(11155111));
-        assert_eq!(chain_id(), U256::from(11155111));
-
-        // Set it back to the original value
-        set_chain_id(U256::from(42161));
-        assert_eq!(chain_id(), U256::from(42161));
     }
 }
 
@@ -1115,47 +1122,40 @@ mod proxies_tests {
     }
 }
 
-/// Get the current chain ID.
-///
-/// # Examples
-///
-/// ```rust
-/// use motsu::prelude::*;
-/// use alloy_primitives::U256;
-///
-/// #[motsu::test]
-/// fn test_chain_id() {
-///     // Default chain ID is 42161 (Arbitrum Nova)
-///     assert_eq!(chain_id(), U256::from(42161));
-///
-///     // Set chain ID to 11155111 (Sepolia testnet)
-///     set_chain_id(U256::from(11155111));
-///     assert_eq!(chain_id(), U256::from(11155111));
-/// }
-/// ```
-#[must_use]
-pub fn chain_id() -> U256 {
-    crate::context::VMContext::current().chain_id()
-}
+/// Tests for chain ID functionality
+#[cfg(test)]
+mod chain_id_tests {
+    use crate::context::VMContext;
+    use crate::shims;
+    use crate as motsu;
+    use crate::prelude::*;
+    use stylus_sdk::block;
 
-/// Set the chain ID.
-///
-/// # Examples
-///
-/// ```rust
-/// use motsu::prelude::*;
-/// use alloy_primitives::U256;
-///
-/// #[motsu::test]
-/// fn test_set_chain_id() {
-///     // Default chain ID is 42161 (Arbitrum Nova)
-///     assert_eq!(chain_id(), U256::from(42161));
-///
-///     // Set chain ID to 11155111 (Sepolia testnet)
-///     set_chain_id(U256::from(11155111));
-///     assert_eq!(chain_id(), U256::from(11155111));
-/// }
-/// ```
-pub fn set_chain_id(chain_id: U256) {
-    crate::context::VMContext::current().set_chain_id(chain_id)
+    #[motsu::test]
+    fn chain_id_functions(_alice: Account) {
+        // Default chain ID is 42161 (Arbitrum One)
+        assert_eq!(VMContext::current().chain_id(), 42161);
+        
+        // Verify that block::chainid() returns the same value
+        assert_eq!(block::chainid(), 42161);
+
+        // Set chain ID to 11155111 (Sepolia testnet)
+        VMContext::current().set_chain_id(11155111);
+        assert_eq!(VMContext::current().chain_id(), 11155111);
+        
+        // Verify that block::chainid() also returns the updated value
+        assert_eq!(block::chainid(), 11155111);
+        
+        // Verify that the chainid() shim function also returns the updated value
+        unsafe {
+            assert_eq!(shims::chainid(), 11155111);
+        }
+        
+        // Set it back to the original value
+        VMContext::current().set_chain_id(42161);
+        assert_eq!(VMContext::current().chain_id(), 42161);
+        
+        // Verify that block::chainid() returns the original value again
+        assert_eq!(block::chainid(), 42161);
+    }
 }
