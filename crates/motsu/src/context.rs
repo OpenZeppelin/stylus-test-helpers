@@ -540,12 +540,12 @@ impl VMContext {
     }
 
     /// Get the current chain ID.
-    pub fn chain_id(self) -> U256 {
+    pub(crate) fn chain_id(self) -> u64 {
         self.storage().chain_id
     }
 
     /// Set the chain ID.
-    pub fn set_chain_id(self, chain_id: U256) {
+    pub fn set_chain_id(self, chain_id: u64) {
         let mut storage = self.storage();
         storage.chain_id = chain_id;
     }
@@ -617,7 +617,7 @@ struct VMContextStorage {
     /// Account's address to tag mapping.
     tags: HashMap<Address, String>,
     /// Chain ID of the current network.
-    chain_id: U256,
+    chain_id: u64,
 }
 
 impl Default for VMContextStorage {
@@ -630,7 +630,7 @@ impl Default for VMContextStorage {
             return_data_size: None,
             persistent: Backuped::default(),
             tags: HashMap::default(),
-            chain_id: U256::from(42161), // Arbitrum Nova chain ID
+            chain_id: 42161, // Arbitrum One chain ID
         }
     }
 }
