@@ -18,7 +18,6 @@ use stylus_sdk::{
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
-    testing::constants::DEFAULT_CHAIN_ID,
     ArbResult,
 };
 
@@ -39,6 +38,12 @@ use crate::{
 /// accessed twice from the same thread.
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
+
+/// Same value as [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`].
+/// We'll be able to remove this after we can enable the `stylus-test` feature,
+/// which should happen after we implement the [`stylus_sdk::testing::Host`]
+/// trait.
+const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
