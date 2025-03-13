@@ -42,19 +42,14 @@ static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
 /// Same value as
-#[cfg_attr(
-    feature = "stylus-test",
-    doc = "[`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`]."
-)]
-#[cfg_attr(
-    not(feature = "stylus-test"),
-    doc = "`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`."
-)]
+/// [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`][chain_id].
+///
 /// We'll be able to remove this after we can enable the `stylus-test` feature,
-/// which should happen after we implement the
-#[cfg_attr(feature = "stylus-test", doc = "[`stylus_sdk::testing::Host`]")]
-#[cfg_attr(not(feature = "stylus-test"), doc = "`stylus_sdk::testing::Host`")]
-/// trait.
+/// which should happen after we refactor `motsu` to implement a mock
+/// [`stylus_core::host::Host`][host] trait.
+///
+/// [chain_id]: https://github.com/OffchainLabs/stylus-sdk-rs/blob/b1993362d214b27ceb67e0aa01ee2a6397f376b4/stylus-test/src/constants.rs#L15
+/// [host]: https://github.com/OffchainLabs/stylus-sdk-rs/blob/b1993362d214b27ceb67e0aa01ee2a6397f376b4/stylus-core/src/host.rs#L22
 pub const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
