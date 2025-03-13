@@ -32,7 +32,8 @@
 //!
 //! ### Global Variables
 //!
-//! Motsu allows you to manipulate certain global variables that affect the execution environment:
+//! Motsu allows you to manipulate certain global variables that affect the
+//! execution environment:
 //!
 //! #### Chain ID
 //!
@@ -42,13 +43,17 @@
 //! use motsu::prelude::*;
 //!
 //! #[motsu::test]
-//! fn test_with_custom_chain_id(contract: Contract<MyContract>, alice: Account) {
+//! fn test_with_custom_chain_id(
+//!     contract: Contract<MyContract>,
+//!     alice: Account,
+//! ) {
 //!     // Default chain ID is 42161 (Arbitrum One)
-//!     
+//!
 //!     // Set chain ID to 11155111 (Sepolia testnet)
 //!     VMContext::current().set_chain_id(11155111);
-//!     
-//!     // Now any contract code that depends on the chain ID will use this value
+//!
+//!     // Now any contract code that depends on the chain ID will use this
+//!     // value
 //! }
 //! ```
 //!
