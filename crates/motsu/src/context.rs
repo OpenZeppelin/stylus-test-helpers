@@ -41,9 +41,19 @@ use crate::{
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
-/// Same value as [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`].
+/// Same value as
+#[cfg_attr(
+    feature = "stylus-test",
+    doc = "[`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`]."
+)]
+#[cfg_attr(
+    not(feature = "stylus-test"),
+    doc = "`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`."
+)]
 /// We'll be able to remove this after we can enable the `stylus-test` feature,
-/// which should happen after we implement the [`stylus_sdk::testing::Host`]
+/// which should happen after we implement the
+#[cfg_attr(feature = "stylus-test", doc = "[`stylus_sdk::testing::Host`]")]
+#[cfg_attr(not(feature = "stylus-test"), doc = "`stylus_sdk::testing::Host`")]
 /// trait.
 pub const DEFAULT_CHAIN_ID: u64 = 42161;
 
