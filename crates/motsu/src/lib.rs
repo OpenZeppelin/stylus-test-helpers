@@ -46,6 +46,33 @@
 //! }
 //! ```
 //!
+//! ### Global Variables
+//!
+//! Motsu allows you to manipulate certain global variables that affect the
+//! execution environment:
+//!
+//! #### Chain ID
+//!
+//! You can get and set the Chain ID in tests using the `VMContext` API:
+//!
+//! ```rust,ignore
+//! use motsu::prelude::*;
+//!
+//! #[motsu::test]
+//! fn test_with_custom_chain_id(
+//!     contract: Contract<MyContract>,
+//!     alice: Account,
+//! ) {
+//!     // Default chain ID is 42161 (Arbitrum One)
+//!
+//!     // Set chain ID to 11155111 (Sepolia testnet)
+//!     VMContext::current().set_chain_id(11155111);
+//!
+//!     // Now any contract code that depends on the chain ID will use this
+//!     // value
+//! }
+//! ```
+//!
 //! ### Sender and Value
 //!
 //! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
@@ -1114,5 +1141,50 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TEN + THREE);
         // and call to the fourth proxy should revert.
         assert_eq!(proxy4.balance(), TEN);
+    }
+}
+
+#[cfg(test)]
+mod vm_tests {
+    use stylus_sdk::{block, prelude::*};
+
+    use crate as motsu;
+    use crate::prelude::*;
+
+    const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
+    const CUSTOM_CHAIN_ID: u64 = 12345678987654321;
+
+    #[storage]
+    struct ChainChecker;
+
+    #[public]
+    impl ChainChecker {
+        fn get_chain_id(&self) -> u64 {
+            block::chainid()
+        }
+    }
+
+    unsafe impl TopLevelStorage for ChainChecker {}
+
+    #[motsu::test]
+    fn chain_id(contract: Contract<ChainChecker>, alice: Account) {
+        // Default chain ID is Arbitrum One
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, DEFAULT_CHAIN_ID);
+        // Verify the correct chain ID is returned within tests too
+        assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
+
+        VMContext::current().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
+
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
+        assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
+
+        // Verify that even custom chain ID can be set
+        VMContext::current().set_chain_id(CUSTOM_CHAIN_ID);
+
+        let chain_id = contract.sender(alice).get_chain_id();
+        assert_eq!(chain_id, CUSTOM_CHAIN_ID);
+        assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
     }
 }
