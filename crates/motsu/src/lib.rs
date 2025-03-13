@@ -178,6 +178,7 @@
 //!
 //! [test_attribute]: crate::test
 #![allow(deprecated)]
+#![allow(unexpected_cfgs)]
 #[cfg(test)]
 extern crate alloc;
 
