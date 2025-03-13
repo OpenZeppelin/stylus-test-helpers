@@ -27,9 +27,6 @@ use crate::context::{
     WORD_BYTES,
 };
 
-/// Arbitrum's CHAID ID.
-const CHAIN_ID: u64 = 42161;
-
 /// Externally Owned Account (EOA) code hash (wallet account).
 const EOA_CODEHASH: &[u8; 66] =
     b"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
@@ -146,7 +143,7 @@ unsafe extern "C" fn contract_address(address: *mut u8) {
 /// [`CHAINID`]: https://www.evm.codes/#46
 #[no_mangle]
 unsafe extern "C" fn chainid() -> u64 {
-    CHAIN_ID
+    VMContext::current().chain_id()
 }
 
 /// Emits an EVM log with the given number of topics and data, the first bytes

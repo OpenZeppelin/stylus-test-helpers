@@ -39,6 +39,12 @@ use crate::{
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
+/// Same value as [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`].
+/// We'll be able to remove this after we can enable the `stylus-test` feature,
+/// which should happen after we implement the [`stylus_sdk::testing::Host`]
+/// trait.
+pub const DEFAULT_CHAIN_ID: u64 = 42161;
+
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
@@ -538,6 +544,17 @@ impl VMContext {
     fn router(self, address: Address) -> VMRouterContext {
         VMRouterContext::new(self.thread_id, address)
     }
+
+    /// Get the current chain ID.
+    pub(crate) fn chain_id(self) -> u64 {
+        self.storage().chain_id
+    }
+
+    /// Set the chain ID.
+    pub fn set_chain_id(self, chain_id: u64) {
+        let mut storage = self.storage();
+        storage.chain_id = chain_id;
+    }
 }
 
 /// Read the word from location pointed by `ptr`.
@@ -590,7 +607,6 @@ unsafe fn decode_calldata(
 }
 
 /// Main storage for Motsu test VM.
-#[derive(Default)]
 struct VMContextStorage {
     /// Address of the message sender.
     msg_sender: Option<Address>,
@@ -606,6 +622,23 @@ struct VMContextStorage {
     persistent: Backuped<PersistentStorage>,
     /// Account's address to tag mapping.
     tags: HashMap<Address, String>,
+    /// Chain ID of the current network.
+    chain_id: u64,
+}
+
+impl Default for VMContextStorage {
+    fn default() -> Self {
+        Self {
+            msg_sender: None,
+            msg_value: None,
+            contract_address: None,
+            return_data: None,
+            return_data_size: None,
+            persistent: Backuped::default(),
+            tags: HashMap::default(),
+            chain_id: DEFAULT_CHAIN_ID,
+        }
+    }
 }
 
 /// Persistent storage for Motsu test VM.
