@@ -1128,7 +1128,6 @@ mod vm_tests {
     use crate as motsu;
     use crate::prelude::*;
 
-    /// Default Chain ID
     const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
     const CUSTOM_CHAIN_ID: u64 = 12345678987654321;
 
