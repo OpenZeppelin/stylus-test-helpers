@@ -49,7 +49,6 @@
 //!     VMContext::current().set_chain_id(11155111);
 //!     
 //!     // Now any contract code that depends on the chain ID will use this value
-//!     // This is useful for testing EIP-712 signatures, ERC20Permit, etc.
 //! }
 //! ```
 //!

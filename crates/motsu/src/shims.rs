@@ -142,7 +142,7 @@ unsafe extern "C" fn contract_address(address: *mut u8) {
 ///
 /// [`CHAINID`]: https://www.evm.codes/#46
 #[no_mangle]
-pub(crate) unsafe extern "C" fn chainid() -> u64 {
+unsafe extern "C" fn chainid() -> u64 {
     VMContext::current().chain_id()
 }
 
