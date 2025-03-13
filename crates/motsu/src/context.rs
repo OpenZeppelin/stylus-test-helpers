@@ -18,6 +18,7 @@ use stylus_sdk::{
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
+    testing::constants::DEFAULT_CHAIN_ID,
     ArbResult,
 };
 
@@ -38,10 +39,6 @@ use crate::{
 /// accessed twice from the same thread.
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
-
-/// The same chain ID used in Nitro Testnode.
-/// See https://github.com/OffchainLabs/nitro-testnode/blob/72cd4e5d50c2ae04ee8cb56b132ee7267b6294d2/test-node.bash#L606C123-L606C129
-const DEFAULT_CHAIN_ID: u64 = 412346;
 
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
