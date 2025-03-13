@@ -178,6 +178,8 @@
 //!
 //! [test_attribute]: crate::test
 #![allow(deprecated)]
+// We're ignoring the warning: "unexpected `cfg` condition value: `stylus-test`"
+#![allow(unexpected_cfgs)]
 #[cfg(test)]
 extern crate alloc;
 
