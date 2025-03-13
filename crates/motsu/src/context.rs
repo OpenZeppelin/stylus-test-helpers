@@ -43,7 +43,7 @@ static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
 /// We'll be able to remove this after we can enable the `stylus-test` feature,
 /// which should happen after we implement the [`stylus_sdk::testing::Host`]
 /// trait.
-const DEFAULT_CHAIN_ID: u64 = 42161;
+pub const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]

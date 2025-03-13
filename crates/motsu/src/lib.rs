@@ -1130,7 +1130,7 @@ mod proxies_tests {
 
 #[cfg(test)]
 mod vm_tests {
-    use stylus_sdk::{block, prelude::*, testing::constants::DEFAULT_CHAIN_ID};
+    use stylus_sdk::{block, prelude::*};
 
     use crate as motsu;
     use crate::prelude::*;
