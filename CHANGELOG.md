@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
+- Changed Chain ID type from `U256` to native `u64` to align with Stylus implementation. #XX
+
 ## [0.6.0] - 2025-03-11
 
 ### Added
