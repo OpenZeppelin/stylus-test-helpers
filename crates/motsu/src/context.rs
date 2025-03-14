@@ -45,10 +45,9 @@ static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
 // TODO: remove this after we can enable the `stylus-test` feature, which should
 // happen after we refactor `motsu` to implement a mock
 // `stylus_core::host::Host` trait.
-/// Same value as
-/// [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`][chain_id].
+/// Arbitrum one chain id from [chain info].
 ///
-/// [chain_id]: https://github.com/OffchainLabs/stylus-sdk-rs/blob/b1993362d214b27ceb67e0aa01ee2a6397f376b4/stylus-test/src/constants.rs#L15
+/// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
 pub const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.

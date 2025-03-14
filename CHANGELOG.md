@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Account` can no longer be created at a predetermined address. #70
 - `Funding::balance` is removed. #70
-- Bump Stylus SDK to v0.8.2. #46
+- Bump Stylus SDK to v0.8.3-rc.1 #75
 
 ## [0.6.0] - 2025-03-11
 
