@@ -1006,22 +1006,15 @@ fn create_signer(private_key: &[u8]) -> PrivateKeySigner {
     )
 }
 
-/// Fund the account.
+/// Allows funding account with the chain's native token.
 pub trait Funding {
-    /// Fund the account with the given `value`.
+    /// Fund the account with the specified amount of the chain's native token.
     fn fund(&self, value: U256);
-
-    /// Get the balance of the account.
-    fn balance(&self) -> U256;
 }
 
 impl Funding for Address {
     fn fund(&self, value: U256) {
         VMContext::current().add_assign_balance(*self, value);
-    }
-
-    fn balance(&self) -> U256 {
-        VMContext::current().balance(*self)
     }
 }
 
@@ -1029,19 +1022,29 @@ impl Funding for Account {
     fn fund(&self, value: U256) {
         self.address().fund(value);
     }
-
-    fn balance(&self) -> U256 {
-        self.address().balance()
-    }
 }
 
 impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     fn fund(&self, value: U256) {
         self.address().fund(value);
     }
+}
 
+/// Provides access to an account's native token balance.
+pub trait Balance {
+    /// Returns the account's current balance of the chain's native token.
+    fn balance(&self) -> U256;
+}
+
+impl Balance for Account {
     fn balance(&self) -> U256 {
-        self.address().balance()
+        VMContext::current().balance(self.address())
+    }
+}
+
+impl<ST: StorageType + VMRouter + 'static> Balance for Contract<ST> {
+    fn balance(&self) -> U256 {
+        VMContext::current().balance(self.address())
     }
 }
 
