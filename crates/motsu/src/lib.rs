@@ -21,7 +21,7 @@
 //!     #[motsu::test]
 //!     fn reads_balance(
 //!         contract: Contract<Erc20>,
-//!         alice: Account,
+//!         alice: Address,
 //!     ) {
 //!         // Access storage.
 //!         let balance = contract.sender(alice).balance_of(Address::ZERO);
@@ -29,7 +29,10 @@
 //!     }
 //! }
 //! ```
-//! You can even access the underlying account signer:
+//!
+//! If you need to instantiate an accound that contains a signer and a private
+//! key, you can use [`crate::prelude::Account`] instead of
+//! [`stylus_sdk::alloy_primitives::Address`]:
 //!
 //! ```rust,ignore
 //! #[cfg(test)]
@@ -39,8 +42,8 @@
 //!
 //!     #[motsu::test]
 //!     fn signs_message(alice: Account) {
-//!         let signer = alice.signer();
 //!         let msg = "message".as_bytes();
+//!         let signer = alice.signer();
 //!         assert!(signer.sign_message_sync(msg).is_ok());
 //!     }
 //! }
@@ -61,7 +64,7 @@
 //! #[motsu::test]
 //! fn test_with_custom_chain_id(
 //!     contract: Contract<MyContract>,
-//!     alice: Account,
+//!     alice: Address,
 //! ) {
 //!     // Default chain ID is 42161 (Arbitrum One)
 //!
@@ -90,7 +93,7 @@
 //!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
 //!
 //!  #[motsu::test]
-//!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
+//!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Address) {
 //!     let one = uint!(1_U256);
 //!     let ten = uint!(10_U256);
 //!
@@ -112,9 +115,9 @@
 //! ### External Calls
 //!
 //! Multiple external calls are supported in Motsu.
-//! Assuming `Proxy` is a contract that exposes `#[public]` function
-//! `Proxy::call_proxy`, where it adds `one` to the passed argument and calls
-//! next `Proxy` contract at the address provided during initialization.
+//! Assuming `Proxy` is a contract that exposes [`stylus_sdk::prelude::public`]
+//! function `Proxy::call_proxy`, where it adds `one` to the passed argument and
+//! calls next `Proxy` contract at the address provided during initialization.
 //! The following test case can emulate a call chain of three `Proxy` contracts:
 //!
 //! ```rust,ignore
@@ -126,7 +129,7 @@
 //!     proxy1: Contract<Proxy>,
 //!     proxy2: Contract<Proxy>,
 //!     proxy3: Contract<Proxy>,
-//!     alice: Account,
+//!     alice: Address,
 //!  ) {
 //!     let one = uint!(1_U256);
 //!     let ten = uint!(10_U256);

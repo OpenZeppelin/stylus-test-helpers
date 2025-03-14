@@ -24,7 +24,7 @@ mod tests {
     #[motsu::test]
     fn reads_balance(
         contract: Contract<Erc20>,
-        alice: Account,
+        alice: Address,
     ) {
         // Access storage.
         let balance = contract.sender(alice).balance_of(Address::ZERO);
@@ -33,7 +33,8 @@ mod tests {
 }
 ```
 
-You can even access the underlying account signer:
+If you need to instantiate an accound that contains a signer and a private key,
+you can use `Account` instead of `Address`:
 
 ```rust
 #[cfg(test)]
@@ -43,29 +44,55 @@ mod tests {
 
     #[motsu::test]
     fn signs_message(alice: Account) {
-        let signer = alice.signer();
         let msg = "message".as_bytes();
+        let signer = alice.signer();
         assert!(signer.sign_message_sync(msg).is_ok());
     }
 }
 ```
 
+### Global Variables
+
+Motsu allows you to manipulate certain global variables that affect the
+execution environment:
+
+#### Chain ID
+
+You can get and set the Chain ID in tests using the `VMContext` API:
+
+```rust,ignore
+use motsu::prelude::*;
+
+#[motsu::test]
+fn test_with_custom_chain_id(
+    contract: Contract<MyContract>,
+    alice: Address,
+) {
+    // Default chain ID is 42161 (Arbitrum One)
+
+    // Set chain ID to 11155111 (Sepolia testnet)
+    VMContext::current().set_chain_id(11155111);
+
+    // Now any contract code that depends on the chain ID will use this
+    // value
+}
+```
+
 ### Sender and Value
 
-Function `Contract::sender()` is necessary to trigger call
-to a contract, and should accept an `Account` or `Address` as an argument.
+Function `Contract::sender()` is necessary to trigger call to a contract, and
+should accept an `Account` or `Address` as an argument.
 
-Alternatively `Contract::sender_and_value()` can be used to
-pass additional value to the contract.
-To make a payable call work, user should be funded with
-`Account::fund` method (there is no funding by default),
-like in example below:
+Alternatively `Contract::sender_and_value()` can be used to pass additional
+value to the contract.
+To make a payable call work, user should be funded with `Funding::fund` method
+(each account has zero balance by default), like in example below:
 
 ```rust
 use motsu::prelude::*;
 
 #[motsu::test]
-fn pay_three_proxies(proxy: Contract<Proxy>, alice: Account) {
+fn pay_three_proxies(proxy: Contract<Proxy>, alice: Address) {
     let one = uint!(1_U256);
     let ten = uint!(10_U256);
 
@@ -100,7 +127,7 @@ fn call_three_proxies(
     proxy1: Contract<Proxy>,
     proxy2: Contract<Proxy>,
     proxy3: Contract<Proxy>,
-    alice: Account,
+    alice: Address,
 ) {
     let one = uint!(1_U256);
     let ten = uint!(10_U256);
