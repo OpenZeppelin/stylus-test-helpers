@@ -974,15 +974,9 @@ impl Account {
     #[must_use]
     pub fn from_seed_slice(seed: &[u8]) -> Self {
         let private_key_bytes = Keccak256::new().update(seed).finalize();
-
-        let signing_key = SigningKey::from_slice(&private_key_bytes)
-            .expect("failed to create signing key from keccak hashed seed");
-        let signer = PrivateKeySigner::from_signing_key(signing_key);
-
-        Self {
-            address: signer.address(),
-            private_key: private_key_bytes.into(),
-        }
+        let address = create_signer(&private_key_bytes).address();
+        let private_key = private_key_bytes.into();
+        Self { address, private_key }
     }
 
     /// Creates a new account with a randomly generated private key and address.
@@ -1000,12 +994,16 @@ impl Account {
     /// Returns a signer that can be used to sign messages and transactions.
     #[must_use]
     pub fn signer(&self) -> PrivateKeySigner {
-        PrivateKeySigner::from_signing_key(
-            SigningKey::from_slice(self.private_key.as_slice()).expect(
-                "failed to recreate signing key from valid private key",
-            ),
-        )
+        create_signer(self.private_key.as_slice())
     }
+}
+
+#[inline]
+fn create_signer(private_key: &[u8]) -> PrivateKeySigner {
+    PrivateKeySigner::from_signing_key(
+        SigningKey::from_slice(private_key)
+            .expect("failed to create signing key"),
+    )
 }
 
 /// Fund the account.
