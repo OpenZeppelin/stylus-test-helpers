@@ -9,9 +9,6 @@ Japanese -- we hold a stylus in our hand.
 
 ## Usage
 
-This crate enables unit-testing for Stylus contracts. It abstracts away the
-machinery necessary for writing tests behind a `#[motsu::test]` procedural macro.
-
 Annotate tests with `#[motsu::test]` instead of `#[test]`
 to get access to VM affordances:
 
