@@ -13,9 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented `AddressVM` for `Account` and `Contract<T>`. #70
 - Added ability to set the chain ID in tests. #67
 
-### Changed
-
-
 ### Changed (Breaking)
 
 - `Account` can no longer be created at a predetermined address. #70
