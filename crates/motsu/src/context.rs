@@ -1149,10 +1149,10 @@ mod tests {
 
         #[test]
         fn account() {
-            let tag = String::from("some seed");
-            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let tag = String::from("signer");
+            let expected_private_key = b256!("6c8d7f768a6bb4aafe85e8a2f5a9680355239c7e14646ed62b044e39de154512");
             let expected_address =
-                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+                address!("0x6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
 
             let account = Account::from_tag(&tag);
             assert_eq!(expected_private_key, account.private_key);
@@ -1166,9 +1166,9 @@ mod tests {
 
         #[test]
         fn address() {
-            let tag = String::from("some seed");
+            let tag = String::from("alice");
             let expected_address =
-                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+                address!("0x9c0257114eb9399a2985f8e75dad7600c5d89fe3");
 
             let address = Address::from_tag(&tag);
             assert_eq!(expected_address, address);
@@ -1188,7 +1188,7 @@ mod tests {
         fn contract() {
             let tag = String::from("contract");
             let expected_address =
-                address!("0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6");
+                address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
 
             let contract = Contract::<SomeContract>::from_tag(&tag);
             assert_eq!(expected_address, contract.address());
