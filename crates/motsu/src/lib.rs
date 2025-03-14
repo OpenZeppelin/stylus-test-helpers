@@ -396,7 +396,7 @@ mod ping_pong_tests {
     fn external_call(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         let value = TEN;
         let ponged_value =
@@ -411,7 +411,7 @@ mod ping_pong_tests {
     fn external_call_error(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         let value = MAGIC_ERROR_VALUE;
         let err =
@@ -427,7 +427,7 @@ mod ping_pong_tests {
     fn external_call_panic(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         let value = MAGIC_ERROR_VALUE;
         ping.sender(alice).ping(pong.address(), value).motsu_unwrap();
@@ -437,7 +437,7 @@ mod ping_pong_tests {
     fn external_static_call(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         let can_ping =
             ping.sender(alice).can_ping(pong.address()).motsu_unwrap();
@@ -448,14 +448,14 @@ mod ping_pong_tests {
     fn msg_sender(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         assert_eq!(ping.sender(alice).pinged_from.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).ponged_from.get(), Address::ZERO);
 
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
-        assert_eq!(ping.sender(alice).pinged_from.get(), alice.address());
+        assert_eq!(ping.sender(alice).pinged_from.get(), alice);
         assert_eq!(pong.sender(alice).ponged_from.get(), ping.address());
     }
 
@@ -463,7 +463,7 @@ mod ping_pong_tests {
     fn has_code(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         assert!(ping.sender(alice).has_pong(pong.address()));
     }
@@ -472,7 +472,7 @@ mod ping_pong_tests {
     fn contract_address(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         assert_eq!(ping.sender(alice).contract_address.get(), Address::ZERO);
         assert_eq!(pong.sender(alice).contract_address.get(), Address::ZERO);
@@ -487,7 +487,7 @@ mod ping_pong_tests {
     fn deref_invalidated_storage_cache(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         // This test is different from `contract_address` test, since it checks
         // that `StorageType` contract correctly resets.
@@ -524,13 +524,13 @@ mod ping_pong_tests {
     // chain, this is still an allowed "feature" of motsu, so we "document" the
     // behavior with this unit test.
     #[motsu::test]
-    fn storage_cleanup(alice: Account, addr: Address) {
+    fn storage_cleanup(alice: Address, addr: Address) {
         // First contract
         let pong1 = Contract::<PongContract>::new_at(addr);
 
         pong1.sender(alice).pong(U256::ZERO).expect("should pong");
 
-        assert_eq!(alice.address(), pong1.sender(alice).ponged_from.get());
+        assert_eq!(alice, pong1.sender(alice).ponged_from.get());
         assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
         assert_eq!(addr, pong1.sender(alice).contract_address.get());
 
@@ -550,20 +550,18 @@ mod ping_pong_tests {
     fn emits_event(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Assert emitted events.
-        ping.assert_emitted(&Pinged { from: alice.address(), value: TEN });
+        ping.assert_emitted(&Pinged { from: alice, value: TEN });
         pong.assert_emitted(&Ponged { from: ping.address(), value: TEN });
 
         // Assert not emitted events
         assert!(!ping.emitted(&Pinged { from: ping.address(), value: TEN }));
-        assert!(!pong.emitted(&Ponged { from: alice.address(), value: TEN }));
-        assert!(
-            !ping.emitted(&Pinged { from: alice.address(), value: TEN + ONE })
-        );
+        assert!(!pong.emitted(&Ponged { from: alice, value: TEN }));
+        assert!(!ping.emitted(&Pinged { from: alice, value: TEN + ONE }));
         assert!(
             !pong.emitted(&Ponged { from: ping.address(), value: TEN + ONE })
         );
@@ -576,7 +574,7 @@ mod ping_pong_tests {
     fn asserted_emitted_event(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
@@ -592,17 +590,17 @@ mod ping_pong_tests {
     fn assert_reverts_emitted_event(
         ping: Contract<PingContract>,
         pong: Contract<PongContract>,
-        alice: Account,
+        alice: Address,
     ) {
         let value = MAGIC_ERROR_VALUE;
         ping.sender(alice).ping(pong.address(), value).motsu_unwrap_err();
 
         // Both events should not be emitted after revert.
-        assert!(!ping.emitted(&Pinged { from: alice.address(), value }));
+        assert!(!ping.emitted(&Pinged { from: alice, value }));
         assert!(!pong.emitted(&Ponged { from: ping.address(), value }));
 
         // Check panic assertion.
-        ping.assert_emitted(&Pinged { from: alice.address(), value });
+        ping.assert_emitted(&Pinged { from: alice, value });
     }
 }
 
@@ -852,7 +850,7 @@ mod proxies_tests {
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
@@ -872,7 +870,7 @@ mod proxies_tests {
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy1 -> ..
@@ -892,7 +890,7 @@ mod proxies_tests {
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
@@ -921,7 +919,7 @@ mod proxies_tests {
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
@@ -951,7 +949,7 @@ mod proxies_tests {
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
@@ -984,7 +982,7 @@ mod proxies_tests {
             let proxy1 = Contract::<Proxy>::new();
             let proxy2 = Contract::<Proxy>::new();
             let proxy3 = Contract::<Proxy>::new();
-            let alice = Account::random();
+            let alice = Address::random();
 
             // Set up a chain of three proxies.
             // With the given call chain: proxy1 -> proxy2 -> proxy3.
@@ -1006,7 +1004,7 @@ mod proxies_tests {
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
         proxy4: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
@@ -1052,7 +1050,7 @@ mod proxies_tests {
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
         proxy4: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
@@ -1103,7 +1101,7 @@ mod proxies_tests {
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
         proxy4: Contract<Proxy>,
-        alice: Account,
+        alice: Address,
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
@@ -1146,7 +1144,7 @@ mod proxies_tests {
 
 #[cfg(test)]
 mod vm_tests {
-    use stylus_sdk::{block, prelude::*};
+    use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
 
     use crate as motsu;
     use crate::prelude::*;
@@ -1167,7 +1165,7 @@ mod vm_tests {
     unsafe impl TopLevelStorage for ChainChecker {}
 
     #[motsu::test]
-    fn chain_id(contract: Contract<ChainChecker>, alice: Account) {
+    fn chain_id(contract: Contract<ChainChecker>, alice: Address) {
         // Default chain ID is Arbitrum One
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, DEFAULT_CHAIN_ID);
