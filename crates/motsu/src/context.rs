@@ -20,6 +20,7 @@ use stylus_sdk::{
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
+    types::AddressVM,
     ArbResult,
 };
 
@@ -1030,21 +1031,47 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     }
 }
 
-/// Provides access to an account's native token balance.
-pub trait Balance {
-    /// Returns the account's current balance of the chain's native token.
-    fn balance(&self) -> U256;
-}
-
-impl Balance for Account {
+impl AddressVM for Account {
     fn balance(&self) -> U256 {
-        VMContext::current().balance(self.address())
+        self.address().balance()
+    }
+
+    fn code(&self) -> Vec<u8> {
+        self.address().code()
+    }
+
+    fn code_size(&self) -> usize {
+        self.address().code_size()
+    }
+
+    fn code_hash(&self) -> B256 {
+        self.address().code_hash()
+    }
+
+    fn has_code(&self) -> bool {
+        self.address().has_code()
     }
 }
 
-impl<ST: StorageType + VMRouter + 'static> Balance for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> AddressVM for Contract<ST> {
     fn balance(&self) -> U256 {
-        VMContext::current().balance(self.address())
+        self.address().balance()
+    }
+
+    fn code(&self) -> Vec<u8> {
+        self.address().code()
+    }
+
+    fn code_size(&self) -> usize {
+        self.address().code_size()
+    }
+
+    fn code_hash(&self) -> B256 {
+        self.address().code_hash()
+    }
+
+    fn has_code(&self) -> bool {
+        self.address().has_code()
     }
 }
 
