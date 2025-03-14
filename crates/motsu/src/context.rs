@@ -39,10 +39,9 @@ use crate::{
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
-/// Same value as [`stylus_sdk::testing::constants::DEFAULT_CHAIN_ID`].
-/// We'll be able to remove this after we can enable the `stylus-test` feature,
-/// which should happen after we implement the [`stylus_sdk::testing::Host`]
-/// trait.
+/// Arbitrum one chain id from [chain info].
+///
+/// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
 pub const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
