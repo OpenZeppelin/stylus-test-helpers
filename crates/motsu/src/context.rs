@@ -1072,7 +1072,10 @@ impl FromTag for Address {
     ///
     /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
-        Account::from_tag(tag).address()
+        let hash = Keccak256::new().update(tag.as_bytes()).finalize();
+        let address = Address::from_slice(&hash[..20]);
+        VMContext::current().set_tag(address, tag.to_string());
+        address
     }
 }
 
