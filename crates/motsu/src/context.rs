@@ -39,7 +39,7 @@ use crate::{
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
-/// Arbitrum one chain id from [chain info]
+/// Arbitrum one chain id from [chain info].
 ///
 /// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
 pub const DEFAULT_CHAIN_ID: u64 = 42161;
