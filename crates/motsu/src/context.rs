@@ -1028,47 +1028,21 @@ impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     }
 }
 
-impl AddressVM for Account {
+/// Allows getting account's balance of chain's native token.
+pub trait Balance {
+    /// Get the chain's native token balance of the account.
+    fn balance(&self) -> U256;
+}
+
+impl Balance for Account {
     fn balance(&self) -> U256 {
         self.address().balance()
-    }
-
-    fn code(&self) -> Vec<u8> {
-        self.address().code()
-    }
-
-    fn code_size(&self) -> usize {
-        self.address().code_size()
-    }
-
-    fn code_hash(&self) -> B256 {
-        self.address().code_hash()
-    }
-
-    fn has_code(&self) -> bool {
-        self.address().has_code()
     }
 }
 
-impl<ST: StorageType + VMRouter + 'static> AddressVM for Contract<ST> {
+impl<ST: StorageType + VMRouter + 'static> Balance for Contract<ST> {
     fn balance(&self) -> U256 {
         self.address().balance()
-    }
-
-    fn code(&self) -> Vec<u8> {
-        self.address().code()
-    }
-
-    fn code_size(&self) -> usize {
-        self.address().code_size()
-    }
-
-    fn code_hash(&self) -> B256 {
-        self.address().code_hash()
-    }
-
-    fn has_code(&self) -> bool {
-        self.address().has_code()
     }
 }
 

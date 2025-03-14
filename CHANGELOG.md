@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Account` can be created from string and byte seeds, and can return a signer. #70
-- Implemented `AddressVM` for `Account` and `Contract<T>`. #70
+- Implemented `Balance` trait for `Account` and `Contract<T>`. #70
 - Added ability to set the chain ID in tests. #67
 
 ### Changed (Breaking)
