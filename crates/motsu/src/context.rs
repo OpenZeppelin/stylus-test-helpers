@@ -999,7 +999,6 @@ impl Account {
     }
 }
 
-#[inline]
 fn create_signer(private_key: &[u8]) -> PrivateKeySigner {
     PrivateKeySigner::from_signing_key(
         SigningKey::from_slice(private_key)
