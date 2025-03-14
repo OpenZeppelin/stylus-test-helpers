@@ -998,11 +998,6 @@ impl Account {
     }
 
     /// Returns a signer that can be used to sign messages and transactions.
-    ///
-    /// # Panics
-    ///
-    /// * If the signing key creation fails with the current private key
-    ///   (shouldn't happen).
     #[must_use]
     pub fn signer(&self) -> PrivateKeySigner {
         PrivateKeySigner::from_signing_key(
