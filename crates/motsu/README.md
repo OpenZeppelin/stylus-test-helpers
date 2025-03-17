@@ -4,8 +4,9 @@ This crate enables unit-testing for Stylus contracts. It abstracts away the
 machinery necessary for writing tests behind a `#[motsu::test]` procedural
 macro.
 
-`motsu` means ["to hold"](https://jisho.org/word/%E6%8C%81%E3%81%A4) in
-Japanese -- we hold a stylus in our hand.
+`motsu` means ["to hold"][to-hold] in Japanese -- we hold a stylus in our hand.
+
+[to-hold]: https://jisho.org/word/%E6%8C%81%E3%81%A4
 
 ## Usage
 
@@ -225,9 +226,10 @@ That being said, please do open an issue to start a discussion, keeping in mind
 our [code of conduct] and [contribution guidelines].
 
 [code of conduct]: ../../CODE_OF_CONDUCT.md
-
 [contribution guidelines]: ../../CONTRIBUTING.md
 
 ## Security
 
-Refer to our [Security Policy](../../SECURITY.md) for more details.
+Refer to our [Security Policy] for more details.
+
+[Security Policy]: ../../SECURITY.md
