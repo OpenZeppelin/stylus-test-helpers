@@ -55,7 +55,7 @@ execution environment:
 
 #### Chain ID
 
-You can get and set the Chain ID in tests using the `VMContext` API:
+You can set the Chain ID in tests using the `VMContext` API:
 
 ```rust,ignore
 use motsu::prelude::*;
@@ -70,8 +70,8 @@ fn test_with_custom_chain_id(
     // Set chain ID to 11155111 (Sepolia testnet)
     VMContext::current().set_chain_id(11155111);
 
-    // Now any contract code that depends on the chain ID will use this
-    // value
+    // Now any contract code that depends on `block::chainid()` 
+    // will use this value
 }
 ```
 
