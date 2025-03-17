@@ -11,13 +11,16 @@ use std::{
 };
 
 use alloy_primitives::{Address, Bytes, LogData, B256, U256};
+use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
+use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
+    types::AddressVM,
     ArbResult,
 };
 
@@ -39,10 +42,13 @@ use crate::{
 static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
     Lazy::new(DashMap::new);
 
+// TODO: remove this after we can enable the `stylus-test` feature, which should
+// happen after we refactor `motsu` to implement a mock
+// `stylus_core::host::Host` trait.
 /// Arbitrum one chain id from [chain info].
 ///
 /// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
-pub const DEFAULT_CHAIN_ID: u64 = 42161;
+pub(crate) const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
@@ -521,6 +527,17 @@ impl VMContext {
         MOTSU_VM.entry(self).or_default().tags.insert(address, tag);
     }
 
+    /// Get tag at `address`.
+    #[cfg(test)]
+    pub(crate) fn get_tag(self, address: Address) -> Option<String> {
+        MOTSU_VM
+            .entry(self)
+            .or_default()
+            .tags
+            .get_key_value(&address)
+            .map(|kv| kv.1.clone())
+    }
+
     /// Replaces non-checksumed addresses in the `msg` with corresponding tags
     /// (if any).
     pub(crate) fn replace_with_tags(self, mut msg: String) -> String {
@@ -922,10 +939,12 @@ pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
     unsafe { ST::new(U256::ZERO, 0, VM(WasmVM {})) }
 }
 
-/// Account used to call contracts.
+/// Account that can be used to interact with contracts in test environments.
+/// Used to interact with and sign transactions for contracts.
 #[derive(Clone, Copy)]
 pub struct Account {
     address: Address,
+    private_key: B256,
 }
 
 impl From<Account> for Address {
@@ -935,16 +954,33 @@ impl From<Account> for Address {
 }
 
 impl Account {
-    /// Create a new account with the given `address`.
+    /// Creates an account with an address derived from the provided seed
+    /// string.
+    ///
+    /// The seed string is hashed with Keccak256 to generate the private key.
+    /// The same seed will always produce the same account address.
     #[must_use]
-    pub const fn new_at(address: Address) -> Self {
-        Self { address }
+    pub fn from_seed(seed: &str) -> Self {
+        Self::from_seed_slice(seed.as_bytes())
     }
 
-    /// Create a new account with random address.
+    /// Creates an account with an address derived from the provided seed bytes.
+    ///
+    /// The seed bytes are hashed with Keccak256 to generate the private key.
+    /// The same seed will always produce the same account address.
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
+    pub fn from_seed_slice(seed: &[u8]) -> Self {
+        let private_key_bytes = Keccak256::new().update(seed).finalize();
+        let address = create_signer(&private_key_bytes).address();
+        let private_key = private_key_bytes.into();
+        Self { address, private_key }
+    }
+
+    /// Creates a new account with a randomly generated private key and address.
     #[must_use]
     pub fn random() -> Self {
-        Self::new_at(Address::random())
+        Self::from_seed_slice(B256::random().as_slice())
     }
 
     /// Get account's address.
@@ -952,24 +988,31 @@ impl Account {
     pub fn address(&self) -> Address {
         self.address
     }
+
+    /// Returns a signer that can be used to sign messages and transactions.
+    #[must_use]
+    pub fn signer(&self) -> PrivateKeySigner {
+        create_signer(self.private_key.as_slice())
+    }
 }
 
-/// Fund the account.
-pub trait Funding {
-    /// Fund the account with the given `value`.
-    fn fund(&self, value: U256);
+/// Utility wrapper function for instantiating [`PrivateKeySigner`].
+fn create_signer(private_key: &[u8]) -> PrivateKeySigner {
+    PrivateKeySigner::from_signing_key(
+        SigningKey::from_slice(private_key)
+            .expect("failed to create signing key"),
+    )
+}
 
-    /// Get the balance of the account.
-    fn balance(&self) -> U256;
+/// Allows funding account with the chain's native token.
+pub trait Funding {
+    /// Fund the account with the specified amount of the chain's native token.
+    fn fund(&self, value: U256);
 }
 
 impl Funding for Address {
     fn fund(&self, value: U256) {
         VMContext::current().add_assign_balance(*self, value);
-    }
-
-    fn balance(&self) -> U256 {
-        VMContext::current().balance(*self)
     }
 }
 
@@ -977,29 +1020,58 @@ impl Funding for Account {
     fn fund(&self, value: U256) {
         self.address().fund(value);
     }
-
-    fn balance(&self) -> U256 {
-        self.address().balance()
-    }
 }
 
 impl<ST: StorageType + VMRouter + 'static> Funding for Contract<ST> {
     fn fund(&self, value: U256) {
         self.address().fund(value);
     }
+}
 
+/// Allows getting account's balance of chain's native token.
+pub trait Balance {
+    /// Get the chain's native token balance of the account.
+    fn balance(&self) -> U256;
+}
+
+impl Balance for Account {
     fn balance(&self) -> U256 {
         self.address().balance()
     }
 }
 
-/// Deterministically derive from a string representation.
+impl<ST: StorageType + VMRouter + 'static> Balance for Contract<ST> {
+    fn balance(&self) -> U256 {
+        self.address().balance()
+    }
+}
+
+/// Allows creating entities deterministically from a string identifier.
+///
+/// This trait enables consistent generation of addresses and contracts across
+/// test runs using meaningful string identifiers (tags).
 pub trait FromTag {
-    /// Deterministically derive inner address of `Self` from a string `tag`.
+    /// Creates an instance deterministically derived from the provided tag.
+    ///
+    /// The same tag will always produce the same entity.
     fn from_tag(tag: &str) -> Self;
 }
 
+impl FromTag for Account {
+    /// Creates an account derived from the tag string.
+    ///
+    /// Also registers the tag in the test context for debugging purposes.
+    fn from_tag(tag: &str) -> Self {
+        let account = Account::from_seed(tag);
+        VMContext::current().set_tag(account.address(), tag.to_string());
+        account
+    }
+}
+
 impl FromTag for Address {
+    /// Creates an Ethereum address derived from the tag string.
+    ///
+    /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         let hash = Keccak256::new().update(tag.as_bytes()).finalize();
         let address = Address::from_slice(&hash[..20]);
@@ -1008,14 +1080,124 @@ impl FromTag for Address {
     }
 }
 
-impl FromTag for Account {
+impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
+    /// Creates a contract at an address derived from the tag string.
+    ///
+    /// This allows deploying contracts to deterministic addresses for testing.
+    /// Also registers the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
-        Account::new_at(Address::from_tag(tag))
+        Contract::new_at(Address::from_tag(tag))
     }
 }
 
-impl<ST: StorageType + VMRouter + 'static> FromTag for Contract<ST> {
-    fn from_tag(tag: &str) -> Self {
-        Contract::new_at(Address::from_tag(tag))
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::{address, b256};
+    use stylus_sdk::prelude::*;
+
+    use super::{Account, Address, Contract, FromTag};
+    use crate::context::VMContext;
+
+    mod account {
+        use super::*;
+
+        #[test]
+        fn from_seed() {
+            let seed = "some seed";
+            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+
+            let account = Account::from_seed(&seed);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
+        }
+
+        #[test]
+        fn from_seed_bytes() {
+            let seed = [115, 111, 109, 101, 32, 115, 101, 101, 100];
+            let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
+            let expected_address =
+                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+
+            let account = Account::from_seed_slice(&seed);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
+        }
+
+        #[test]
+        fn random() {
+            let account = Account::random();
+            assert!(!account.private_key.is_zero());
+            assert!(!account.address().is_zero());
+
+            // verify signer can be recreated
+            let signer = account.signer();
+            assert_eq!(account.address(), signer.address());
+        }
+    }
+
+    mod from_tag {
+        use super::*;
+
+        #[test]
+        fn account() {
+            let tag = String::from("signer");
+            let expected_private_key = b256!("6c8d7f768a6bb4aafe85e8a2f5a9680355239c7e14646ed62b044e39de154512");
+            let expected_address =
+                address!("0x6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
+
+            let account = Account::from_tag(&tag);
+            assert_eq!(expected_private_key, account.private_key);
+            assert_eq!(expected_address, account.address());
+
+            assert_eq!(
+                Some(tag),
+                VMContext::current().get_tag(account.address())
+            );
+        }
+
+        #[test]
+        fn address() {
+            let tag = String::from("alice");
+            let expected_address =
+                address!("0x9c0257114eb9399a2985f8e75dad7600c5d89fe3");
+
+            let address = Address::from_tag(&tag);
+            assert_eq!(expected_address, address);
+
+            assert_eq!(Some(tag), VMContext::current().get_tag(address));
+        }
+
+        #[storage]
+        struct SomeContract;
+
+        #[public]
+        impl SomeContract {}
+
+        unsafe impl TopLevelStorage for SomeContract {}
+
+        #[test]
+        fn contract() {
+            let tag = String::from("contract");
+            let expected_address =
+                address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
+
+            let contract = Contract::<SomeContract>::from_tag(&tag);
+            assert_eq!(expected_address, contract.address());
+
+            assert_eq!(
+                Some(tag),
+                VMContext::current().get_tag(contract.address())
+            );
+        }
     }
 }
