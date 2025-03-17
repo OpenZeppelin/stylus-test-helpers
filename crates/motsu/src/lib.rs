@@ -1150,7 +1150,7 @@ mod vm_tests {
     use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
 
     use crate as motsu;
-    use crate::prelude::*;
+    use crate::{context::DEFAULT_CHAIN_ID, prelude::*};
 
     const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
     const CUSTOM_CHAIN_ID: u64 = 12345678987654321;

@@ -48,7 +48,7 @@ static MOTSU_VM: Lazy<DashMap<VMContext, VMContextStorage>> =
 /// Arbitrum one chain id from [chain info].
 ///
 /// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
-pub const DEFAULT_CHAIN_ID: u64 = 42161;
+pub(crate) const DEFAULT_CHAIN_ID: u64 = 42161;
 
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
