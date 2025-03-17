@@ -56,7 +56,7 @@
 //!
 //! #### Chain ID
 //!
-//! You can get and set the Chain ID in tests using the `VMContext` API:
+//! You can set the Chain ID in tests using the `VMContext` API:
 //!
 //! ```rust,ignore
 //! use motsu::prelude::*;
