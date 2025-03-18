@@ -1,4 +1,4 @@
-//! Procedural macro definitions used in `motsu`.
+#![doc = include_str!("../README.md")]
 use proc_macro::TokenStream;
 
 /// Shorthand to print nice errors.
