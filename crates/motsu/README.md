@@ -71,7 +71,7 @@ fn test_with_custom_chain_id(
     // Set chain ID to 11155111 (Sepolia testnet)
     VMContext::current().set_chain_id(11155111);
 
-    // Now any contract code that depends on `block::chainid()` 
+    // Now any contract code that depends on `block::chainid()`
     // will use this value
 }
 ```

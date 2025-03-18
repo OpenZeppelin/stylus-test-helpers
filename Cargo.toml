@@ -28,7 +28,7 @@ all = "warn"
 const-hex = { version = "1.11.1", default-features = false }
 once_cell = "1.19.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
-stylus-sdk = { version = "0.8.3-rc.1", default-features = false }
+stylus-sdk = { version = "0.8.3", default-features = false }
 dashmap = "6.1.0"
 syn = { version = "2.0.58", features = ["full"] }
 proc-macro2 = "1.0.79"
