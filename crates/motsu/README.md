@@ -1,7 +1,7 @@
 # Motsu (持つ) - Unit Testing for Stylus
 
 This crate enables unit-testing for Stylus contracts. It abstracts away the
-machinery necessary for writing tests behind a `#[motsu::test]` procedural
+machinery necessary for writing tests behind a [`#[motsu::test]`][test_attribute] procedural
 macro.
 
 `motsu` means ["to hold"][to-hold] in Japanese -- we hold a stylus in our hand.
@@ -10,7 +10,7 @@ macro.
 
 ## Usage
 
-Annotate tests with `#[motsu::test]` instead of `#[test]`
+Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
 to get access to VM affordances:
 
 ```rust
@@ -32,7 +32,7 @@ mod tests {
 ```
 
 If you need to instantiate an accound that contains a signer and a private key,
-you can use `Account` instead of `Address`:
+you can use [`Account`][account] instead of [`Address`][address]:
 
 ```rust
 #[cfg(test)]
@@ -56,7 +56,7 @@ execution environment:
 
 #### Chain ID
 
-You can set the Chain ID in tests using the `VMContext` API:
+You can set the Chain ID in tests using the [`VMContext`][vm_context] API:
 
 ```rust,ignore
 use motsu::prelude::*;
@@ -78,12 +78,14 @@ fn test_with_custom_chain_id(
 
 ### Sender and Value
 
-Function `Contract::sender()` is necessary to trigger call to a contract, and
-should accept an `Account` or `Address` as an argument.
+Function [`Contract::sender()`][contract_sender] is necessary to trigger call to a contract, and
+should accept an [`Account`][account] or [`Address`][address] as an
+argument.
 
-Alternatively `Contract::sender_and_value()` can be used to pass additional
+Alternatively [`Contract::sender_and_value()`][contract_sender_and_value] can be used to pass
+additional
 value to the contract.
-To make a payable call work, user should be funded with `Funding::fund` method
+To make a payable call work, user should be funded with [`Funding::fund`][funding_fund] method
 (each account has zero balance by default), like in example below:
 
 ```rust
@@ -112,7 +114,7 @@ fn pay_three_proxies(proxy: Contract<Proxy>, alice: Address) {
 ### External Calls
 
 Multiple external calls are supported in Motsu.
-Assuming `Proxy` is a contract that exposes (`#[public]`) function `call_proxy`,
+Assuming `Proxy` is a contract that exposes ([`#[public]`][stylus_sdk_public]) function `call_proxy`,
 where it adds `one` to the passed argument and calls next `Proxy` contract
 at the address provided during initialization.
 The following test case can emulate a call chain of three `Proxy` contracts:
@@ -147,8 +149,8 @@ fn call_three_proxies(
 ### Checking Events
 
 It is possible to check emitted events by specific contract with
-`Contract::emitted` method.
-And assert with `Contract::assert_emitted` that will print all matching
+[`Contract::emitted`][contract_emitted] method.
+And assert with [`Contract::assert_emitted`][contract_assert_emitted] that will print all matching
 events in case of failed assertion.
 
 ### Transaction Revert
@@ -156,11 +158,11 @@ events in case of failed assertion.
 To revert a transaction in case of `Result::Err`, you should call one of
 the following functions:
 
-- `ResultExt::motsu_unwrap`
-- `ResultExt::motsu_unwrap_err`
-- `ResultExt::motsu_expect`
-- `ResultExt::motsu_expect_err`
-- `ResultExt::motsu_res`
+- [`ResultExt::motsu_unwrap`][result_motsu_unwrap]
+- [`ResultExt::motsu_unwrap_err`][result_motsu_unwrap_err]
+- [`ResultExt::motsu_expect`][result_motsu_expect]
+- [`ResultExt::motsu_expect_err`][result_motsu_expect_err]
+- [`ResultExt::motsu_res`][result_motsu_res]
 
 ```rust, ignore
 const FOUR: U256 = uint!(4_U256);
@@ -178,7 +180,7 @@ Panics in contract code are not handled as a revert and will fail the test.
 ### Notes
 
 Annotating a test function that accepts no parameters will make
-`#[motsu::test]` behave the same as `#[test]`.
+[`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
 
 ```rust,ignore
 #[cfg(test)]
@@ -191,9 +193,10 @@ mod tests {
 ```
 
 **Important:** To use a contract in tests, you must ensure it implements the
-unsafe trait `stylus_sdk::prelude::TopLevelStorage`.
-While this trait is automatically derived for contracts marked with `#[entrypoint]`,
-you'll need to implement it manually for any contract without this attribute:
+unsafe trait [`TopLevelStorage`][stylus_sdk_top_level_storage].
+While this trait is automatically derived for contracts marked with
+[`#[entrypoint]`][stylus_sdk_entrypoint], you'll need to implement
+it manually for any contract without this attribute:
 
 ```rust
  use stylus_sdk::{
@@ -226,6 +229,7 @@ That being said, please do open an issue to start a discussion, keeping in mind
 our [code of conduct] and [contribution guidelines].
 
 [code of conduct]: ../../CODE_OF_CONDUCT.md
+
 [contribution guidelines]: ../../CONTRIBUTING.md
 
 ## Security
@@ -233,3 +237,37 @@ our [code of conduct] and [contribution guidelines].
 Refer to our [Security Policy] for more details.
 
 [Security Policy]: ../../SECURITY.md
+
+[test_attribute]: crate::test
+
+[account]: crate::prelude::Account
+
+[address]: stylus_sdk::alloy_primitives::Address
+
+[vm_context]: crate::prelude::VMContext
+
+[contract_sender]: crate::prelude::Contract::sender
+
+[contract_sender_and_value]: crate::prelude::Contract::sender_and_value
+
+[funding_fund]: crate::prelude::Funding::fund
+
+[stylus_sdk_public]: stylus_sdk::prelude::public
+
+[contract_emitted]: crate::prelude::Contract::emitted
+
+[contract_assert_emitted]: crate::prelude::Contract::assert_emitted
+
+[result_motsu_unwrap]: crate::prelude::ResultExt::motsu_unwrap
+
+[result_motsu_unwrap_err]: crate::prelude::ResultExt::motsu_unwrap_err
+
+[result_motsu_expect]: crate::prelude::ResultExt::motsu_expect
+
+[result_motsu_expect_err]: crate::prelude::ResultExt::motsu_expect_err
+
+[result_motsu_res]: crate::prelude::ResultExt::motsu_res
+
+[stylus_sdk_top_level_storage]: stylus_sdk::prelude::TopLevelStorage
+
+[stylus_sdk_entrypoint]: stylus_sdk::prelude::entrypoint
