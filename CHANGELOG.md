@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+### Changed (Breaking)
+
+### Changed
+
+## [0.7.0] - 2025-03-19
+
+### Added
+
+- Enabled 'stylus-test' SDK feature by default. #78
 - `Account` can be created from string and byte seeds, and can return a signer. #70
 - Implemented `Balance` trait for `Account` and `Contract<T>`. #70
 - Added ability to set the chain ID in tests. #67
