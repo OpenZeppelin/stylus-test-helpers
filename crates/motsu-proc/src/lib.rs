@@ -25,7 +25,7 @@ mod test;
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// #[cfg(test)]
 /// mod tests {
 ///     #[motsu::test]

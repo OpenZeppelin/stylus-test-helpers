@@ -58,7 +58,7 @@ execution environment:
 
 You can set the Chain ID in tests using the [`VMContext`][vm_context] API:
 
-```rust,ignore
+```rust
 use motsu::prelude::*;
 
 #[motsu::test]
@@ -71,7 +71,7 @@ fn test_with_custom_chain_id(
     // Set chain ID to 11155111 (Sepolia testnet)
     VMContext::current().set_chain_id(11155111);
 
-    // Now any contract code that depends on `block::chainid()` 
+    // Now any contract code that depends on `block::chainid()`
     // will use this value
 }
 ```
@@ -164,7 +164,7 @@ the following functions:
 - [`ResultExt::motsu_expect_err`][result_motsu_expect_err]
 - [`ResultExt::motsu_res`][result_motsu_res]
 
-```rust, ignore
+```rust,ignore
 const FOUR: U256 = uint!(4_U256);
 
 // If the argument is `FOUR`, the call should revert.
@@ -199,7 +199,9 @@ While this trait is automatically derived for contracts marked with
 it manually for any contract without this attribute:
 
 ```rust
- use stylus_sdk::{
+extern crate alloc;
+
+use stylus_sdk::{
     storage::{StorageMap, StorageU256, StorageAddress},
     prelude::*,
     alloy_primitives::Address,

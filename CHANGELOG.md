@@ -17,9 +17,9 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Changed (Breaking)
 
+- Bump Stylus SDK to `v0.8.3` #77
 - `Account` can no longer be created at a predetermined address. #70
 - `Funding::balance` is removed. #70
-- Bump Stylus SDK to v0.8.3-rc.1 #75
 
 ## [0.6.0] - 2025-03-11
 
