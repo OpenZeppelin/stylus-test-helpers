@@ -26,10 +26,10 @@ Add motsu to your project's dependencies:
 
 ```toml
 [dev-dependencies]
-motsu = "0.6.0"
+motsu = "0.7.0"
 
 [dependencies]
-stylus-sdk = { version = "0.8.3", default-features = false, features = [
+stylus-sdk = { version = "=0.8.3", default-features = false, features = [
   "mini-alloc",
 ] }
 ```

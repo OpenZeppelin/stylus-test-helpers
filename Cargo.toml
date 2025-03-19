@@ -42,7 +42,7 @@ k256 = { version = "=0.13.4", default-features = false }
 
 # members
 motsu = { path = "crates/motsu" }
-motsu-proc = { path = "crates/motsu-proc", version = ">=0.6.0, <=0.7.0" }
+motsu-proc = { path = "crates/motsu-proc", version = "=0.7.0" }
 
 [profile.release]
 codegen-units = 1
