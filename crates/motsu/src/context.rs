@@ -4,7 +4,6 @@ use core::fmt::Debug;
 use std::{
     cell::Cell,
     collections::HashMap,
-    hash::Hash,
     ops::{Deref, DerefMut},
     ptr, slice,
     thread::ThreadId,
@@ -936,7 +935,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
 /// `0` offset.
 pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
-    unsafe { ST::new(U256::ZERO, 0, VM(WasmVM {})) }
+    unsafe { ST::new(U256::ZERO, 0, VM { host: Box::new(WasmVM {}) }) }
 }
 
 /// Account that can be used to interact with contracts in test environments.

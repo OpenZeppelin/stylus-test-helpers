@@ -1,7 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![allow(deprecated)]
-// We're ignoring the warning: "unexpected `cfg` condition value: `stylus-test`"
-#![allow(unexpected_cfgs)]
 #[cfg(test)]
 extern crate alloc;
 
