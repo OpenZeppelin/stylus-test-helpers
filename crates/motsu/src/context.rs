@@ -1155,8 +1155,8 @@ mod tests {
             let account = Account::from_seed("seed");
             let signer = account.signer();
 
-            let signer_pk = signer.to_bytes();
-            assert_eq!(account.private_key, signer_pk);
+            let signing_key = signer.to_bytes();
+            assert_eq!(account.private_key, signing_key);
         }
 
         #[test]
