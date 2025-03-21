@@ -1214,6 +1214,19 @@ mod tests {
             let expected_address =
                 address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
 
+            let contract = Contract::<SomeContract>::from_tag(&tag);
+
+            assert_eq!(expected_address, contract.address());
+            // this works because `contract` is not dropped, and storage is
+            // still populated
+            assert_eq!(
+                Some(tag.clone()),
+                VMContext::current().get_tag(contract.address())
+            );
+
+            // this will fail on the tag (2nd) assertion because on calling
+            // `.address()`, the temporary `Contract<SomeContract>` value is
+            // dropped
             let contract = Contract::<SomeContract>::from_tag(&tag).address();
 
             assert_eq!(expected_address, contract);
