@@ -1154,8 +1154,8 @@ mod tests {
         fn account_and_its_signer_have_same_private_keys() {
             let account = Account::from_seed("seed");
             let signer = account.signer();
-
             let signing_key = signer.to_bytes();
+
             assert_eq!(account.private_key, signing_key);
         }
 
@@ -1179,9 +1179,9 @@ mod tests {
                 address!("0x6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
 
             let account = Account::from_tag(&tag);
+
             assert_eq!(expected_private_key, account.private_key);
             assert_eq!(expected_address, account.address());
-
             assert_eq!(
                 Some(tag),
                 VMContext::current().get_tag(account.address())
@@ -1195,8 +1195,8 @@ mod tests {
                 address!("0x9c0257114eb9399a2985f8e75dad7600c5d89fe3");
 
             let address = Address::from_tag(&tag);
-            assert_eq!(expected_address, address);
 
+            assert_eq!(expected_address, address);
             assert_eq!(Some(tag), VMContext::current().get_tag(address));
         }
 
@@ -1214,13 +1214,10 @@ mod tests {
             let expected_address =
                 address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
 
-            let contract = Contract::<SomeContract>::from_tag(&tag);
-            assert_eq!(expected_address, contract.address());
+            let contract = Contract::<SomeContract>::from_tag(&tag).address();
 
-            assert_eq!(
-                Some(tag),
-                VMContext::current().get_tag(contract.address())
-            );
+            assert_eq!(expected_address, contract);
+            assert_eq!(Some(tag), VMContext::current().get_tag(contract));
         }
 
         #[test]
@@ -1228,26 +1225,18 @@ mod tests {
             let tag = "tag";
 
             let address = Address::from_tag(tag);
-            let account = Account::from_tag(tag);
-            let contract = Contract::<SomeContract>::from_tag(tag);
+            let account = Account::from_tag(tag).address();
+            let contract = Contract::<SomeContract>::from_tag(tag).address();
 
             // account uses a different algorithm for deriving the address
-            assert_eq!(address, contract.address());
-            assert_ne!(address, account.address());
+            assert_eq!(address, contract);
+            assert_ne!(address, account);
 
             // all addresses still map to the same tag
-            assert_eq!(
-                Some(tag.to_owned()),
-                VMContext::current().get_tag(address)
-            );
-            assert_eq!(
-                Some(tag.to_owned()),
-                VMContext::current().get_tag(account.address())
-            );
-            assert_eq!(
-                Some(tag.to_owned()),
-                VMContext::current().get_tag(contract.address())
-            );
+            let tag = Some(tag.to_owned());
+            assert_eq!(tag, VMContext::current().get_tag(address));
+            assert_eq!(tag, VMContext::current().get_tag(account));
+            assert_eq!(tag, VMContext::current().get_tag(contract));
         }
     }
 }
