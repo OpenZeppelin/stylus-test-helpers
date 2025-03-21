@@ -1224,7 +1224,7 @@ mod tests {
         }
 
         #[test]
-        fn tags_maps_to_different_address_for_account() {
+        fn tag_maps_to_different_address_for_account() {
             let tag = "tag";
 
             let address = Address::from_tag(tag);
