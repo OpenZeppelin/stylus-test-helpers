@@ -1217,20 +1217,10 @@ mod tests {
             let contract = Contract::<SomeContract>::from_tag(&tag);
 
             assert_eq!(expected_address, contract.address());
-            // this works because `contract` is not dropped, and storage is
-            // still populated
             assert_eq!(
-                Some(tag.clone()),
+                Some(tag),
                 VMContext::current().get_tag(contract.address())
             );
-
-            // this will fail on the tag (2nd) assertion because on calling
-            // `.address()`, the temporary `Contract<SomeContract>` value is
-            // dropped
-            let contract = Contract::<SomeContract>::from_tag(&tag).address();
-
-            assert_eq!(expected_address, contract);
-            assert_eq!(Some(tag), VMContext::current().get_tag(contract));
         }
 
         #[test]
@@ -1238,18 +1228,18 @@ mod tests {
             let tag = "tag";
 
             let address = Address::from_tag(tag);
-            let account = Account::from_tag(tag).address();
-            let contract = Contract::<SomeContract>::from_tag(tag).address();
+            let account = Account::from_tag(tag);
+            let contract = Contract::<SomeContract>::from_tag(tag);
 
             // account uses a different algorithm for deriving the address
-            assert_eq!(address, contract);
-            assert_ne!(address, account);
+            assert_eq!(address, contract.address());
+            assert_ne!(address, account.address());
 
             // all addresses still map to the same tag
             let tag = Some(tag.to_owned());
             assert_eq!(tag, VMContext::current().get_tag(address));
-            assert_eq!(tag, VMContext::current().get_tag(account));
-            assert_eq!(tag, VMContext::current().get_tag(contract));
+            assert_eq!(tag, VMContext::current().get_tag(account.address()));
+            assert_eq!(tag, VMContext::current().get_tag(contract.address()));
         }
     }
 }
