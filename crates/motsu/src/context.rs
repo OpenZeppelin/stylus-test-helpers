@@ -940,7 +940,7 @@ pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
 
 /// Account that can be used to interact with contracts in test environments.
 /// Used to interact with and sign transactions for contracts.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Account {
     address: Address,
     private_key: B256,
@@ -949,6 +949,12 @@ pub struct Account {
 impl From<Account> for Address {
     fn from(value: Account) -> Self {
         value.address
+    }
+}
+
+impl From<PrivateKeySigner> for Account {
+    fn from(value: PrivateKeySigner) -> Self {
+        Self { address: value.address(), private_key: value.to_bytes() }
     }
 }
 
@@ -971,8 +977,9 @@ impl Account {
     #[must_use]
     pub fn from_seed_slice(seed: &[u8]) -> Self {
         let private_key_bytes = Keccak256::new().update(seed).finalize();
-        let address = create_signer(&private_key_bytes).address();
-        let private_key = private_key_bytes.into();
+        let signer = create_signer(&private_key_bytes);
+        let address = signer.address();
+        let private_key = private_key_bytes.into(); // same as signer.to_bytes()
         Self { address, private_key }
     }
 
@@ -1142,6 +1149,23 @@ mod tests {
             let signer = account.signer();
             assert_eq!(account.address(), signer.address());
         }
+
+        #[test]
+        fn account_and_its_signer_have_same_private_keys() {
+            let account = Account::from_seed("seed");
+            let signer = account.signer();
+            let signing_key = signer.to_bytes();
+
+            assert_eq!(account.private_key, signing_key);
+        }
+
+        #[test]
+        fn account_into_signer_and_back_returns_same_account() {
+            let old_account = Account::from_seed("seed");
+            let signer = old_account.signer();
+            let new_account = signer.into();
+            assert_eq!(old_account, new_account);
+        }
     }
 
     mod from_tag {
@@ -1155,9 +1179,9 @@ mod tests {
                 address!("0x6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
 
             let account = Account::from_tag(&tag);
+
             assert_eq!(expected_private_key, account.private_key);
             assert_eq!(expected_address, account.address());
-
             assert_eq!(
                 Some(tag),
                 VMContext::current().get_tag(account.address())
@@ -1171,8 +1195,8 @@ mod tests {
                 address!("0x9c0257114eb9399a2985f8e75dad7600c5d89fe3");
 
             let address = Address::from_tag(&tag);
-            assert_eq!(expected_address, address);
 
+            assert_eq!(expected_address, address);
             assert_eq!(Some(tag), VMContext::current().get_tag(address));
         }
 
@@ -1191,12 +1215,31 @@ mod tests {
                 address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
 
             let contract = Contract::<SomeContract>::from_tag(&tag);
-            assert_eq!(expected_address, contract.address());
 
+            assert_eq!(expected_address, contract.address());
             assert_eq!(
                 Some(tag),
                 VMContext::current().get_tag(contract.address())
             );
+        }
+
+        #[test]
+        fn tag_maps_to_different_address_for_account() {
+            let tag = "tag";
+
+            let address = Address::from_tag(tag);
+            let account = Account::from_tag(tag);
+            let contract = Contract::<SomeContract>::from_tag(tag);
+
+            // account uses a different algorithm for deriving the address
+            assert_eq!(address, contract.address());
+            assert_ne!(address, account.address());
+
+            // all addresses still map to the same tag
+            let tag = Some(tag.to_owned());
+            assert_eq!(tag, VMContext::current().get_tag(address));
+            assert_eq!(tag, VMContext::current().get_tag(account.address()));
+            assert_eq!(tag, VMContext::current().get_tag(contract.address()));
         }
     }
 }
