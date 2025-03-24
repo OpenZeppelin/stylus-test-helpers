@@ -476,8 +476,11 @@ mod fallback_tests {
         proxy.sender(account).set_implementation(implementation.address());
 
         let value = U256::from(101);
+
         account.fund(value);
+
         proxy.sender_and_value(account, value).pass_msg_value().unwrap();
+
         assert!(account.balance().is_zero());
         assert!(proxy.balance().is_zero());
         assert_eq!(implementation.balance(), value);
