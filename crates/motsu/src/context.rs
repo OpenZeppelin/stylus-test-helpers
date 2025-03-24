@@ -17,7 +17,6 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
 use stylus_sdk::{
-    abi::router_entrypoint,
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
@@ -202,13 +201,8 @@ impl VMContext {
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(
-            address,
-            slice::from_raw_parts(calldata, calldata_len).to_vec(),
-            None,
-        );
+        let result = self.call_contract(address, calldata, calldata_len, None);
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -224,13 +218,9 @@ impl VMContext {
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(
-            address,
-            slice::from_raw_parts(calldata, calldata_len).to_vec(),
-            Some(value),
-        );
+        let result =
+            self.call_contract(address, calldata, calldata_len, Some(value));
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -257,10 +247,11 @@ impl VMContext {
 
     /// Call the function associated with the given `selector` at the given
     /// `contract_address`. Pass `input` and optional `value` to it.
-    fn call_contract(
+    unsafe fn call_contract(
         self,
         contract_address: Address,
-        calldata: Vec<u8>,
+        calldata: *const u8,
+        calldata_len: usize,
         value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
@@ -283,15 +274,18 @@ impl VMContext {
         self.transfer_value();
 
         // Call external contract.
-        let result =
-            self.router(contract_address).route(calldata).unwrap_or_else(
-                || panic!("selector not found - selector is {selector}"),
-            );
-
-        // If the call was unsuccessful, we should restore the data.
-        if result.is_err() {
-            self.storage().persistent.restore_from(backup);
-        }
+        let result = self
+            .router(contract_address)
+            .route(slice::from_raw_parts(calldata, calldata_len).to_vec())
+            .inspect_err(|e| {
+                if e.is_empty() {
+                    let selector = decode_selector(calldata, calldata_len);
+                    panic!("selector {selector} not found and missing fallback")
+                } else {
+                    // If the call was unsuccessful, we should restore the data.
+                    self.storage().persistent.restore_from(backup);
+                }
+            });
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -627,15 +621,11 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
 
 /// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
 /// raw pointer.
-unsafe fn decode_calldata(
-    calldata: *const u8,
-    calldata_len: usize,
-) -> (u32, Vec<u8>) {
+unsafe fn decode_selector(calldata: *const u8, calldata_len: usize) -> u32 {
     let calldata = slice::from_raw_parts(calldata, calldata_len);
     let selector =
         u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
-    let input = calldata[4..].to_vec();
-    (selector, input)
+    selector
 }
 
 /// Main storage for Motsu test VM.

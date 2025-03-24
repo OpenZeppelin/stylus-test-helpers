@@ -133,11 +133,16 @@ pub trait VMRouter {
 
 impl<R> VMRouter for R
 where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + ValueDenier,
+    R: Router<R>
+        + StorageType
+        + TopLevelStorage
+        + BorrowMut<R::Storage>
+        + ValueDenier,
 {
     fn route(&mut self, calldata: Vec<u8>) -> ArbResult {
-        router_entrypoint(calldata, VM { host: Box::new(WasmVM {}) })
-        // <Self as Router<R>>::route(self, selector, input)
-        //     .or_else(|| <Self as Router<R>>::fallback(self, input))
+        router_entrypoint::<Self, Self>(
+            calldata,
+            VM { host: Box::new(WasmVM {}) },
+        )
     }
 }
