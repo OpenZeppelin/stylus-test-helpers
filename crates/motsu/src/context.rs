@@ -17,6 +17,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
 use stylus_sdk::{
+    abi::router_entrypoint,
     host::{WasmVM, VM},
     keccak_const::Keccak256,
     prelude::StorageType,
@@ -203,7 +204,11 @@ impl VMContext {
         let address = read_address(address);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input, None);
+        let result = self.call_contract(
+            address,
+            slice::from_raw_parts(calldata, calldata_len).to_vec(),
+            None,
+        );
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -221,7 +226,11 @@ impl VMContext {
         let value = read_u256(value);
         let (selector, input) = decode_calldata(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input, Some(value));
+        let result = self.call_contract(
+            address,
+            slice::from_raw_parts(calldata, calldata_len).to_vec(),
+            Some(value),
+        );
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -251,8 +260,7 @@ impl VMContext {
     fn call_contract(
         self,
         contract_address: Address,
-        selector: u32,
-        input: &[u8],
+        calldata: Vec<u8>,
         value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
@@ -275,12 +283,10 @@ impl VMContext {
         self.transfer_value();
 
         // Call external contract.
-        let result = self
-            .router(contract_address)
-            .route(selector, input)
-            .unwrap_or_else(|| {
-                panic!("selector not found - selector is {selector}")
-            });
+        let result =
+            self.router(contract_address).route(calldata).unwrap_or_else(
+                || panic!("selector not found - selector is {selector}"),
+            );
 
         // If the call was unsuccessful, we should restore the data.
         if result.is_err() {
