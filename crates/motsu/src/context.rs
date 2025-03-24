@@ -952,6 +952,18 @@ impl From<Account> for Address {
     }
 }
 
+impl From<&Account> for Address {
+    fn from(value: &Account) -> Self {
+        value.address
+    }
+}
+
+impl From<&mut Account> for Address {
+    fn from(value: &mut Account) -> Self {
+        value.address
+    }
+}
+
 impl From<PrivateKeySigner> for Account {
     fn from(value: PrivateKeySigner) -> Self {
         Self { address: value.address(), private_key: value.to_bytes() }
@@ -1165,6 +1177,13 @@ mod tests {
             let signer = old_account.signer();
             let new_account = signer.into();
             assert_eq!(old_account, new_account);
+        }
+
+        #[test]
+        fn account_ref_into_address() {
+            let account = &mut Account::random();
+            let address: Address = account.into();
+            assert_eq!(account.address(), address);
         }
     }
 
