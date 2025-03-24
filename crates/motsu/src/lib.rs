@@ -382,6 +382,77 @@ mod ping_pong_tests {
 }
 
 #[cfg(test)]
+mod fallback_tests {
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::{call, Call},
+        prelude::*,
+        storage::{StorageAddress, StorageU256},
+    };
+
+    use crate::{self as motsu, context::Contract};
+
+    #[storage]
+    struct Implementation {
+        value: StorageU256,
+    }
+
+    #[public]
+    impl Implementation {
+        fn set_value(&mut self, value: U256) {
+            self.value.set(value);
+        }
+    }
+
+    unsafe impl TopLevelStorage for Implementation {}
+
+    #[storage]
+    struct Proxy {
+        implementation: StorageAddress,
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[public]
+    impl Proxy {
+        fn set_implementation(&mut self, implementation: Address) {
+            self.implementation.set(implementation);
+        }
+
+        #[payable]
+        #[fallback]
+        fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new_in(self), to, calldata).map_err(|e| e.into())
+        }
+    }
+
+    sol_interface! {
+        interface IProxy {
+            function setValue(uint256 value) external;
+        }
+    }
+
+    #[motsu::test]
+    fn fallback(
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        alice: Address,
+    ) {
+        proxy.sender(alice).set_implementation(implementation.address());
+
+        let value = U256::from(101);
+
+        let call = Call::new();
+        let i_proxy = IProxy::new(proxy.address());
+        let result = i_proxy.set_value(call, value);
+
+        assert!(result.is_ok());
+        assert_eq!(implementation.sender(alice).value.get(), value);
+    }
+}
+
+#[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
     use alloy_sol_types::sol;
