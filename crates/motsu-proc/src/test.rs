@@ -52,7 +52,7 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         #( #attrs )*
         #[test]
         fn #fn_name() #fn_return_type {
-            deploy_precompiles();
+            motsu::prelude::deploy_precompiles();
             let test = | #( #arg_defs ),* | #fn_block;
             test( #( #arg_inits ),* )
         }
