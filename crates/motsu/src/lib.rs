@@ -386,11 +386,15 @@ mod fallback_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::{call, Call},
+        msg,
         prelude::*,
         storage::{StorageAddress, StorageU256},
     };
 
-    use crate::{self as motsu, context::Contract};
+    use crate::{
+        self as motsu,
+        context::{Balance, Contract, Funding},
+    };
 
     #[storage]
     struct Implementation {
@@ -401,6 +405,11 @@ mod fallback_tests {
     impl Implementation {
         fn set_value(&mut self, value: U256) {
             self.value.set(value);
+        }
+
+        #[receive]
+        fn receive(&self) -> Result<(), Vec<u8>> {
+            Ok(())
         }
     }
 
@@ -420,6 +429,12 @@ mod fallback_tests {
         }
 
         #[payable]
+        fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new().value(msg::value()), to, &[]).map_err(|e| e.into())
+        }
+
+        #[payable]
         #[fallback]
         fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
@@ -430,6 +445,7 @@ mod fallback_tests {
     sol_interface! {
         interface IProxy {
             function setValue(uint256 value) external;
+            function passMsgValue() external payable;
         }
     }
 
@@ -449,6 +465,22 @@ mod fallback_tests {
 
         assert!(result.is_ok());
         assert_eq!(implementation.sender(alice).value.get(), value);
+    }
+
+    #[motsu::test]
+    fn receive(
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        account: Address,
+    ) {
+        proxy.sender(account).set_implementation(implementation.address());
+
+        let value = U256::from(101);
+        account.fund(value);
+        proxy.sender_and_value(account, value).pass_msg_value().unwrap();
+        assert!(account.balance().is_zero());
+        assert!(proxy.balance().is_zero());
+        assert_eq!(implementation.balance(), value);
     }
 }
 
