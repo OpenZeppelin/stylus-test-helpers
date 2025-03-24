@@ -438,19 +438,41 @@ mod fallback_tests {
         #[fallback]
         fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
-            call(Call::new_in(self), to, calldata).map_err(|e| e.into())
+            call(Call::new().value(msg::value()), to, calldata)
+                .map_err(|e| e.into())
         }
     }
 
     sol_interface! {
         interface IProxy {
-            function setValue(uint256 value) external;
+            function setValue(uint256 value) external payable;
             function passMsgValue() external payable;
+        }
+    }
+
+    #[storage]
+    struct ProxyCaller;
+
+    unsafe impl TopLevelStorage for ProxyCaller {}
+
+    #[public]
+    impl ProxyCaller {
+        #[payable]
+        fn call_set_value_on_proxy(
+            &mut self,
+            proxy: Address,
+            value: U256,
+        ) -> Result<(), Vec<u8>> {
+            let i_proxy = IProxy::new(proxy);
+            i_proxy
+                .set_value(Call::new().value(msg::value()), value)
+                .map_err(|e| e.into())
         }
     }
 
     #[motsu::test]
     fn fallback(
+        proxy_caller: Contract<ProxyCaller>,
         proxy: Contract<Proxy>,
         implementation: Contract<Implementation>,
         alice: Address,
@@ -459,12 +481,24 @@ mod fallback_tests {
 
         let value = U256::from(101);
 
-        let call = Call::new();
-        let i_proxy = IProxy::new(proxy.address());
-        let result = i_proxy.set_value(call, value);
+        proxy_caller
+            .sender(alice)
+            .call_set_value_on_proxy(proxy.address(), value)
+            .unwrap();
 
-        assert!(result.is_ok());
         assert_eq!(implementation.sender(alice).value.get(), value);
+
+        alice.fund(value);
+
+        proxy_caller
+            .sender_and_value(alice, value)
+            .call_set_value_on_proxy(proxy.address(), U256::ZERO)
+            .unwrap();
+
+        assert_eq!(alice.balance(), U256::ZERO);
+        assert_eq!(proxy.balance(), U256::ZERO);
+        assert_eq!(implementation.balance(), value);
+        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
     }
 
     #[motsu::test]
