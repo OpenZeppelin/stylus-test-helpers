@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 ### Added
 
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
-- Enabled conversion from `PrivateKeySigner` into `Account`. #81
+- Enabled additional conversions between `PrivateKeySigner`, `Address` and `Account`. #81
 
 ### Changed (Breaking)
 
