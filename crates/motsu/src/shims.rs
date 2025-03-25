@@ -258,7 +258,7 @@ unsafe extern "C" fn call_contract(
     )
 }
 
-const VALUE_ZERO_RAW: *const u8 = [0; 32].as_ptr();
+const ZERO_RAW: *const u8 = [0; 32].as_ptr();
 
 /// Static calls the contract at the given address, with the option to limit the
 /// amount of gas supplied. The return status indicates whether the call
@@ -286,7 +286,7 @@ unsafe extern "C" fn static_call_contract(
         contract,
         calldata,
         calldata_len,
-        VALUE_ZERO_RAW,
+        ZERO_RAW,
         return_data_len,
     )
 }
@@ -317,7 +317,7 @@ unsafe extern "C" fn delegate_call_contract(
         contract,
         calldata,
         calldata_len,
-        VALUE_ZERO_RAW,
+        ZERO_RAW,
         return_data_len,
     )
 }
