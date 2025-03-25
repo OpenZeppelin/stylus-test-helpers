@@ -196,29 +196,14 @@ impl VMContext {
         address: *const u8,
         calldata: *const u8,
         calldata_len: usize,
-        return_data_size: *mut usize,
-    ) -> u8 {
-        let address = read_address(address);
-
-        let result = self.call_contract(address, calldata, calldata_len, None);
-        self.process_arb_result_raw(result, return_data_size)
-    }
-
-    /// Call the contract at raw `address` with the given raw `calldata` and
-    /// `value`.
-    pub(crate) unsafe fn call_contract_with_value_raw(
-        self,
-        address: *const u8,
-        calldata: *const u8,
-        calldata_len: usize,
         value: *const u8,
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
+        let value = (!value.is_zero()).then_some(value);
 
-        let result =
-            self.call_contract(address, calldata, calldata_len, Some(value));
+        let result = self.call_contract(address, calldata, calldata_len, value);
         self.process_arb_result_raw(result, return_data_size)
     }
 
