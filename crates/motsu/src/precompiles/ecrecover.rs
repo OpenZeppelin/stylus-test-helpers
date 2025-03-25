@@ -1,43 +1,57 @@
-//! Ethereum Precompiles
-use revm_precompile::{secp256k1::ec_recover_run, PrecompileErrors};
-use stylus_sdk::{alloy_sol_types::sol, call::MethodError, prelude::*};
+//! EcRecover Contract simulating that is deployed on the chain to simulate the
+//! being precompiled.
+use revm_precompile::{
+    secp256k1::{ec_recover_run, ECRECOVER},
+    PrecompileErrors,
+};
+use stylus_sdk::{
+    alloy_primitives::Address, alloy_sol_types::sol, call::MethodError,
+    prelude::*,
+};
+
+pub(crate) const ADDRESS: Address = ECRECOVER.0;
 
 sol! {
     /// out of gas is the main error. Others are here just for completeness
     #[derive(Debug)]
     error PrecompileOutOfGas();
-    // Blake2 errors
+    // Blake2 wrong length
     #[derive(Debug)]
     error PrecompileBlake2WrongLength();
+    // Blake2 wrong indicator flag
     #[derive(Debug)]
     error PrecompileBlake2WrongFinalIndicatorFlag();
-    // Modexp errors
+    // Modexp exponent overflow
     #[derive(Debug)]
     error PrecompileModexpExpOverflow();
+    // Modexp base overflow
     #[derive(Debug)]
     error PrecompileModexpBaseOverflow();
+    // Modexp mod overflow
     #[derive(Debug)]
     error PrecompileModexpModOverflow();
-    // Bn128 errors
+    // Bn128 field point not a member
     #[derive(Debug)]
     error PrecompileBn128FieldPointNotAMember();
+    // Bn128 affine G failed to create
     #[derive(Debug)]
     error PrecompileBn128AffineGFailedToCreate();
+    // Bn128 pair length error
     #[derive(Debug)]
     error PrecompileBn128PairLength();
-    // Blob errors
-    /// The input length is not exactly 192 bytes.
+    /// The blob input length is not exactly 192 bytes.
     #[derive(Debug)]
     error PrecompileBlobInvalidInputLength();
-    /// The commitment does not match the versioned hash.
+    /// The blob commitment does not match the versioned hash.
     #[derive(Debug)]
     error PrecompileBlobMismatchedVersion();
-    /// The proof verification failed.
+    /// The blob proof verification failed.
     #[derive(Debug)]
     error PrecompileBlobVerifyKzgProofFailed();
     /// Catch-all variant for other errors.
     #[derive(Debug)]
     error PrecompileOther(string);
+    /// Fatal
     #[derive(Debug)]
     error PrecompileFatal(string msg);
 }
@@ -129,6 +143,7 @@ impl MethodError for Error {
     }
 }
 
+/// EcRecover Contract.
 #[storage]
 pub struct EcRecover;
 

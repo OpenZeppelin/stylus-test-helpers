@@ -12,7 +12,6 @@ use std::{
 use alloy_primitives::{Address, Bytes, LogData, B256, U256};
 use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
-use const_hex::FromHex;
 use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
@@ -25,7 +24,6 @@ use stylus_sdk::{
 };
 
 use crate::{
-    precompiles::EcRecover,
     router::{VMRouter, VMRouterContext},
     storage_access::AccessStorage,
 };
@@ -572,16 +570,6 @@ impl VMContext {
         let mut storage = self.storage();
         storage.chain_id = chain_id;
     }
-}
-
-/// Deploy precompiled contracts.
-/// See: <https://ethereum.github.io/yellowpaper/paper.pdf>
-pub fn deploy_precompiles() {
-    fn digit_to_address(digit: u8) -> Address {
-        Address::from_hex(format!("{:0>40x}", digit)).unwrap()
-    }
-
-    VMContext::current().init_storage::<EcRecover>(digit_to_address(1));
 }
 
 /// Read the word from location pointed by `ptr`.
