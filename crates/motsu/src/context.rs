@@ -260,15 +260,16 @@ impl VMContext {
         let result = self
             .router(contract_address)
             .route(slice::from_raw_parts(calldata, calldata_len).to_vec())
-            .inspect_err(|e| {
+            .map_err(|e| {
                 // The nested `router_entrypoint` call returns `Err(Vec::new())` when no function
                 // was found for the selector and no fallback is present.
                 if e.is_empty() {
                     let selector = decode_selector(calldata, calldata_len);
-                    panic!("function not found for selector {selector} and no fallback defined")
+                    format!("function not found for selector '{selector}' and no fallback defined").as_bytes().to_vec()
                 } else {
                     // If the call was unsuccessful, we should restore the data.
                     self.storage().persistent.restore_from(backup);
+                    e
                 }
             });
 
