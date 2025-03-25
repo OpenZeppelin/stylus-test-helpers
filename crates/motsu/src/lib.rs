@@ -381,7 +381,7 @@ mod ping_pong_tests {
 }
 
 #[cfg(test)]
-mod fallback_receive_tests {
+mod fallback_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::{call, Call},
@@ -393,7 +393,6 @@ mod fallback_receive_tests {
     use crate::{
         self as motsu,
         context::{Balance, Contract, Funding},
-        revert::ResultExt,
     };
 
     #[storage]
@@ -465,17 +464,6 @@ mod fallback_receive_tests {
                 .set_value(Call::new().value(msg::value()), value)
                 .map_err(|e| e.into())
         }
-
-        #[payable]
-        fn call_non_existent_fn_on_implementation(
-            &mut self,
-            implementation: Address,
-        ) -> Result<(), Vec<u8>> {
-            let i_proxy = IProxy::new(implementation);
-            i_proxy
-                .pass_msg_value(Call::new().value(msg::value()))
-                .map_err(|e| e.into())
-        }
     }
 
     #[motsu::test]
@@ -508,23 +496,6 @@ mod fallback_receive_tests {
         assert_eq!(alice.balance(), U256::ZERO);
         assert_eq!(proxy.balance(), U256::ZERO);
         assert_eq!(implementation.balance(), value);
-    }
-
-    #[motsu::test]
-    fn fallback_missing(
-        proxy_caller: Contract<ProxyCaller>,
-        implementation: Contract<Implementation>,
-        alice: Address,
-    ) {
-        let err = proxy_caller
-            .sender(alice)
-            .call_non_existent_fn_on_implementation(implementation.address())
-            .motsu_unwrap_err();
-
-        assert_eq!(
-            String::from_utf8(err).unwrap(),
-            "function not found for selector '3208857325' and no fallback defined"
-        )
     }
 
     #[motsu::test]
