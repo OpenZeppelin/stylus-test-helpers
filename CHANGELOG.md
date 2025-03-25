@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+- Predeploy `EcRecover` precompile contract. #90
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
 - Enabled additional conversions between `PrivateKeySigner`, `Address` and `Account`. #84
 
