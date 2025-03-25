@@ -1,9 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![allow(deprecated)]
-#[cfg(test)]
 extern crate alloc;
 
 mod context;
+mod precompiles;
 pub mod prelude;
 mod revert;
 mod router;
