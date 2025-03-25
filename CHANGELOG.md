@@ -17,8 +17,6 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Changed (Breaking)
 
-- `evm_gas_left` and `evm_ink_left` now return `u64::MAX`. #PR_ID
-
 ### Changed
 
 ## [0.7.0] - 2025-03-19
