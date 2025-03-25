@@ -403,6 +403,7 @@ mod fallback_tests {
 
     #[public]
     impl Implementation {
+        #[payable]
         fn set_value(&mut self, value: U256) {
             self.value.set(value);
         }
@@ -424,10 +425,6 @@ mod fallback_tests {
 
     #[public]
     impl Proxy {
-        fn set_implementation(&mut self, implementation: Address) {
-            self.implementation.set(implementation);
-        }
-
         #[payable]
         fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
@@ -477,7 +474,7 @@ mod fallback_tests {
         implementation: Contract<Implementation>,
         alice: Address,
     ) {
-        proxy.sender(alice).set_implementation(implementation.address());
+        proxy.sender(alice).implementation.set(implementation.address());
 
         let value = U256::from(101);
 
@@ -495,10 +492,11 @@ mod fallback_tests {
             .call_set_value_on_proxy(proxy.address(), U256::ZERO)
             .unwrap();
 
+        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
+
         assert_eq!(alice.balance(), U256::ZERO);
         assert_eq!(proxy.balance(), U256::ZERO);
         assert_eq!(implementation.balance(), value);
-        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
     }
 
     #[motsu::test]
@@ -507,7 +505,7 @@ mod fallback_tests {
         implementation: Contract<Implementation>,
         account: Address,
     ) {
-        proxy.sender(account).set_implementation(implementation.address());
+        proxy.sender(account).implementation.set(implementation.address());
 
         let value = U256::from(101);
 
