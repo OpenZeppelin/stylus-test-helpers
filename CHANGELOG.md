@@ -11,10 +11,13 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+- Predeploy `EcRecover` precompile contract. #PR_ID
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
 - Enabled conversion from `PrivateKeySigner` into `Account`. #81
 
 ### Changed (Breaking)
+
+- `evm_gas_left` and `evm_ink_left` now return `u64::MAX`. #PR_ID
 
 ### Changed
 
