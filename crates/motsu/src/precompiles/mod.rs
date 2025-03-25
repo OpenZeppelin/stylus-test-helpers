@@ -1,7 +1,7 @@
 //! Ethereum Precompiles
 use crate::context::Contract;
 
-mod ecrecover;
+pub(crate) mod ecrecover;
 
 /// Deploy precompiled contracts.
 /// See: <https://ethereum.github.io/yellowpaper/paper.pdf>

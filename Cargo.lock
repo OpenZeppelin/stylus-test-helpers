@@ -1857,6 +1857,7 @@ name = "motsu"
 version = "0.7.0"
 dependencies = [
  "alloy-primitives",
+ "alloy-signer",
  "alloy-signer-local",
  "alloy-sol-types",
  "const-hex",

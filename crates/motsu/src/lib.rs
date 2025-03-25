@@ -921,7 +921,15 @@ mod proxies_tests {
 
 #[cfg(test)]
 mod vm_tests {
-    use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
+    use alloy_signer::SignerSync;
+    use motsu::precompiles::ecrecover;
+    use stylus_sdk::{
+        alloy_primitives::{Address, B256},
+        alloy_sol_types::{sol, SolValue},
+        block,
+        call::{self, Call},
+        prelude::*,
+    };
 
     use crate as motsu;
     use crate::{context::DEFAULT_CHAIN_ID, prelude::*};
@@ -961,5 +969,91 @@ mod vm_tests {
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);
         assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
+    }
+
+    sol! {
+        /// Struct with callable data to the `ecrecover` precompile.
+        #[allow(missing_docs)]
+        struct EcRecoverData {
+            /// EIP-191 Hash of the message.
+            bytes32 hash;
+            /// `v` value from the signature.
+            uint8 v;
+            /// `r` value from the signature.
+            bytes32 r;
+            /// `s` value from the signature.
+            bytes32 s;
+        }
+    }
+
+    fn encode_calldata(hash: B256, v: u8, r: B256, s: B256) -> Vec<u8> {
+        let calldata = EcRecoverData { hash, v, r, s };
+        EcRecoverData::abi_encode(&calldata)
+    }
+
+    #[storage]
+    struct PrecompileAccessor;
+
+    unsafe impl TopLevelStorage for PrecompileAccessor {}
+
+    #[public]
+    impl PrecompileAccessor {
+        fn get_signer_address(
+            &self,
+            message: B256,
+            v: u8,
+            r: B256,
+            s: B256,
+        ) -> Result<Address, stylus_sdk::call::Error> {
+            let calldata = encode_calldata(message, v, r, s);
+
+            let recovered =
+                call::static_call(Call::new(), ecrecover::ADDRESS, &calldata)?;
+
+            Ok(Address::from_slice(&recovered[12..]))
+        }
+    }
+
+    #[motsu::test]
+    fn ecrecover(contract: Contract<PrecompileAccessor>, alice: Account) {
+        let message = "Message to sign here.".as_bytes();
+
+        // get v, r and s values
+        let signature = alice.signer().sign_message_sync(message).unwrap();
+        let recid: u8 = signature.recid().into();
+        let (v, r, s) = (
+            // ecrecover expects `v` to be in the range {27,28}
+            recid + 27,
+            signature.r().into(),
+            signature.s().into(),
+        );
+
+        let address = contract
+            .sender(alice)
+            .get_signer_address(B256::from_slice(message), v, r, s)
+            .unwrap();
+
+        assert_eq!(address, alice.address());
+    }
+
+    #[motsu::test]
+    fn ecrecover_with_invalid_input(
+        contract: Contract<PrecompileAccessor>,
+        alice: Account,
+    ) {
+        let message = "Message to sign here.".as_bytes();
+
+        // verify invalid inputs still work
+        let address = contract
+            .sender(alice)
+            .get_signer_address(
+                B256::from_slice(message),
+                27,
+                B256::from_slice(&[1]),
+                B256::from_slice(&[1]),
+            )
+            .unwrap();
+
+        assert_eq!(address, Address::ZERO);
     }
 }
