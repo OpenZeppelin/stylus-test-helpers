@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+- Support `fallback` and `receive` functions. #85
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
 - Enabled conversion from `PrivateKeySigner` into `Account`. #81
 
