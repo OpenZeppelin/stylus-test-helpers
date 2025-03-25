@@ -952,9 +952,33 @@ impl From<Account> for Address {
     }
 }
 
+impl From<&Account> for Address {
+    fn from(value: &Account) -> Self {
+        value.address
+    }
+}
+
 impl From<PrivateKeySigner> for Account {
     fn from(value: PrivateKeySigner) -> Self {
         Self { address: value.address(), private_key: value.to_bytes() }
+    }
+}
+
+impl From<&PrivateKeySigner> for Account {
+    fn from(value: &PrivateKeySigner) -> Self {
+        Self { address: value.address(), private_key: value.to_bytes() }
+    }
+}
+
+impl From<Account> for PrivateKeySigner {
+    fn from(value: Account) -> Self {
+        value.signer()
+    }
+}
+
+impl From<&Account> for PrivateKeySigner {
+    fn from(value: &Account) -> Self {
+        value.signer()
     }
 }
 
@@ -1105,6 +1129,10 @@ mod tests {
     use crate::context::VMContext;
 
     mod account {
+        use std::ops::Deref;
+
+        use alloy_signer_local::PrivateKeySigner;
+
         use super::*;
 
         #[test]
@@ -1160,11 +1188,30 @@ mod tests {
         }
 
         #[test]
-        fn account_into_signer_and_back_returns_same_account() {
+        fn account_signer_and_back_returns_same_account() {
             let old_account = Account::from_seed("seed");
             let signer = old_account.signer();
             let new_account = signer.into();
             assert_eq!(old_account, new_account);
+        }
+
+        #[test]
+        fn account_into_signer_and_back_returns_same_account() {
+            let old_account = Account::from_seed("seed");
+            let signer: PrivateKeySigner = old_account.into();
+            let new_account = signer.into();
+            assert_eq!(old_account, new_account);
+        }
+
+        #[test]
+        fn account_ref_into_address() {
+            let account = &Account::random();
+            let address: Address = account.into();
+            assert_eq!(account.address(), address);
+
+            let account = &mut Account::random();
+            let address: Address = account.deref().into();
+            assert_eq!(account.address(), address);
         }
     }
 
