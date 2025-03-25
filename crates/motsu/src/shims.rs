@@ -453,7 +453,7 @@ unsafe extern "C" fn create2(
 /// [`GAS`]: https://www.evm.codes/#5a
 #[no_mangle]
 unsafe extern "C" fn evm_gas_left() -> u64 {
-    0
+    u64::MAX
 }
 
 /// Gets the amount of ink remaining after paying for the cost of this hostio.
@@ -465,7 +465,7 @@ unsafe extern "C" fn evm_gas_left() -> u64 {
 /// [`Ink and Gas`]: https://docs.arbitrum.io/stylus/concepts/gas-metering
 #[no_mangle]
 unsafe extern "C" fn evm_ink_left() -> u64 {
-    0
+    u64::MAX
 }
 
 /// Whether the current call is reentrant.

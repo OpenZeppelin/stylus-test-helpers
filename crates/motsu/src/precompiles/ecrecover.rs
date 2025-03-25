@@ -5,38 +5,38 @@ use revm_precompile::{
     PrecompileErrors,
 };
 use stylus_sdk::{
-    alloy_primitives::Address, alloy_sol_types::sol, call::MethodError,
+    alloy_primitives::Address, alloy_sol_types::sol, call::MethodError, evm,
     prelude::*,
 };
 
 pub(crate) const ADDRESS: Address = ECRECOVER.0;
 
 sol! {
-    /// out of gas is the main error. Others are here just for completeness
+    /// Out of gas is the main error. Others are here just for completeness
     #[derive(Debug)]
     error PrecompileOutOfGas();
-    // Blake2 wrong length
+    /// Blake2 wrong length
     #[derive(Debug)]
     error PrecompileBlake2WrongLength();
-    // Blake2 wrong indicator flag
+    /// Blake2 wrong indicator flag
     #[derive(Debug)]
     error PrecompileBlake2WrongFinalIndicatorFlag();
-    // Modexp exponent overflow
+    /// Modexp exponent overflow
     #[derive(Debug)]
     error PrecompileModexpExpOverflow();
-    // Modexp base overflow
+    /// Modexp base overflow
     #[derive(Debug)]
     error PrecompileModexpBaseOverflow();
-    // Modexp mod overflow
+    /// Modexp mod overflow
     #[derive(Debug)]
     error PrecompileModexpModOverflow();
-    // Bn128 field point not a member
+    /// Bn128 field point not a member
     #[derive(Debug)]
     error PrecompileBn128FieldPointNotAMember();
-    // Bn128 affine G failed to create
+    /// Bn128 affine G failed to create
     #[derive(Debug)]
     error PrecompileBn128AffineGFailedToCreate();
-    // Bn128 pair length error
+    /// Bn128 pair length error
     #[derive(Debug)]
     error PrecompileBn128PairLength();
     /// The blob input length is not exactly 192 bytes.
@@ -58,19 +58,33 @@ sol! {
 
 #[derive(SolidityError, Debug)]
 pub enum Error {
+    /// Out of gas is the main error. Others are here just for completeness
     OutOfGas(PrecompileOutOfGas),
+    /// Blake2 wrong length
     Blake2WrongLength(PrecompileBlake2WrongLength),
+    /// Blake2 wrong indicator flag
     Blake2WrongFinalIndicatorFlag(PrecompileBlake2WrongFinalIndicatorFlag),
+    /// Modexp exponent overflow
     ModexpExpOverflow(PrecompileModexpExpOverflow),
+    /// Modexp base overflow
     ModexpBaseOverflow(PrecompileModexpBaseOverflow),
+    /// Modexp mod overflow
     ModexpModOverflow(PrecompileModexpModOverflow),
+    /// Bn128 field point not a member
     Bn128FieldPointNotAMember(PrecompileBn128FieldPointNotAMember),
+    /// Bn128 affine G failed to create
     Bn128AffineGFailedToCreate(PrecompileBn128AffineGFailedToCreate),
+    /// Bn128 pair length error
     Bn128PairLength(PrecompileBn128PairLength),
+    /// The blob input length is not exactly 192 bytes.
     BlobInvalidInputLength(PrecompileBlobInvalidInputLength),
+    /// The blob commitment does not match the versioned hash.
     BlobMismatchedVersion(PrecompileBlobMismatchedVersion),
+    /// The blob proof verification failed.
     BlobVerifyKzgProofFailed(PrecompileBlobVerifyKzgProofFailed),
+    /// Catch-all variant for other errors.
     Other(PrecompileOther),
+    /// Fatal
     Fatal(PrecompileFatal),
 }
 
@@ -151,15 +165,14 @@ unsafe impl TopLevelStorage for EcRecover {}
 
 #[public]
 impl EcRecover {
+    /// Fallback function.
     #[fallback]
     fn fallback(&self) -> Result<Vec<u8>, Vec<u8>> {
         let args = vec![];
         let b = &(args.into());
-        let r: Result<Vec<u8>, Error> =
-            ec_recover_run(b, 3_000) // TODO: update to self.vm().evm_gas_left() after transitioning
-                // to Host trait
-                .map(|out| out.bytes.into())
-                .map_err(|e| e.into());
+        let r: Result<Vec<u8>, Error> = ec_recover_run(b, evm::gas_left())
+            .map(|out| out.bytes.into())
+            .map_err(|e| e.into());
         r.map_err(|e| e.into())
     }
 }
