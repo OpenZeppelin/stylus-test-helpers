@@ -593,8 +593,7 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
     ptr::copy(bytes.as_ptr(), ptr, 32);
 }
 
-/// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
-/// raw pointer.
+/// Decode the selector as [`u32`] from the raw pointer to the calldata.
 unsafe fn decode_selector(calldata: *const u8, calldata_len: usize) -> u32 {
     let calldata = slice::from_raw_parts(calldata, calldata_len);
     let selector =
