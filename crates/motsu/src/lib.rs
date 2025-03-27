@@ -492,7 +492,7 @@ mod fallback_receive_tests {
         proxy_caller
             .sender(alice)
             .call_set_value_on_proxy(proxy.address(), value)
-            .unwrap();
+            .motsu_unwrap();
 
         assert_eq!(implementation.sender(alice).value.get(), value);
 
@@ -501,12 +501,12 @@ mod fallback_receive_tests {
         proxy_caller
             .sender_and_value(alice, value)
             .call_set_value_on_proxy(proxy.address(), U256::ZERO)
-            .unwrap();
+            .motsu_unwrap();
 
-        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
+        assert!(implementation.sender(alice).value.is_zero());
 
-        assert_eq!(alice.balance(), U256::ZERO);
-        assert_eq!(proxy.balance(), U256::ZERO);
+        assert!(alice.balance().is_zero());
+        assert!(proxy.balance().is_zero());
         assert_eq!(implementation.balance(), value);
     }
 
