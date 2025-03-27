@@ -6,7 +6,8 @@ use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
-    abi::Router,
+    abi::{router_entrypoint, Router},
+    host::{WasmVM, VM},
     prelude::{StorageType, TopLevelStorage, ValueDenier},
     ArbResult,
 };
@@ -55,18 +56,14 @@ impl VMRouterContext {
         MOTSU_VM_ROUTERS.contains_key(&self)
     }
 
-    pub(crate) fn route(
-        self,
-        selector: u32,
-        input: &[u8],
-    ) -> Option<ArbResult> {
+    pub(crate) fn route(self, calldata: Vec<u8>) -> ArbResult {
         let storage = self.storage();
         let mut router = storage.router_factory.create();
 
         // Drop the storage reference to avoid a panic on lock.
         drop(storage);
 
-        router.route(selector, input)
+        router.route(calldata)
     }
 
     /// Initialise contract router for the current test thread and
@@ -131,14 +128,21 @@ impl<R: StorageType + VMRouter + 'static> CreateVMRouter for RouterFactory<R> {
 pub trait VMRouter {
     /// Tries to find and execute a method for the given `selector`, returning
     /// `None` if the `selector` wasn't found.
-    fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult>;
+    fn route(&mut self, calldata: Vec<u8>) -> ArbResult;
 }
 
 impl<R> VMRouter for R
 where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + ValueDenier,
+    R: Router<R>
+        + StorageType
+        + TopLevelStorage
+        + BorrowMut<R::Storage>
+        + ValueDenier,
 {
-    fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult> {
-        <Self as Router<R>>::route(self, selector, input)
+    fn route(&mut self, calldata: Vec<u8>) -> ArbResult {
+        router_entrypoint::<Self, Self>(
+            calldata,
+            VM { host: Box::new(WasmVM {}) },
+        )
     }
 }

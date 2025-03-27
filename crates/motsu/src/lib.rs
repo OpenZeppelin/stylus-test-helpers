@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![allow(deprecated)]
-#[cfg(test)]
 extern crate alloc;
 
 mod context;
@@ -378,6 +377,173 @@ mod ping_pong_tests {
 
         // Check panic assertion.
         ping.assert_emitted(&Pinged { from: alice, value });
+    }
+}
+
+#[cfg(test)]
+mod fallback_receive_tests {
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::{call, Call},
+        msg,
+        prelude::*,
+        storage::{StorageAddress, StorageU256},
+    };
+
+    use crate::{
+        self as motsu,
+        context::{Balance, Contract, Funding},
+        revert::ResultExt,
+    };
+
+    #[storage]
+    struct Implementation {
+        value: StorageU256,
+    }
+
+    #[public]
+    impl Implementation {
+        #[payable]
+        fn set_value(&mut self, value: U256) {
+            self.value.set(value);
+        }
+
+        #[receive]
+        fn receive(&self) -> Result<(), Vec<u8>> {
+            Ok(())
+        }
+    }
+
+    unsafe impl TopLevelStorage for Implementation {}
+
+    #[storage]
+    struct Proxy {
+        implementation: StorageAddress,
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[public]
+    impl Proxy {
+        #[payable]
+        fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new().value(msg::value()), to, &[]).map_err(|e| e.into())
+        }
+
+        #[payable]
+        #[fallback]
+        fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new().value(msg::value()), to, calldata)
+                .map_err(|e| e.into())
+        }
+    }
+
+    sol_interface! {
+        interface IProxy {
+            function setValue(uint256 value) external payable;
+            function passMsgValue() external payable;
+        }
+    }
+
+    #[storage]
+    struct ProxyCaller;
+
+    unsafe impl TopLevelStorage for ProxyCaller {}
+
+    #[public]
+    impl ProxyCaller {
+        #[payable]
+        fn call_set_value_on_proxy(
+            &mut self,
+            proxy: Address,
+            value: U256,
+        ) -> Result<(), Vec<u8>> {
+            let i_proxy = IProxy::new(proxy);
+            i_proxy
+                .set_value(Call::new().value(msg::value()), value)
+                .map_err(|e| e.into())
+        }
+
+        #[payable]
+        fn call_non_existent_fn_on_implementation(
+            &mut self,
+            implementation: Address,
+        ) -> Result<(), Vec<u8>> {
+            let i_proxy = IProxy::new(implementation);
+            i_proxy
+                .pass_msg_value(Call::new().value(msg::value()))
+                .map_err(|e| e.into())
+        }
+    }
+
+    #[motsu::test]
+    fn fallback(
+        proxy_caller: Contract<ProxyCaller>,
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        alice: Address,
+    ) {
+        proxy.sender(alice).implementation.set(implementation.address());
+
+        let value = U256::from(101);
+
+        proxy_caller
+            .sender(alice)
+            .call_set_value_on_proxy(proxy.address(), value)
+            .motsu_unwrap();
+
+        assert_eq!(implementation.sender(alice).value.get(), value);
+
+        alice.fund(value);
+
+        proxy_caller
+            .sender_and_value(alice, value)
+            .call_set_value_on_proxy(proxy.address(), U256::ZERO)
+            .motsu_unwrap();
+
+        assert!(implementation.sender(alice).value.is_zero());
+
+        assert!(alice.balance().is_zero());
+        assert!(proxy.balance().is_zero());
+        assert_eq!(implementation.balance(), value);
+    }
+
+    #[motsu::test]
+    fn fallback_missing(
+        proxy_caller: Contract<ProxyCaller>,
+        implementation: Contract<Implementation>,
+        alice: Address,
+    ) {
+        let err = proxy_caller
+            .sender(alice)
+            .call_non_existent_fn_on_implementation(implementation.address())
+            .motsu_unwrap_err();
+
+        assert_eq!(
+            String::from_utf8(err).unwrap(),
+            "function not found for selector '3208857325' and no fallback defined"
+        )
+    }
+
+    #[motsu::test]
+    fn receive(
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        account: Address,
+    ) {
+        proxy.sender(account).implementation.set(implementation.address());
+
+        let value = U256::from(101);
+
+        account.fund(value);
+
+        proxy.sender_and_value(account, value).pass_msg_value().unwrap();
+
+        assert!(account.balance().is_zero());
+        assert!(proxy.balance().is_zero());
+        assert_eq!(implementation.balance(), value);
     }
 }
 

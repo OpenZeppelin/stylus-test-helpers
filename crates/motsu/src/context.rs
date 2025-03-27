@@ -196,30 +196,14 @@ impl VMContext {
         address: *const u8,
         calldata: *const u8,
         calldata_len: usize,
-        return_data_size: *mut usize,
-    ) -> u8 {
-        let address = read_address(address);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
-
-        let result = self.call_contract(address, selector, &input, None);
-        self.process_arb_result_raw(result, return_data_size)
-    }
-
-    /// Call the contract at raw `address` with the given raw `calldata` and
-    /// `value`.
-    pub(crate) unsafe fn call_contract_with_value_raw(
-        self,
-        address: *const u8,
-        calldata: *const u8,
-        calldata_len: usize,
         value: *const u8,
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
+        let value = (!value.is_zero()).then_some(value);
 
-        let result = self.call_contract(address, selector, &input, Some(value));
+        let result = self.call_contract(address, calldata, calldata_len, value);
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -246,11 +230,11 @@ impl VMContext {
 
     /// Call the function associated with the given `selector` at the given
     /// `contract_address`. Pass `input` and optional `value` to it.
-    fn call_contract(
+    unsafe fn call_contract(
         self,
         contract_address: Address,
-        selector: u32,
-        input: &[u8],
+        calldata: *const u8,
+        calldata_len: usize,
         value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
@@ -275,15 +259,19 @@ impl VMContext {
         // Call external contract.
         let result = self
             .router(contract_address)
-            .route(selector, input)
-            .unwrap_or_else(|| {
-                panic!("selector not found - selector is {selector}")
+            .route(slice::from_raw_parts(calldata, calldata_len).to_vec())
+            .map_err(|e| {
+                // The nested `router_entrypoint` call returns `Err(Vec::new())` when no function
+                // was found for the selector and no fallback is present.
+                if e.is_empty() {
+                    let selector = decode_selector(calldata, calldata_len);
+                    format!("function not found for selector '{selector}' and no fallback defined").as_bytes().to_vec()
+                } else {
+                    // If the call was unsuccessful, we should restore the data.
+                    self.storage().persistent.restore_from(backup);
+                    e
+                }
             });
-
-        // If the call was unsuccessful, we should restore the data.
-        if result.is_err() {
-            self.storage().persistent.restore_from(backup);
-        }
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -608,17 +596,12 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
     ptr::copy(bytes.as_ptr(), ptr, 32);
 }
 
-/// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
-/// raw pointer.
-unsafe fn decode_calldata(
-    calldata: *const u8,
-    calldata_len: usize,
-) -> (u32, Vec<u8>) {
+/// Decode the selector as [`u32`] from the raw pointer to the calldata.
+unsafe fn decode_selector(calldata: *const u8, calldata_len: usize) -> u32 {
     let calldata = slice::from_raw_parts(calldata, calldata_len);
     let selector =
         u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
-    let input = calldata[4..].to_vec();
-    (selector, input)
+    selector
 }
 
 /// Main storage for Motsu test VM.
