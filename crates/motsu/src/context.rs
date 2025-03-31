@@ -200,11 +200,10 @@ impl VMContext {
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
-        let calldata = slice::from_raw_parts(calldata, calldata_len);
         let value = read_u256(value);
-        let value = if value.is_zero() { None } else { Some(value) };
+        let calldata = slice::from_raw_parts(calldata, calldata_len);
 
-        let result = self.call_contract(address, calldata, value);
+        let result = self.call_contract(address, calldata, Some(value));
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -261,14 +260,14 @@ impl VMContext {
             .router(contract_address)
             .route(calldata.to_vec())
             .map_err(|e| {
+                // If the call was unsuccessful, we should restore the data.
+                self.storage().persistent.restore_from(backup);
                 // The nested `router_entrypoint` call returns `Err(Vec::new())` when no function
                 // was found for the selector and no fallback is present.
                 if e.is_empty() {
                     let selector = decode_selector(calldata);
                     format!("function not found for selector '{selector}' and no fallback defined").as_bytes().to_vec()
                 } else {
-                    // If the call was unsuccessful, we should restore the data.
-                    self.storage().persistent.restore_from(backup);
                     e
                 }
             });
