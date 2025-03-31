@@ -200,10 +200,11 @@ impl VMContext {
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
+        let calldata = slice::from_raw_parts(calldata, calldata_len);
         let value = read_u256(value);
-        let value = (!value.is_zero()).then_some(value);
+        let value = if value.is_zero() { None } else { Some(value) };
 
-        let result = self.call_contract(address, calldata, calldata_len, value);
+        let result = self.call_contract(address, calldata, value);
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -233,8 +234,7 @@ impl VMContext {
     unsafe fn call_contract(
         self,
         contract_address: Address,
-        calldata: *const u8,
-        calldata_len: usize,
+        calldata: &[u8],
         value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
@@ -259,12 +259,12 @@ impl VMContext {
         // Call external contract.
         let result = self
             .router(contract_address)
-            .route(slice::from_raw_parts(calldata, calldata_len).to_vec())
+            .route(calldata.to_vec())
             .map_err(|e| {
                 // The nested `router_entrypoint` call returns `Err(Vec::new())` when no function
                 // was found for the selector and no fallback is present.
                 if e.is_empty() {
-                    let selector = decode_selector(calldata, calldata_len);
+                    let selector = decode_selector(calldata);
                     format!("function not found for selector '{selector}' and no fallback defined").as_bytes().to_vec()
                 } else {
                     // If the call was unsuccessful, we should restore the data.
@@ -597,8 +597,7 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
 }
 
 /// Decode the selector as [`u32`] from the raw pointer to the calldata.
-unsafe fn decode_selector(calldata: *const u8, calldata_len: usize) -> u32 {
-    let calldata = slice::from_raw_parts(calldata, calldata_len);
+unsafe fn decode_selector(calldata: &[u8]) -> u32 {
     let selector =
         u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
     selector
