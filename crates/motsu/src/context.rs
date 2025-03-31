@@ -230,7 +230,7 @@ impl VMContext {
 
     /// Call the function associated with the given `selector` at the given
     /// `contract_address`. Pass `input` and optional `value` to it.
-    unsafe fn call_contract(
+    fn call_contract(
         self,
         contract_address: Address,
         calldata: &[u8],
@@ -596,7 +596,7 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
 }
 
 /// Decode the selector as [`u32`] from the raw pointer to the calldata.
-unsafe fn decode_selector(calldata: &[u8]) -> u32 {
+fn decode_selector(calldata: &[u8]) -> u32 {
     let selector =
         u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
     selector
