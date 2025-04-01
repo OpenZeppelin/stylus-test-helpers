@@ -12,10 +12,13 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 ### Added
 
 - Predeploy `EcRecover` precompile contract. #90
+- Support `fallback` and `receive` functions. #88
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
-- Enabled conversion from `PrivateKeySigner` into `Account`. #81
+- Enabled additional conversions between `PrivateKeySigner`, `Address` and `Account`. #84
 
 ### Changed (Breaking)
+
+- Missing selector returns an error instead of panicking. #88
 
 ### Changed
 

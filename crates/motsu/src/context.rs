@@ -196,30 +196,14 @@ impl VMContext {
         address: *const u8,
         calldata: *const u8,
         calldata_len: usize,
-        return_data_size: *mut usize,
-    ) -> u8 {
-        let address = read_address(address);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
-
-        let result = self.call_contract(address, selector, &input, None);
-        self.process_arb_result_raw(result, return_data_size)
-    }
-
-    /// Call the contract at raw `address` with the given raw `calldata` and
-    /// `value`.
-    pub(crate) unsafe fn call_contract_with_value_raw(
-        self,
-        address: *const u8,
-        calldata: *const u8,
-        calldata_len: usize,
         value: *const u8,
         return_data_size: *mut usize,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
-        let (selector, input) = decode_calldata(calldata, calldata_len);
+        let calldata = slice::from_raw_parts(calldata, calldata_len);
 
-        let result = self.call_contract(address, selector, &input, Some(value));
+        let result = self.call_contract(address, calldata, Some(value));
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -249,8 +233,7 @@ impl VMContext {
     fn call_contract(
         self,
         contract_address: Address,
-        selector: u32,
-        input: &[u8],
+        calldata: &[u8],
         value: Option<U256>,
     ) -> ArbResult {
         // Set the caller contract as message sender and callee contract as
@@ -275,15 +258,19 @@ impl VMContext {
         // Call external contract.
         let result = self
             .router(contract_address)
-            .route(selector, input)
-            .unwrap_or_else(|| {
-                panic!("selector not found - selector is {selector}")
+            .route(calldata.to_vec())
+            .map_err(|e| {
+                // If the call was unsuccessful, we should restore the data.
+                self.storage().persistent.restore_from(backup);
+                // The nested `router_entrypoint` call returns `Err(Vec::new())` when no function
+                // was found for the selector and no fallback is present.
+                if e.is_empty() {
+                    let selector = decode_selector(calldata);
+                    format!("function not found for selector '{selector}' and no fallback defined").as_bytes().to_vec()
+                } else {
+                    e
+                }
             });
-
-        // If the call was unsuccessful, we should restore the data.
-        if result.is_err() {
-            self.storage().persistent.restore_from(backup);
-        }
 
         // Set the previous message sender and contract address back.
         _ = self.replace_contract_address(previous_contract_address);
@@ -608,17 +595,11 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
     ptr::copy(bytes.as_ptr(), ptr, 32);
 }
 
-/// Decode the selector as [`u32`], and function input as [`Vec<u8>`] from the
-/// raw pointer.
-unsafe fn decode_calldata(
-    calldata: *const u8,
-    calldata_len: usize,
-) -> (u32, Vec<u8>) {
-    let calldata = slice::from_raw_parts(calldata, calldata_len);
+/// Decode the selector as [`u32`] from the raw pointer to the calldata.
+fn decode_selector(calldata: &[u8]) -> u32 {
     let selector =
         u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
-    let input = calldata[4..].to_vec();
-    (selector, input)
+    selector
 }
 
 /// Main storage for Motsu test VM.
@@ -952,9 +933,33 @@ impl From<Account> for Address {
     }
 }
 
+impl From<&Account> for Address {
+    fn from(value: &Account) -> Self {
+        value.address
+    }
+}
+
 impl From<PrivateKeySigner> for Account {
     fn from(value: PrivateKeySigner) -> Self {
         Self { address: value.address(), private_key: value.to_bytes() }
+    }
+}
+
+impl From<&PrivateKeySigner> for Account {
+    fn from(value: &PrivateKeySigner) -> Self {
+        Self { address: value.address(), private_key: value.to_bytes() }
+    }
+}
+
+impl From<Account> for PrivateKeySigner {
+    fn from(value: Account) -> Self {
+        value.signer()
+    }
+}
+
+impl From<&Account> for PrivateKeySigner {
+    fn from(value: &Account) -> Self {
+        value.signer()
     }
 }
 
@@ -1105,6 +1110,10 @@ mod tests {
     use crate::context::VMContext;
 
     mod account {
+        use std::ops::Deref;
+
+        use alloy_signer_local::PrivateKeySigner;
+
         use super::*;
 
         #[test]
@@ -1160,11 +1169,30 @@ mod tests {
         }
 
         #[test]
-        fn account_into_signer_and_back_returns_same_account() {
+        fn account_signer_and_back_returns_same_account() {
             let old_account = Account::from_seed("seed");
             let signer = old_account.signer();
             let new_account = signer.into();
             assert_eq!(old_account, new_account);
+        }
+
+        #[test]
+        fn account_into_signer_and_back_returns_same_account() {
+            let old_account = Account::from_seed("seed");
+            let signer: PrivateKeySigner = old_account.into();
+            let new_account = signer.into();
+            assert_eq!(old_account, new_account);
+        }
+
+        #[test]
+        fn account_ref_into_address() {
+            let account = &Account::random();
+            let address: Address = account.into();
+            assert_eq!(account.address(), address);
+
+            let account = &mut Account::random();
+            let address: Address = account.deref().into();
+            assert_eq!(account.address(), address);
         }
     }
 

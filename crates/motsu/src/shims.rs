@@ -249,7 +249,7 @@ unsafe extern "C" fn call_contract(
     _gas: u64,
     return_data_len: *mut usize,
 ) -> u8 {
-    VMContext::current().call_contract_with_value_raw(
+    VMContext::current().call_contract_raw(
         contract,
         calldata,
         calldata_len,
@@ -257,6 +257,8 @@ unsafe extern "C" fn call_contract(
         return_data_len,
     )
 }
+
+const ZERO_RAW: *const u8 = [0; 32].as_ptr();
 
 /// Static calls the contract at the given address, with the option to limit the
 /// amount of gas supplied. The return status indicates whether the call
@@ -284,6 +286,7 @@ unsafe extern "C" fn static_call_contract(
         contract,
         calldata,
         calldata_len,
+        ZERO_RAW,
         return_data_len,
     )
 }
@@ -314,6 +317,7 @@ unsafe extern "C" fn delegate_call_contract(
         contract,
         calldata,
         calldata_len,
+        ZERO_RAW,
         return_data_len,
     )
 }
