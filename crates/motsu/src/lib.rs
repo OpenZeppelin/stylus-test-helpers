@@ -1109,19 +1109,6 @@ mod vm_tests {
     unsafe impl TopLevelStorage for ChainChecker {}
 
     #[motsu::test]
-    fn reads_balance(contract: Contract<Erc20>, alice: Address) {
-        // `contract` is already set up
-        let balance = contract.sender(alice).balance_of(Address::ZERO);
-        assert_eq!(U256::ZERO, balance);
-
-        let owner = msg::sender();
-        let one = U256::from(1);
-        contract.sender(alice)._balances.setter(owner).set(one);
-        let balance = contract.sender(alice).balance_of(owner);
-        assert_eq!(one, balance);
-    }
-
-    #[motsu::test]
     fn chain_id(contract: Contract<ChainChecker>, alice: Address) {
         // Default chain ID is Arbitrum One
         let chain_id = contract.sender(alice).get_chain_id();

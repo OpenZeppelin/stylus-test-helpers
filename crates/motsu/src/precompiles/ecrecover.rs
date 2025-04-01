@@ -1,5 +1,4 @@
-//! EcRecover Contract simulating that is deployed on the chain to simulate the
-//! being precompiled.
+//! Contract simulating the precompiled `ecrecover` contract on-chain.
 use revm_precompile::{
     secp256k1::{ec_recover_run, ECRECOVER},
     PrecompileErrors,
@@ -168,12 +167,10 @@ impl EcRecover {
     /// Fallback function.
     #[fallback]
     fn fallback(&self) -> Result<Vec<u8>, Vec<u8>> {
-        let args = vec![];
-        let b = &(args.into());
-        let r: Result<Vec<u8>, Error> = ec_recover_run(b, evm::gas_left())
+        ec_recover_run(&(vec![].into()), evm::gas_left())
             .map(|out| out.bytes.into())
-            .map_err(|e| e.into());
-        r.map_err(|e| e.into())
+            .map_err(Into::<Error>::into)
+            .map_err(Into::into)
     }
 }
 
@@ -185,6 +182,7 @@ mod tests {
         alloy_primitives::{Address, B256},
         alloy_sol_types::{sol, SolValue},
         call::{self, Call},
+        keccak_const::Keccak256,
         prelude::*,
     };
 
@@ -236,10 +234,13 @@ mod tests {
 
     #[motsu::test]
     fn ecrecover(contract: Contract<PrecompileAccessor>, alice: Account) {
-        let message = "Message to sign here.".as_bytes();
+        let msg_hash = Keccak256::new()
+            .update("Message to sign here.".as_bytes())
+            .finalize()
+            .into();
 
         // get v, r and s values
-        let signature = alice.signer().sign_message_sync(message).unwrap();
+        let signature = alice.signer().sign_hash_sync(&msg_hash).unwrap();
         let recid: u8 = signature.recid().into();
         let (v, r, s) = (
             // ecrecover expects `v` to be in the range {27,28}
@@ -250,7 +251,7 @@ mod tests {
 
         let address = contract
             .sender(alice)
-            .get_signer_address(B256::from_slice(message), v, r, s)
+            .get_signer_address(msg_hash, v, r, s)
             .unwrap();
 
         assert_eq!(address, alice.address());
@@ -261,17 +262,17 @@ mod tests {
         contract: Contract<PrecompileAccessor>,
         alice: Account,
     ) {
-        let message = "Message to sign here.".as_bytes();
+        let to_b256 = |input: &str| {
+            Keccak256::new().update(input.as_bytes()).finalize().into()
+        };
+        let msg_hash = to_b256("Message to sign here.");
+        let r = to_b256("1");
+        let s = to_b256("1");
 
         // verify invalid inputs still work
         let address = contract
             .sender(alice)
-            .get_signer_address(
-                B256::from_slice(message),
-                27,
-                B256::from_slice(&[1]),
-                B256::from_slice(&[1]),
-            )
+            .get_signer_address(msg_hash, 27, r, s)
             .unwrap();
 
         assert_eq!(address, Address::ZERO);
