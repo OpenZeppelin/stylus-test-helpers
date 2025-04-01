@@ -157,10 +157,13 @@ impl MethodError for Error {
     }
 }
 
-/// EcRecover Contract.
+/// State of an [`EcRecover`] contract.
 #[storage]
 pub struct EcRecover;
 
+/// NOTE: Implementation of [`TopLevelStorage`] to be able use `&mut self` when
+/// calling other contracts and not `&mut (impl TopLevelStorage +
+/// BorrowMut<Self>)`. Should be fixed in the future by the Stylus team.
 unsafe impl TopLevelStorage for EcRecover {}
 
 #[public]
