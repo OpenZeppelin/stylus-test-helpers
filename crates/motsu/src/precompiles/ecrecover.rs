@@ -1,7 +1,8 @@
 //! Contract simulating the precompiled `ecrecover` contract on-chain.
+use alloy_primitives::Bytes;
 use revm_precompile::{
     secp256k1::{ec_recover_run, ECRECOVER},
-    PrecompileErrors,
+    PrecompileErrors, PrecompileOutput,
 };
 use stylus_sdk::{
     alloy_primitives::Address, alloy_sol_types::sol, call::MethodError, evm,
@@ -166,12 +167,36 @@ unsafe impl TopLevelStorage for EcRecover {}
 impl EcRecover {
     /// Fallback function.
     #[fallback]
-    fn fallback(&self) -> Result<Vec<u8>, Vec<u8>> {
-        ec_recover_run(&(vec![].into()), evm::gas_left())
-            .map(|out| out.bytes.into())
+    fn fallback(&self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+        ec_recover_run(&Bytes::copy_from_slice(calldata), evm::gas_left())
+            .map(output_to_left_padded_vec)
             .map_err(Into::<Error>::into)
             .map_err(Into::into)
     }
+}
+
+/// Converts Bytes to a Vec<u8> with left-padding to ensure it's 32 bytes.
+///
+/// Assumes the input Bytes will never be more than 32 bytes.
+/// If the input Bytes is less than 32 bytes, the result will be left-padded
+/// with zeroes.
+///
+/// # Arguments
+///
+/// * `bytes` - The Bytes to convert (must be ≤ 32 bytes)
+///
+/// # Returns
+///
+/// A Vec<u8> containing exactly 32 bytes
+fn output_to_left_padded_vec(out: PrecompileOutput) -> Vec<u8> {
+    let mut result = vec![0u8; 32];
+
+    // Calculate the starting index in the result vector (for left padding)
+    let start_index = 32 - out.bytes.len();
+
+    result[start_index..].copy_from_slice(&out.bytes[..]);
+
+    result
 }
 
 #[cfg(test)]
@@ -252,7 +277,7 @@ mod tests {
         let address = contract
             .sender(alice)
             .get_signer_address(msg_hash, v, r, s)
-            .unwrap();
+            .motsu_expect("should recover signer address");
 
         assert_eq!(address, alice.address());
     }
@@ -273,7 +298,7 @@ mod tests {
         let address = contract
             .sender(alice)
             .get_signer_address(msg_hash, 27, r, s)
-            .unwrap();
+            .motsu_expect("should recover signer address");
 
         assert_eq!(address, Address::ZERO);
     }

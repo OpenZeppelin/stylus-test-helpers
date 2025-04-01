@@ -451,13 +451,18 @@ unsafe extern "C" fn create2(
 ) {
 }
 
+/// How much ink is in 1 unit of gas.
+/// See: https://docs.arbitrum.io/stylus/concepts/gas-metering#the-ink-price
+const GAS_TO_INK_RATE: u64 = 10_000;
+
 /// Gets the amount of gas left after paying for the cost of this hostio. The
 /// semantics are equivalent to that of the EVM's [`GAS`] opcode.
 ///
 /// [`GAS`]: https://www.evm.codes/#5a
 #[no_mangle]
 unsafe extern "C" fn evm_gas_left() -> u64 {
-    0
+    // gas must be directly convertible to ink, and it can't exceed it
+    evm_ink_left() / GAS_TO_INK_RATE
 }
 
 /// Gets the amount of ink remaining after paying for the cost of this hostio.
@@ -469,7 +474,7 @@ unsafe extern "C" fn evm_gas_left() -> u64 {
 /// [`Ink and Gas`]: https://docs.arbitrum.io/stylus/concepts/gas-metering
 #[no_mangle]
 unsafe extern "C" fn evm_ink_left() -> u64 {
-    0
+    u64::MAX
 }
 
 /// Whether the current call is reentrant.
