@@ -36,6 +36,10 @@ const EOA_CODEHASH: &[u8; 66] =
 const CA_CODEHASH: &[u8; 66] =
     b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
+/// How much ink is in 1 unit of gas.
+/// See: <https://docs.arbitrum.io/stylus/concepts/gas-metering#the-ink-price>
+const GAS_TO_INK_RATE: u64 = 10_000;
+
 /// Efficiently computes the [`keccak256`] hash of the given preimage.
 /// The semantics are equivalent to that of the EVM's [`SHA3`] opcode.
 ///
@@ -450,10 +454,6 @@ unsafe extern "C" fn create2(
     _revert_data_len: *mut usize,
 ) {
 }
-
-/// How much ink is in 1 unit of gas.
-/// See: https://docs.arbitrum.io/stylus/concepts/gas-metering#the-ink-price
-const GAS_TO_INK_RATE: u64 = 10_000;
 
 /// Gets the amount of gas left after paying for the cost of this hostio. The
 /// semantics are equivalent to that of the EVM's [`GAS`] opcode.

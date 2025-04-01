@@ -11,6 +11,7 @@ pub(crate) mod ecrecover;
 /// contracts.
 ///
 /// See: <https://ethereum.github.io/yellowpaper/paper.pdf>
+#[must_use]
 pub fn deploy_precompiles() -> Vec<Contract<impl StorageType>> {
     vec![Contract::<ecrecover::EcRecover>::new_at(ecrecover::ADDRESS)]
 }

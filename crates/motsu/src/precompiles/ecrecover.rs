@@ -2,7 +2,7 @@
 use alloy_primitives::Bytes;
 use revm_precompile::{
     secp256k1::{ec_recover_run, ECRECOVER},
-    PrecompileErrors, PrecompileOutput,
+    PrecompileErrors,
 };
 use stylus_sdk::{
     alloy_primitives::Address, alloy_sol_types::sol, call::MethodError, evm,
@@ -169,10 +169,11 @@ unsafe impl TopLevelStorage for EcRecover {}
 #[public]
 impl EcRecover {
     /// Fallback function.
+    #[allow(clippy::unused_self)]
     #[fallback]
     fn fallback(&self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
         ec_recover_run(&Bytes::copy_from_slice(calldata), evm::gas_left())
-            .map(output_to_left_padded_vec)
+            .map(|out| output_to_left_padded_vec(out.bytes))
             .map_err(Into::<Error>::into)
             .map_err(Into::into)
     }
@@ -191,13 +192,13 @@ impl EcRecover {
 /// # Returns
 ///
 /// A Vec<u8> containing exactly 32 bytes
-fn output_to_left_padded_vec(out: PrecompileOutput) -> Vec<u8> {
+fn output_to_left_padded_vec(bytes: Bytes) -> Vec<u8> {
     let mut result = vec![0u8; 32];
 
     // Calculate the starting index in the result vector (for left padding)
-    let start_index = 32 - out.bytes.len();
+    let start_index = 32 - bytes.len();
 
-    result[start_index..].copy_from_slice(&out.bytes[..]);
+    result[start_index..].copy_from_slice(&bytes[..]);
 
     result
 }
