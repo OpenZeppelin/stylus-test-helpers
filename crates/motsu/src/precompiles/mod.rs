@@ -5,6 +5,8 @@ use crate::context::Contract;
 
 pub(crate) mod ecrecover;
 
+mod errors;
+
 /// Deploy precompiled contracts.
 ///
 /// Returns a vector of the contracts to ensure the compiler doesn't drop the
