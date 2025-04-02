@@ -37,14 +37,6 @@ impl EcRecover {
 /// with zeroes.
 ///
 /// See: <https://docs.soliditylang.org/en/v0.8.29/cheatsheet.html#mathematical-and-cryptographic-functions>
-///
-/// # Arguments
-///
-/// * `bytes` - The Bytes to convert (must be ≤ 32 bytes)
-///
-/// # Returns
-///
-/// A Vec<u8> containing exactly 32 bytes
 fn output_to_left_padded_vec(bytes: &Bytes) -> Vec<u8> {
     let mut result = vec![0u8; 32];
 
