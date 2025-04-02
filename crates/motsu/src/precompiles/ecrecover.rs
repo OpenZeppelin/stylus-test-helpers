@@ -173,7 +173,7 @@ impl EcRecover {
     #[fallback]
     fn fallback(&self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
         ec_recover_run(&Bytes::copy_from_slice(calldata), evm::gas_left())
-            .map(|out| output_to_left_padded_vec(out.bytes))
+            .map(|out| output_to_left_padded_vec(&out.bytes))
             .map_err(Into::<Error>::into)
             .map_err(Into::into)
     }
@@ -192,7 +192,7 @@ impl EcRecover {
 /// # Returns
 ///
 /// A Vec<u8> containing exactly 32 bytes
-fn output_to_left_padded_vec(bytes: Bytes) -> Vec<u8> {
+fn output_to_left_padded_vec(bytes: &Bytes) -> Vec<u8> {
     let mut result = vec![0u8; 32];
 
     // Calculate the starting index in the result vector (for left padding)
