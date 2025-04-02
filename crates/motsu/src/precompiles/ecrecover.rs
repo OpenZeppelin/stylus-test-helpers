@@ -12,31 +12,31 @@ use stylus_sdk::{
 pub(crate) const ADDRESS: Address = ECRECOVER.0;
 
 sol! {
-    /// Out of gas is the main error. Others are here just for completeness
+    /// Out of gas is the main error. Others are here just for completeness.
     #[derive(Debug)]
     error PrecompileOutOfGas();
-    /// Blake2 wrong length
+    /// Blake2 wrong length.
     #[derive(Debug)]
     error PrecompileBlake2WrongLength();
-    /// Blake2 wrong indicator flag
+    /// Blake2 wrong indicator flag.
     #[derive(Debug)]
     error PrecompileBlake2WrongFinalIndicatorFlag();
-    /// Modexp exponent overflow
+    /// Modexp exponent overflow.
     #[derive(Debug)]
     error PrecompileModexpExpOverflow();
-    /// Modexp base overflow
+    /// Modexp base overflow.
     #[derive(Debug)]
     error PrecompileModexpBaseOverflow();
-    /// Modexp mod overflow
+    /// Modexp mod overflow.
     #[derive(Debug)]
     error PrecompileModexpModOverflow();
-    /// Bn128 field point not a member
+    /// Bn128 field point not a member.
     #[derive(Debug)]
     error PrecompileBn128FieldPointNotAMember();
-    /// Bn128 affine G failed to create
+    /// Bn128 affine G failed to create.
     #[derive(Debug)]
     error PrecompileBn128AffineGFailedToCreate();
-    /// Bn128 pair length error
+    /// Bn128 pair length error.
     #[derive(Debug)]
     error PrecompileBn128PairLength();
     /// The blob input length is not exactly 192 bytes.
@@ -51,30 +51,30 @@ sol! {
     /// Catch-all variant for other errors.
     #[derive(Debug)]
     error PrecompileOther(string);
-    /// Fatal
+    /// Fatal.
     #[derive(Debug)]
     error PrecompileFatal(string msg);
 }
 
 #[derive(SolidityError, Debug)]
 pub enum Error {
-    /// Out of gas is the main error. Others are here just for completeness
+    /// Out of gas is the main error. Others are here just for completeness.
     OutOfGas(PrecompileOutOfGas),
-    /// Blake2 wrong length
+    /// Blake2 wrong length.
     Blake2WrongLength(PrecompileBlake2WrongLength),
-    /// Blake2 wrong indicator flag
+    /// Blake2 wrong indicator flag.
     Blake2WrongFinalIndicatorFlag(PrecompileBlake2WrongFinalIndicatorFlag),
-    /// Modexp exponent overflow
+    /// Modexp exponent overflow.
     ModexpExpOverflow(PrecompileModexpExpOverflow),
-    /// Modexp base overflow
+    /// Modexp base overflow.
     ModexpBaseOverflow(PrecompileModexpBaseOverflow),
-    /// Modexp mod overflow
+    /// Modexp mod overflow.
     ModexpModOverflow(PrecompileModexpModOverflow),
-    /// Bn128 field point not a member
+    /// Bn128 field point not a member.
     Bn128FieldPointNotAMember(PrecompileBn128FieldPointNotAMember),
-    /// Bn128 affine G failed to create
+    /// Bn128 affine G failed to create.
     Bn128AffineGFailedToCreate(PrecompileBn128AffineGFailedToCreate),
-    /// Bn128 pair length error
+    /// Bn128 pair length error.
     Bn128PairLength(PrecompileBn128PairLength),
     /// The blob input length is not exactly 192 bytes.
     BlobInvalidInputLength(PrecompileBlobInvalidInputLength),
@@ -84,7 +84,7 @@ pub enum Error {
     BlobVerifyKzgProofFailed(PrecompileBlobVerifyKzgProofFailed),
     /// Catch-all variant for other errors.
     Other(PrecompileOther),
-    /// Fatal
+    /// Fatal.
     Fatal(PrecompileFatal),
 }
 
