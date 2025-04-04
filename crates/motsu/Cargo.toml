@@ -19,6 +19,10 @@ alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-sol-types.workspace = true
 alloy-signer-local.workspace = true
 k256.workspace = true
+revm-precompile.workspace = true
+
+[dev-dependencies]
+alloy-signer.workspace = true
 
 [lints]
 workspace = true

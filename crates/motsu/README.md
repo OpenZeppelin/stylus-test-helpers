@@ -179,19 +179,6 @@ Panics in contract code are not handled as a revert and will fail the test.
 
 ### Notes
 
-Annotating a test function that accepts no parameters will make
-[`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
-
-```rust,ignore
-#[cfg(test)]
-mod tests {
-    #[motsu::test] // Equivalent to #[test]
-    fn test_fn() {
-        ...
-    }
-}
-```
-
 **Important:** To use a contract in tests, you must ensure it implements the
 unsafe trait [`TopLevelStorage`][stylus_sdk_top_level_storage].
 While this trait is automatically derived for contracts marked with

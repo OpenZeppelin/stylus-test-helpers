@@ -46,12 +46,15 @@ pub(crate) fn test(_attr: &TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
+    // Deploy precompiles and keep a reference to them to stop the compiler from
+    // dropping them.
     // Declare test case closure.
     // Pass arguments to the test closure and call it.
     quote! {
         #( #attrs )*
         #[test]
         fn #fn_name() #fn_return_type {
+            let precompiles = motsu::prelude::deploy_precompiles();
             let test = | #( #arg_defs ),* | #fn_block;
             test( #( #arg_inits ),* )
         }
