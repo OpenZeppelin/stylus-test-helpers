@@ -1,10 +1,11 @@
 //! Router context for external calls mocks.
 
-use std::{borrow::BorrowMut, marker::PhantomData, thread::ThreadId};
+use std::{
+    borrow::BorrowMut, marker::PhantomData, sync::LazyLock, thread::ThreadId,
+};
 
 use alloy_primitives::Address;
 use dashmap::{mapref::one::RefMut, DashMap};
-use once_cell::sync::Lazy;
 use stylus_sdk::{
     abi::router_entrypoint,
     host::{WasmVM, VM},
@@ -29,8 +30,8 @@ use crate::{
 ///
 /// NOTE: The [`VMRouter::storage`] will panic on lock, when the same key
 /// is accessed twice from the same thread.
-static MOTSU_VM_ROUTERS: Lazy<DashMap<VMRouter, VMRouterStorage>> =
-    Lazy::new(DashMap::new);
+static MOTSU_VM_ROUTERS: LazyLock<DashMap<VMRouter, VMRouterStorage>> =
+    LazyLock::new(DashMap::new);
 
 /// Context of Motsu test VM router associated with the current test thread and
 /// contract's address.

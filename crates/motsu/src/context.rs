@@ -6,6 +6,7 @@ use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
     ptr, slice,
+    sync::LazyLock,
     thread::ThreadId,
 };
 
@@ -14,7 +15,6 @@ use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
-use once_cell::sync::Lazy;
 use stylus_sdk::{
     keccak_const::Keccak256, prelude::StorageType, types::AddressVM, ArbResult,
 };
@@ -34,7 +34,7 @@ use crate::{
 ///
 /// NOTE: The [`VM::storage`] will panic on lock, when the same key is
 /// accessed twice from the same thread.
-static MOTSU_VM: Lazy<DashMap<VM, VMStorage>> = Lazy::new(DashMap::new);
+static MOTSU_VM: LazyLock<DashMap<VM, VMStorage>> = LazyLock::new(DashMap::new);
 
 // TODO: remove this after we can enable the `stylus-test` feature, which should
 // happen after we refactor `motsu` to implement a mock
