@@ -1115,14 +1115,14 @@ mod vm_tests {
         // Verify the correct chain ID is returned within tests too
         assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
 
-        VMContext::current().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
+        VM::context().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
         assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
 
         // Verify that even custom chain ID can be set
-        VMContext::current().set_chain_id(CUSTOM_CHAIN_ID);
+        VM::context().set_chain_id(CUSTOM_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);

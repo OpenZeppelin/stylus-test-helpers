@@ -12,7 +12,7 @@
 
 use core::fmt;
 
-use crate::context::VMContext;
+use crate::context::VM;
 
 /// Motsu extension trait for [`Result`].
 ///
@@ -62,7 +62,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
         match self.motsu_res() {
             Ok(value) => value,
             Err(err) => {
-                let panic_msg = VMContext::current().panic_msg_with_err(err);
+                let panic_msg = VM::context().panic_msg_with_err(err);
                 panic!("{panic_msg}");
             }
         }
@@ -72,7 +72,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_unwrap_err(self) -> E {
         match self.motsu_res() {
             Ok(_value) => {
-                let panic_msg = VMContext::current().panic_msg();
+                let panic_msg = VM::context().panic_msg();
                 panic!("{panic_msg}");
             }
             Err(err) => err,
@@ -84,7 +84,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
         match self.motsu_res() {
             Ok(value) => value,
             Err(err) => {
-                let panic_msg = VMContext::current().panic_msg_with_err(err);
+                let panic_msg = VM::context().panic_msg_with_err(err);
                 panic!("{msg}: {panic_msg}");
             }
         }
@@ -94,7 +94,7 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_expect_err(self, msg: &str) -> E {
         match self.motsu_res() {
             Ok(_value) => {
-                let panic_msg = VMContext::current().panic_msg();
+                let panic_msg = VM::context().panic_msg();
                 panic!("{msg}: {panic_msg}");
             }
             Err(err) => err,
@@ -104,17 +104,17 @@ impl<T, E: fmt::Debug> ResultExt<T, E> for Result<T, E> {
     fn motsu_res(self) -> Result<T, E> {
         match self {
             Ok(_) => {
-                VMContext::current().reset_backup();
+                VM::context().reset_backup();
             }
             Err(_) => {
-                VMContext::current().restore_from_backup();
+                VM::context().restore_from_backup();
             }
         }
         self
     }
 }
 
-impl VMContext {
+impl VM {
     /// Returns a panic message for calls with expected errors.
     fn panic_msg(self) -> String {
         let msg_sender = self.msg_sender().expect("msg_sender should be set");
