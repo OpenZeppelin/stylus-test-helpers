@@ -69,7 +69,7 @@ fn test_with_custom_chain_id(
     // Default chain ID is 42161 (Arbitrum One)
 
     // Set chain ID to 11155111 (Sepolia testnet)
-    VM::current().set_chain_id(11155111);
+    VM::context().set_chain_id(11155111);
 
     // Now any contract code that depends on `block::chainid()`
     // will use this value
