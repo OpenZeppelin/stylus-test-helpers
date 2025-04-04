@@ -19,35 +19,42 @@ mod test;
 /// Defines a unit test that provides access to Stylus' execution context.
 ///
 /// Internally, this is a thin wrapper over `#[test]` that gives access to
-/// affordances like contract storage and `msg::sender`. If you don't need
-/// them, you can pass no arguments to the test function or simply use
-/// `#[test]` instead of `#[motsu::test]`.
+/// affordances like contract storage and `msg::sender` and deploys precompiles.
+/// If you don't need them, you can simply use `#[test]` instead of
+/// `#[motsu::test]`.
 ///
 /// # Examples
-///
-/// ```rust
-/// #[cfg(test)]
-/// mod tests {
-///     #[motsu::test]
-///     fn reads_balance(contract: Erc20) {
-///        let balance = contract.balance_of(Address::ZERO);
-///        assert_eq!(U256::ZERO, balance);
-///
-///        let owner = msg::sender();
-///        let one = U256::from(1);
-///        contract._balances.setter(owner).set(one);
-///        let balance = contract.balance_of(owner);
-///        assert_eq!(one, balance);
-///     }
-/// }
-/// ```
 ///
 /// ```rust,ignore
 /// #[cfg(test)]
 /// mod tests {
 ///     #[motsu::test]
-///     fn t() { // If no params, it expands to a `#[test]`.
-///         ...
+///     fn autosetup(contract: Contract<Erc20>, alice: Address) {
+///         // contract and alice is already set up, and precompiled
+///         // contracts are deployed.
+///
+///         // ...
+///     }
+///
+///     #[motsu::test]
+///     fn no_affordances() {
+///         // only precompiled contracts are deployed, contract and alice
+///         // need to be manually instantiated.
+///         let contract = Contract::<Erc20>::from_tag("contract");
+///         let alice = Address::from_tag("alice");
+///
+///         // ...
+///     }
+///
+///     #[test]
+///     fn manual_setup() {
+///         // CAUTION: precompiles will not be deployed, use only if you're
+///         // sure you don't need them.
+///         // contract and alice still need to be manually instantiated.
+///         let contract = Contract::<Erc20>::from_tag("contract");
+///         let alice = Address::from_tag("alice");
+///
+///         // ...
 ///     }
 /// }
 /// ```
