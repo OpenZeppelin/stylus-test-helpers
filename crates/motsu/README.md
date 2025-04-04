@@ -56,7 +56,7 @@ execution environment:
 
 #### Chain ID
 
-You can set the Chain ID in tests using the [`VMContext`][vm_context] API:
+You can set the Chain ID in tests using the [`VM`][vm] API:
 
 ```rust
 use motsu::prelude::*;
@@ -69,7 +69,7 @@ fn test_with_custom_chain_id(
     // Default chain ID is 42161 (Arbitrum One)
 
     // Set chain ID to 11155111 (Sepolia testnet)
-    VMContext::current().set_chain_id(11155111);
+    VM::current().set_chain_id(11155111);
 
     // Now any contract code that depends on `block::chainid()`
     // will use this value
@@ -246,7 +246,7 @@ Refer to our [Security Policy] for more details.
 
 [address]: stylus_sdk::alloy_primitives::Address
 
-[vm_context]: crate::prelude::VMContext
+[vm]: crate::prelude::VM
 
 [contract_sender]: crate::prelude::Contract::sender
 

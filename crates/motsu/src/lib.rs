@@ -524,7 +524,7 @@ mod fallback_receive_tests {
         assert_eq!(
             String::from_utf8(err).unwrap(),
             "function not found for selector '3208857325' and no fallback defined"
-        )
+        );
     }
 
     #[motsu::test]
