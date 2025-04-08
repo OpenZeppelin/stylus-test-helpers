@@ -733,9 +733,9 @@ pub struct ContractCall<'a, ST: StorageType> {
 impl<ST: StorageType> ContractCall<'_, ST> {
     /// Preset the call parameters.
     fn set_call_params(&self) {
-        _ = VM::context().replace_optional_msg_value(self.msg_value);
-        _ = VM::context().replace_msg_sender(self.msg_sender);
-        _ = VM::context().replace_contract_address(self.contract_ref.address);
+        VM::context().replace_optional_msg_value(self.msg_value);
+        VM::context().replace_msg_sender(self.msg_sender);
+        VM::context().replace_contract_address(self.contract_ref.address);
     }
 
     /// Invalidate the storage cache of stylus contract [`StorageType`], by
