@@ -29,7 +29,7 @@ Add motsu to your project's dependencies:
 motsu = "0.7.0"
 
 [dependencies]
-stylus-sdk = { version = "=0.8.3", default-features = false, features = [
+stylus-sdk = { version = "=0.8.4", default-features = false, features = [
   "mini-alloc",
 ] }
 ```
