@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Changed (Breaking)
 
+- Bump Stylus SDK to `v0.8.4`. #92
 - Missing selector returns an error instead of panicking. #88
 - Api `VMContext::current()` simplified to `VM::context()`. #91
 - `evm::gas_left` and `evm::ink_left` return maximum values. #90

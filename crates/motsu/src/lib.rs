@@ -504,7 +504,7 @@ mod fallback_receive_tests {
             .call_set_value_on_proxy(proxy.address(), U256::ZERO)
             .motsu_unwrap();
 
-        assert!(implementation.sender(alice).value.is_zero());
+        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
 
         assert!(alice.balance().is_zero());
         assert!(proxy.balance().is_zero());
