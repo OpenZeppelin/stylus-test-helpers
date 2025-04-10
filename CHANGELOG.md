@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+### Changed (Breaking)
+
+### Changed
+
+## [0.8.0] - 2025-04-10
+
+### Added
+
 - Predeploy `EcRecover` precompile contract. #90
 - Support `fallback` and `receive` functions. #88
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
