@@ -379,6 +379,110 @@ mod ping_pong_tests {
         // Check panic assertion.
         ping.assert_emitted(&Pinged { from: alice, value });
     }
+
+    #[motsu::test]
+    fn all_events(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Address,
+    ) {
+        // Check initial state
+        let ping_events_initial = ping.all_events();
+        let pong_events_initial = pong.all_events();
+        assert!(
+            ping_events_initial.is_empty(),
+            "Ping should have no events initially"
+        );
+        assert!(
+            pong_events_initial.is_empty(),
+            "Pong should have no events initially"
+        );
+
+        // Emit events
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+        ping.sender(alice).ping(pong.address(), TEN + ONE).motsu_unwrap();
+
+        // Check both events
+        let ping_events = ping.all_events();
+        let pong_events = pong.all_events();
+
+        assert_eq!(ping_events.len(), 2);
+        assert_eq!(pong_events.len(), 2);
+
+        // Check event data
+        let ping_event_1 =
+            Pinged::decode_log_data(&ping_events[0], true).unwrap();
+
+        assert_eq!(ping_event_1.from, alice);
+        assert_eq!(ping_event_1.value, TEN);
+
+        let ping_event_2 =
+            Pinged::decode_log_data(&ping_events[1], true).unwrap();
+
+        assert_eq!(ping_event_2.from, alice);
+        assert_eq!(ping_event_2.value, TEN + ONE);
+
+        let pong_event_1 =
+            Ponged::decode_log_data(&pong_events[0], true).unwrap();
+
+        assert_eq!(pong_event_1.from, ping.address());
+        assert_eq!(pong_event_1.value, TEN);
+
+        let pong_event_2 =
+            Ponged::decode_log_data(&pong_events[1], true).unwrap();
+
+        assert_eq!(pong_event_2.from, ping.address());
+        assert_eq!(pong_event_2.value, TEN + ONE);
+    }
+
+    #[motsu::test]
+    fn assert_revert_all_event(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Address,
+    ) {
+        let value_revert = MAGIC_ERROR_VALUE;
+
+        // Check initial state
+        let ping_events_initial = ping.all_events();
+        let pong_events_initial = pong.all_events();
+        assert!(
+            ping_events_initial.is_empty(),
+            "Ping should have no events initially"
+        );
+        assert!(
+            pong_events_initial.is_empty(),
+            "Pong should have no events initially"
+        );
+
+        // Make a call that will revert
+        let _err = ping
+            .sender(alice)
+            .ping(pong.address(), value_revert)
+            .motsu_unwrap_err();
+
+        let ping_events_after_revert = ping.all_events();
+        let pong_events_after_revert = pong.all_events();
+
+        assert!(
+            ping_events_after_revert.is_empty(),
+            "Ping should have no events after revert"
+        );
+        assert!(
+            pong_events_after_revert.is_empty(),
+            "Pong should have no events after revert"
+        );
+
+        // make successful call
+        ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
+
+        // Check both events
+        let ping_events = ping.all_events();
+        let pong_events = pong.all_events();
+
+        assert_eq!(ping_events.len(), 1);
+        assert_eq!(pong_events.len(), 1);
+    }
 }
 
 #[cfg(test)]
