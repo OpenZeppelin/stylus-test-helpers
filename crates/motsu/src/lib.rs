@@ -16,7 +16,7 @@ pub use motsu_proc::test;
 mod ping_pong_tests {
     #![deny(rustdoc::broken_intra_doc_links)]
     use alloy_primitives::uint;
-    use alloy_sol_types::sol;
+    use alloy_sol_types::{sol, SolEvent};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         call::{Call, MethodError},
