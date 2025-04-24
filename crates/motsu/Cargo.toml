@@ -6,7 +6,7 @@ categories = ["development-tools::testing", "cryptography::cryptocurrencies"]
 keywords = ["arbitrum", "ethereum", "stylus", "unit-tests", "tests"]
 license.workspace = true
 repository.workspace = true
-version = "0.6.0"
+version = "0.8.0"
 
 [dependencies]
 const-hex.workspace = true
@@ -19,6 +19,10 @@ alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-sol-types.workspace = true
 alloy-signer-local.workspace = true
 k256.workspace = true
+revm-precompile.workspace = true
+
+[dev-dependencies]
+alloy-signer.workspace = true
 
 [lints]
 workspace = true

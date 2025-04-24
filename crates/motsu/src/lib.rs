@@ -1,235 +1,9 @@
-//! # Motsu - Unit Testing for Stylus
-//!
-//! This crate enables unit-testing for Stylus contracts. It abstracts away the
-//! machinery necessary for writing tests behind a
-//! [`#[motsu::test]`][test_attribute] procedural macro.
-//!
-//! The name `motsu` is an analogy to the place where you put your fingers to
-//! hold a stylus pen.
-//!
-//! ## Usage
-//!
-//! Annotate tests with [`#[motsu::test]`][test_attribute] instead of `#[test]`
-//! to get access to VM affordances:
-//!
-//! ```rust,ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     use motsu::prelude::*;
-//!     use stylus_sdk::alloy_primitives::{Address, U256};
-//!
-//!     #[motsu::test]
-//!     fn reads_balance(
-//!         contract: Contract<Erc20>,
-//!         alice: Address,
-//!     ) {
-//!         // Access storage.
-//!         let balance = contract.sender(alice).balance_of(Address::ZERO);
-//!         assert_eq!(balance, U256::ZERO);
-//!     }
-//! }
-//! ```
-//!
-//! If you need to instantiate an accound that contains a signer and a private
-//! key, you can use [`crate::prelude::Account`] instead of
-//! [`stylus_sdk::alloy_primitives::Address`]:
-//!
-//! ```rust,ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     use motsu::prelude::*;
-//!     use alloy_signer::SignerSync;
-//!
-//!     #[motsu::test]
-//!     fn signs_message(alice: Account) {
-//!         let msg = "message".as_bytes();
-//!         let signer = alice.signer();
-//!         assert!(signer.sign_message_sync(msg).is_ok());
-//!     }
-//! }
-//! ```
-//!
-//! ### Global Variables
-//!
-//! Motsu allows you to manipulate certain global variables that affect the
-//! execution environment:
-//!
-//! #### Chain ID
-//!
-//! You can get and set the Chain ID in tests using the `VMContext` API:
-//!
-//! ```rust,ignore
-//! use motsu::prelude::*;
-//!
-//! #[motsu::test]
-//! fn test_with_custom_chain_id(
-//!     contract: Contract<MyContract>,
-//!     alice: Address,
-//! ) {
-//!     // Default chain ID is 42161 (Arbitrum One)
-//!
-//!     // Set chain ID to 11155111 (Sepolia testnet)
-//!     VMContext::current().set_chain_id(11155111);
-//!
-//!     // Now any contract code that depends on the chain ID will use this
-//!     // value
-//! }
-//! ```
-//!
-//! ### Sender and Value
-//!
-//! Function [`crate::prelude::Contract::sender`] is necessary to trigger call
-//! to a contract, and should accept an [`crate::prelude::Account`] or an
-//! [`stylus_sdk::alloy_primitives::Address`] as an argument.
-//!
-//! Alternatively [`crate::prelude::Contract::sender_and_value`] can be used to
-//! pass additional value to the contract.
-//! To make a payable call work, user should be funded with
-//! [`crate::prelude::Funding::fund`] method (there is no funding by default),
-//! like in example below:
-//!
-//! ```rust,ignore
-//!  use motsu::prelude::*;
-//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
-//!
-//!  #[motsu::test]
-//!  fn pay_three_proxies(proxy: Contract<Proxy>, alice: Address) {
-//!     let one = uint!(1_U256);
-//!     let ten = uint!(10_U256);
-//!
-//!     // Initialize the proxy contract.
-//!     proxy.sender(alice).init(Address::ZERO);
-//!
-//!     // Fund alice.
-//!     alice.fund(ten);
-//!
-//!     // Call the contract.
-//!     proxy.sender_and_value(alice, one).pay_proxy();
-//!
-//!     // Assert that alice lost one wei and the proxy gained one wei.
-//!     assert_eq!(alice.balance(), ten - one);
-//!     assert_eq!(proxy.balance(), one);
-//!  }
-//! ```
-//!
-//! ### External Calls
-//!
-//! Multiple external calls are supported in Motsu.
-//! Assuming `Proxy` is a contract that exposes [`stylus_sdk::prelude::public`]
-//! function `Proxy::call_proxy`, where it adds `one` to the passed argument and
-//! calls next `Proxy` contract at the address provided during initialization.
-//! The following test case can emulate a call chain of three `Proxy` contracts:
-//!
-//! ```rust,ignore
-//!  use motsu::prelude::*;
-//!  use stylus_sdk::alloy_primitives::{Address, U256, ruint::uint};
-//!
-//!  #[motsu::test]
-//!  fn call_three_proxies(
-//!     proxy1: Contract<Proxy>,
-//!     proxy2: Contract<Proxy>,
-//!     proxy3: Contract<Proxy>,
-//!     alice: Address,
-//!  ) {
-//!     let one = uint!(1_U256);
-//!     let ten = uint!(10_U256);
-//!
-//!     // Set up a chain of three proxies.
-//!     // With the given call chain: proxy1 -> proxy2 -> proxy3.
-//!     proxy1.sender(alice).init(proxy2.address());
-//!     proxy2.sender(alice).init(proxy3.address());
-//!     proxy3.sender(alice).init(Address::ZERO);
-//!
-//!     // Call the first proxy.
-//!     let result = proxy1.sender(alice).call_proxy(ten);
-//!
-//!     // The value is incremented by 1 for each proxy.
-//!     assert_eq!(result, ten + one + one + one);
-//!  }
-//! ```
-//!
-//! ### Checking Events
-//!
-//! It is possible to check emitted events by specific contract with
-//! [`crate::prelude::Contract::emitted`] method. And assert with
-//! [`crate::prelude::Contract::assert_emitted`] that will print all matching
-//! events in case of failed assertion.
-//!
-//! ### Transaction Revert
-//!
-//! To revert a transaction in case of [`Result::Err`], you should call one of
-//! the following functions:
-//!
-//! - [`crate::revert::ResultExt::motsu_unwrap`]
-//! - [`crate::revert::ResultExt::motsu_unwrap_err`]
-//! - [`crate::revert::ResultExt::motsu_expect`]
-//! - [`crate::revert::ResultExt::motsu_expect_err`]
-//! - [`crate::revert::ResultExt::motsu_res`]
-//!
-//! ```rust, ignore
-//! const FOUR: U256 = uint!(4_U256);
-//!
-//! // If the argument is `FOUR`, the call should revert.
-//! let err = proxy.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
-//! assert!(matches!(err, Error::ProxyError(_)));
-//! ```
-//!
-//! Otherwise, the state of the contract including persistent storage, balances
-//! and emitted events won't be reverted in case of [`Result::Err`].
-//!
-//! Panics in contract code are not handled as a revert and will fail the test.
-//!
-//! ### Notes
-//!
-//! Annotating a test function that accepts no parameters will make
-//! [`#[motsu::test]`][test_attribute] behave the same as `#[test]`.
-//!
-//! ```rust,ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     #[motsu::test] // Equivalent to #[test]
-//!     fn test_fn() {
-//!         ...
-//!     }
-//! }
-//! ```
-//!
-//! **Important:** To use a contract in tests, you must ensure it implements the
-//! unsafe trait [`stylus_sdk::prelude::TopLevelStorage`]. While this trait is
-//! automatically derived for contracts marked with
-//! [`stylus_sdk::prelude::entrypoint`], you'll need to implement it manually
-//! for any contract without this attribute:
-//!
-//! ```rust,ignore
-//! use stylus_sdk::{
-//!     storage::{StorageMap, StorageU256, StorageAddress},
-//!     prelude::*,
-//!     alloy_primitives::Address,
-//! };
-//!
-//! // Entry point attribute is missing. We should implement `TopLevelStorage` ourselves.
-//! // #[entrypoint]
-//! #[storage]
-//! pub struct Erc20 {
-//!     balances: StorageMap<Address, StorageU256>,
-//!     allowances: StorageMap<Address, StorageMap<Address, StorageU256>>,
-//!     total_supply: StorageU256,
-//! }
-//!
-//! unsafe impl TopLevelStorage for Erc20 {}
-//! ```
-//!
-//! **Important:** For `motsu` to work correctly, `stylus-sdk` should **not**
-//! have a default `hostio-caching` feature enabled.
-//!
-//! [test_attribute]: crate::test
+#![doc = include_str!("../README.md")]
 #![allow(deprecated)]
-// We're ignoring the warning: "unexpected `cfg` condition value: `stylus-test`"
-#![allow(unexpected_cfgs)]
-#[cfg(test)]
 extern crate alloc;
 
 mod context;
+mod precompiles;
 pub mod prelude;
 mod revert;
 mod router;
@@ -604,6 +378,173 @@ mod ping_pong_tests {
 
         // Check panic assertion.
         ping.assert_emitted(&Pinged { from: alice, value });
+    }
+}
+
+#[cfg(test)]
+mod fallback_receive_tests {
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::{call, Call},
+        msg,
+        prelude::*,
+        storage::{StorageAddress, StorageU256},
+    };
+
+    use crate::{
+        self as motsu,
+        context::{Balance, Contract, Funding},
+        revert::ResultExt,
+    };
+
+    #[storage]
+    struct Implementation {
+        value: StorageU256,
+    }
+
+    #[public]
+    impl Implementation {
+        #[payable]
+        fn set_value(&mut self, value: U256) {
+            self.value.set(value);
+        }
+
+        #[receive]
+        fn receive(&self) -> Result<(), Vec<u8>> {
+            Ok(())
+        }
+    }
+
+    unsafe impl TopLevelStorage for Implementation {}
+
+    #[storage]
+    struct Proxy {
+        implementation: StorageAddress,
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[public]
+    impl Proxy {
+        #[payable]
+        fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new().value(msg::value()), to, &[]).map_err(|e| e.into())
+        }
+
+        #[payable]
+        #[fallback]
+        fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+            let to = self.implementation.get();
+            call(Call::new().value(msg::value()), to, calldata)
+                .map_err(|e| e.into())
+        }
+    }
+
+    sol_interface! {
+        interface IProxy {
+            function setValue(uint256 value) external payable;
+            function passMsgValue() external payable;
+        }
+    }
+
+    #[storage]
+    struct ProxyCaller;
+
+    unsafe impl TopLevelStorage for ProxyCaller {}
+
+    #[public]
+    impl ProxyCaller {
+        #[payable]
+        fn call_set_value_on_proxy(
+            &mut self,
+            proxy: Address,
+            value: U256,
+        ) -> Result<(), Vec<u8>> {
+            let i_proxy = IProxy::new(proxy);
+            i_proxy
+                .set_value(Call::new().value(msg::value()), value)
+                .map_err(|e| e.into())
+        }
+
+        #[payable]
+        fn call_non_existent_fn_on_implementation(
+            &mut self,
+            implementation: Address,
+        ) -> Result<(), Vec<u8>> {
+            let i_proxy = IProxy::new(implementation);
+            i_proxy
+                .pass_msg_value(Call::new().value(msg::value()))
+                .map_err(|e| e.into())
+        }
+    }
+
+    #[motsu::test]
+    fn fallback(
+        proxy_caller: Contract<ProxyCaller>,
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        alice: Address,
+    ) {
+        proxy.sender(alice).implementation.set(implementation.address());
+
+        let value = U256::from(101);
+
+        proxy_caller
+            .sender(alice)
+            .call_set_value_on_proxy(proxy.address(), value)
+            .motsu_unwrap();
+
+        assert_eq!(implementation.sender(alice).value.get(), value);
+
+        alice.fund(value);
+
+        proxy_caller
+            .sender_and_value(alice, value)
+            .call_set_value_on_proxy(proxy.address(), U256::ZERO)
+            .motsu_unwrap();
+
+        assert_eq!(implementation.sender(alice).value.get(), U256::ZERO);
+
+        assert!(alice.balance().is_zero());
+        assert!(proxy.balance().is_zero());
+        assert_eq!(implementation.balance(), value);
+    }
+
+    #[motsu::test]
+    fn fallback_missing(
+        proxy_caller: Contract<ProxyCaller>,
+        implementation: Contract<Implementation>,
+        alice: Address,
+    ) {
+        let err = proxy_caller
+            .sender(alice)
+            .call_non_existent_fn_on_implementation(implementation.address())
+            .motsu_unwrap_err();
+
+        assert_eq!(
+            String::from_utf8(err).unwrap(),
+            "function not found for selector '3208857325' and no fallback defined"
+        );
+    }
+
+    #[motsu::test]
+    fn receive(
+        proxy: Contract<Proxy>,
+        implementation: Contract<Implementation>,
+        account: Address,
+    ) {
+        proxy.sender(account).implementation.set(implementation.address());
+
+        let value = U256::from(101);
+
+        account.fund(value);
+
+        proxy.sender_and_value(account, value).pass_msg_value().unwrap();
+
+        assert!(account.balance().is_zero());
+        assert!(proxy.balance().is_zero());
+        assert_eq!(implementation.balance(), value);
     }
 }
 
@@ -1175,14 +1116,14 @@ mod vm_tests {
         // Verify the correct chain ID is returned within tests too
         assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
 
-        VMContext::current().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
+        VM::context().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
         assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
 
         // Verify that even custom chain ID can be set
-        VMContext::current().set_chain_id(CUSTOM_CHAIN_ID);
+        VM::context().set_chain_id(CUSTOM_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);

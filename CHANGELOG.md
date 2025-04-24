@@ -2,22 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog], and this project adheres to [Semantic Versioning].
+
+[Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
+[Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
 ### Added
 
+### Changed (Breaking)
+
+### Changed
+
+## [0.8.0] - 2025-04-10
+
+### Added
+
+- Predeploy `EcRecover` precompile contract. #90
+- Support `fallback` and `receive` functions. #88
+- Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
+- Enabled additional conversions between `PrivateKeySigner`, `Address` and `Account`. #84
+
+### Changed (Breaking)
+
+- Bump Stylus SDK to `v0.8.4`. #92
+- Missing selector returns an error instead of panicking. #88
+- Api `VMContext::current()` simplified to `VM::context()`. #91
+- `evm::gas_left` and `evm::ink_left` return maximum values. #90
+
+### Changed
+
+## [0.7.0] - 2025-03-19
+
+### Added
+
+- Enabled 'stylus-test' SDK feature by default. #78
 - `Account` can be created from string and byte seeds, and can return a signer. #70
 - Implemented `Balance` trait for `Account` and `Contract<T>`. #70
 - Added ability to set the chain ID in tests. #67
 
 ### Changed (Breaking)
 
+- Bump Stylus SDK to `v0.8.3` #77
 - `Account` can no longer be created at a predetermined address. #70
 - `Funding::balance` is removed. #70
-- Bump Stylus SDK to v0.8.3-rc.1 #75
 
 ## [0.6.0] - 2025-03-11
 
