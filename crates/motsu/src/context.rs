@@ -16,11 +16,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
 use once_cell::sync::Lazy;
 use stylus_sdk::{
-    host::{WasmVM, VM},
-    keccak_const::Keccak256,
-    prelude::StorageType,
-    types::AddressVM,
-    ArbResult,
+    keccak_const::Keccak256, prelude::StorageType, types::AddressVM, ArbResult,
 };
 
 use crate::{
@@ -345,7 +341,11 @@ impl VMContext {
         address: &Address,
         event: &E,
     ) -> bool {
-        let log_data = event.encode_log_data();
+        let log_data = LogData::new(
+            event.encode_topics().into_iter().map(|word| word.0).collect(),
+            event.encode_data().into(),
+        )
+        .expect("should create new LogData");
 
         self.storage()
             .persistent
@@ -935,7 +935,7 @@ impl<ST: StorageType + VMRouter + 'static> Contract<ST> {
 /// Create a default [`StorageType`] `ST` type with at [`U256::ZERO`] slot and
 /// `0` offset.
 pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
-    unsafe { ST::new(U256::ZERO, 0, VM { host: Box::new(WasmVM {}) }) }
+    unsafe { ST::new(U256::ZERO, 0) }
 }
 
 /// Account that can be used to interact with contracts in test environments.
@@ -1105,7 +1105,7 @@ mod tests {
             let seed = "some seed";
             let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
             let expected_address =
-                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+                address!("94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
             let account = Account::from_seed(&seed);
             assert_eq!(expected_private_key, account.private_key);
@@ -1121,7 +1121,7 @@ mod tests {
             let seed = [115, 111, 109, 101, 32, 115, 101, 101, 100];
             let expected_private_key = b256!("f5bab94a7fcf9b243fc4b28b4e2011a196e6c86286297b5e8d5f157ecd0f9d31");
             let expected_address =
-                address!("0x94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
+                address!("94cf44a0c23e70feee6c1fdbaebe7dc6f1172c6d");
 
             let account = Account::from_seed_slice(&seed);
             assert_eq!(expected_private_key, account.private_key);
@@ -1152,7 +1152,7 @@ mod tests {
             let tag = String::from("signer");
             let expected_private_key = b256!("6c8d7f768a6bb4aafe85e8a2f5a9680355239c7e14646ed62b044e39de154512");
             let expected_address =
-                address!("0x6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
+                address!("6e12d8c87503d4287c294f2fdef96acd9dff6bd2");
 
             let account = Account::from_tag(&tag);
             assert_eq!(expected_private_key, account.private_key);
@@ -1168,7 +1168,7 @@ mod tests {
         fn address() {
             let tag = String::from("alice");
             let expected_address =
-                address!("0x9c0257114eb9399a2985f8e75dad7600c5d89fe3");
+                address!("9c0257114eb9399a2985f8e75dad7600c5d89fe3");
 
             let address = Address::from_tag(&tag);
             assert_eq!(expected_address, address);
@@ -1188,7 +1188,7 @@ mod tests {
         fn contract() {
             let tag = String::from("contract");
             let expected_address =
-                address!("0x7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
+                address!("7f6dd79f0020bee2024a097aaa5d32ab7ca31126");
 
             let contract = Contract::<SomeContract>::from_tag(&tag);
             assert_eq!(expected_address, contract.address());

@@ -7,7 +7,7 @@ use dashmap::{mapref::one::RefMut, DashMap};
 use once_cell::sync::Lazy;
 use stylus_sdk::{
     abi::Router,
-    prelude::{StorageType, TopLevelStorage, ValueDenier},
+    prelude::{StorageType, TopLevelStorage},
     ArbResult,
 };
 
@@ -136,7 +136,7 @@ pub trait VMRouter {
 
 impl<R> VMRouter for R
 where
-    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage> + ValueDenier,
+    R: Router<R> + TopLevelStorage + BorrowMut<R::Storage>,
 {
     fn route(&mut self, selector: u32, input: &[u8]) -> Option<ArbResult> {
         <Self as Router<R>>::route(self, selector, input)
