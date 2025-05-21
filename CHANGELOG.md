@@ -17,8 +17,6 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ## [0.9.0] - 2025-05-21
 
-### Added
-
 ### Changed (Breaking)
 
 - Bump Stylus SDK to `v0.9.0`. #98
