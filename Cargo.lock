@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "motsu-proc"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3067,8 +3067,9 @@ dependencies = [
 
 [[package]]
 name = "stylus-core"
-version = "0.8.3"
-source = "git+https://github.com/OffchainLabs/stylus-sdk-rs.git?rev=b7310ef#b7310ef87d05182a946555ae8754f13c97c21c8b"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b96d0a4daa641fb5904cc3302c90b2d160f59c62aae7a19c2c6b94e28e3ab93e"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3078,8 +3079,9 @@ dependencies = [
 
 [[package]]
 name = "stylus-proc"
-version = "0.8.3"
-source = "git+https://github.com/OffchainLabs/stylus-sdk-rs.git?rev=b7310ef#b7310ef87d05182a946555ae8754f13c97c21c8b"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c87cad1205aac3d46a3bb303ebe24976de3e88652d001a2e0e489b1e2bd6d0b9"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3098,8 +3100,9 @@ dependencies = [
 
 [[package]]
 name = "stylus-sdk"
-version = "0.8.3"
-source = "git+https://github.com/OffchainLabs/stylus-sdk-rs.git?rev=b7310ef#b7310ef87d05182a946555ae8754f13c97c21c8b"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38519923dae967837b90f00cd669b9d6df778ec1f0df849089f4dd456be96bf8"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3117,8 +3120,9 @@ dependencies = [
 
 [[package]]
 name = "stylus-test"
-version = "0.8.3"
-source = "git+https://github.com/OffchainLabs/stylus-sdk-rs.git?rev=b7310ef#b7310ef87d05182a946555ae8754f13c97c21c8b"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abef8a75532dab6480d83577e47f4db429e7f0330825b3e167a3c9ddb363fd1f"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
