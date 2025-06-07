@@ -461,8 +461,10 @@ mod ping_pong_tests {
             .ping(pong.address(), value_revert)
             .motsu_unwrap_err();
 
-        let ping_events_after_revert = VM::context().all_events_for(&ping.address());
-        let pong_events_after_revert = VM::context().all_events_for(&pong.address());
+        let ping_events_after_revert =
+            VM::context().all_events_for(&ping.address());
+        let pong_events_after_revert =
+            VM::context().all_events_for(&pong.address());
 
         assert!(
             ping_events_after_revert.is_empty(),
@@ -482,6 +484,21 @@ mod ping_pong_tests {
 
         assert_eq!(ping_events.len(), 1);
         assert_eq!(pong_events.len(), 1);
+
+        // Make another call that will revert
+        let _err = ping
+            .sender(alice)
+            .ping(pong.address(), value_revert)
+            .motsu_unwrap_err();
+
+        // Check that events are still the same
+        let ping_events_after_second_revert =
+            VM::context().all_events_for(&ping.address());
+        let pong_events_after_second_revert =
+            VM::context().all_events_for(&pong.address());
+
+        assert_eq!(ping_events_after_second_revert.len(), 1);
+        assert_eq!(pong_events_after_second_revert.len(), 1);
     }
 }
 
