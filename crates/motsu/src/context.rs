@@ -337,6 +337,7 @@ impl VM {
     }
 
     /// Get all events of type [`E`] emitted by the contract at `address`.
+    /// Returns a vector of events of type `E` that match the given address.
     pub(crate) fn matching_events_for<E: SolEvent>(
         self,
         address: &Address,
@@ -553,11 +554,10 @@ impl VM {
         storage.chain_id = chain_id;
     }
 
-    /// Get all events emitted by the contract `self`.
+    /// Get all events emitted by the contract at `address`.
     /// Returns a vector of `LogData` objects representing the events emitted by
     /// the contract.
-    #[must_use]
-    pub fn all_events_for(&self, address: &Address) -> Vec<LogData> {
+    pub(crate) fn all_events_for(&self, address: &Address) -> Vec<LogData> {
         self.storage()
             .persistent
             .contracts
@@ -917,6 +917,14 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
         };
         let panic_msg = context.replace_with_tags(panic_msg);
         panic!("{}", panic_msg);
+    }
+
+    /// Get all events emitted by the contract `self`.
+    /// Returns a vector of `LogData` objects representing the events emitted by
+    /// the contract.
+    #[must_use]
+    pub fn all_events(&self) -> Vec<LogData> {
+        VM::context().all_events_for(&self.address)
     }
 }
 
