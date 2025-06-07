@@ -387,8 +387,8 @@ mod ping_pong_tests {
         alice: Address,
     ) {
         // Check initial state
-        let ping_events_initial = ping.all_events();
-        let pong_events_initial = pong.all_events();
+        let ping_events_initial = VM::context().all_events_for(&ping.address());
+        let pong_events_initial = VM::context().all_events_for(&pong.address());
         assert!(
             ping_events_initial.is_empty(),
             "Ping should have no events initially"
@@ -403,8 +403,8 @@ mod ping_pong_tests {
         ping.sender(alice).ping(pong.address(), TEN + ONE).motsu_unwrap();
 
         // Check both events
-        let ping_events = ping.all_events();
-        let pong_events = pong.all_events();
+        let ping_events = VM::context().all_events_for(&ping.address());
+        let pong_events = VM::context().all_events_for(&pong.address());
 
         assert_eq!(ping_events.len(), 2);
         assert_eq!(pong_events.len(), 2);
@@ -444,8 +444,8 @@ mod ping_pong_tests {
         let value_revert = MAGIC_ERROR_VALUE;
 
         // Check initial state
-        let ping_events_initial = ping.all_events();
-        let pong_events_initial = pong.all_events();
+        let ping_events_initial = VM::context().all_events_for(&ping.address());
+        let pong_events_initial = VM::context().all_events_for(&pong.address());
         assert!(
             ping_events_initial.is_empty(),
             "Ping should have no events initially"
@@ -461,8 +461,8 @@ mod ping_pong_tests {
             .ping(pong.address(), value_revert)
             .motsu_unwrap_err();
 
-        let ping_events_after_revert = ping.all_events();
-        let pong_events_after_revert = pong.all_events();
+        let ping_events_after_revert = VM::context().all_events_for(&ping.address());
+        let pong_events_after_revert = VM::context().all_events_for(&pong.address());
 
         assert!(
             ping_events_after_revert.is_empty(),
@@ -477,8 +477,8 @@ mod ping_pong_tests {
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
         // Check both events
-        let ping_events = ping.all_events();
-        let pong_events = pong.all_events();
+        let ping_events = VM::context().all_events_for(&ping.address());
+        let pong_events = VM::context().all_events_for(&pong.address());
 
         assert_eq!(ping_events.len(), 1);
         assert_eq!(pong_events.len(), 1);

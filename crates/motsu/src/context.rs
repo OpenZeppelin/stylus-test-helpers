@@ -552,6 +552,19 @@ impl VM {
         let mut storage = self.storage();
         storage.chain_id = chain_id;
     }
+
+    /// Get all events emitted by the contract `self`.
+    /// Returns a vector of `LogData` objects representing the events emitted by
+    /// the contract.
+    #[must_use]
+    pub fn all_events_for(&self, address: &Address) -> Vec<LogData> {
+        self.storage()
+            .persistent
+            .contracts
+            .get(address)
+            .map(|contract_storage| contract_storage.events.clone())
+            .unwrap_or_default()
+    }
 }
 
 /// Read the word from location pointed by `ptr`.
@@ -904,21 +917,6 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
         };
         let panic_msg = context.replace_with_tags(panic_msg);
         panic!("{}", panic_msg);
-    }
-
-    /// Get all events emitted by the contract `self`.
-    /// Returns a vector of `LogData` objects representing the events emitted by
-    /// the contract.
-    #[must_use]
-    pub fn all_events(&self) -> Vec<LogData> {
-        let context = VM::context();
-        context
-            .storage()
-            .persistent
-            .contracts
-            .get(&self.address)
-            .map(|contract_storage| contract_storage.events.clone())
-            .unwrap_or_default()
     }
 }
 
