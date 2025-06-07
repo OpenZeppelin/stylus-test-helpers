@@ -38,7 +38,7 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was pinged.
         /// * `value` - Value received when pinged.
         #[allow(missing_docs)]
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq, Eq)]
         event Pinged(
             address indexed from,
             uint256 indexed value
@@ -130,7 +130,7 @@ mod ping_pong_tests {
         /// * `from` - Address from which the contract was ponged.
         /// * `value` - Value received when ponged.
         #[allow(missing_docs)]
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq, Eq)]
         event Ponged(
             address indexed from,
             uint256 indexed value
@@ -495,6 +495,153 @@ mod ping_pong_tests {
 
         assert_eq!(ping_events_after_second_revert.len(), 1);
         assert_eq!(pong_events_after_second_revert.len(), 1);
+    }
+
+    // This test checks that all events are correctly accumulated across
+    // multiple instances of the same contract type
+    #[motsu::test]
+    fn all_events_multiple_instances_same_type(
+        pong: Contract<PongContract>,
+        alice: Address,
+        bob: Address,
+    ) {
+        // Create two PingContract instances at different addresses
+        let ping1 = Contract::<PingContract>::new();
+        let ping2 = Contract::<PingContract>::new();
+
+        // Make sure addresses are different
+        assert_ne!(
+            ping1.address(),
+            ping2.address(),
+            "Ping contracts should have different addresses"
+        );
+
+        // Initial state: no events
+        assert!(
+            ping1.all_events().is_empty(),
+            "Ping1 should have no events initially"
+        );
+        assert!(
+            ping2.all_events().is_empty(),
+            "Ping2 should have no events initially"
+        );
+
+        // Alice pings through ping1
+        let value1 = TEN;
+        ping1.sender(alice).ping(pong.address(), value1).motsu_unwrap();
+
+        // Check events for ping1
+        let ping1_events = ping1.all_events();
+        assert_eq!(ping1_events.len(), 1, "Ping1 should have one event");
+        let event1_decoded =
+            Pinged::decode_log_data(&ping1_events[0], true).unwrap();
+        assert_eq!(event1_decoded.from, alice);
+        assert_eq!(event1_decoded.value, value1);
+
+        // Ping2 should still have no events
+        assert!(
+            ping2.all_events().is_empty(),
+            "Ping2 should still have no events after ping1 interaction"
+        );
+
+        // Bob pings through ping2
+        let value2 = TEN + ONE;
+        ping2.sender(bob).ping(pong.address(), value2).motsu_unwrap();
+
+        // Check events for ping2
+        let ping2_events = ping2.all_events();
+        assert_eq!(ping2_events.len(), 1, "Ping2 should have one event");
+        let event2_decoded =
+            Pinged::decode_log_data(&ping2_events[0], true).unwrap();
+        assert_eq!(event2_decoded.from, bob);
+        assert_eq!(event2_decoded.value, value2);
+
+        // Ping1 events should remain unchanged
+        let ping1_events_after_ping2 = ping1.all_events();
+        assert_eq!(
+            ping1_events_after_ping2.len(),
+            1,
+            "Ping1 events should not change after ping2 interaction"
+        );
+        let event1_recheck_decoded =
+            Pinged::decode_log_data(&ping1_events_after_ping2[0], true)
+                .unwrap();
+        assert_eq!(event1_recheck_decoded.from, alice);
+        assert_eq!(event1_recheck_decoded.value, value1);
+
+        // Check that pong contract also has its events
+        let pong_events = pong.all_events();
+        assert_eq!(
+            pong_events.len(),
+            2,
+            "Pong contract should have two events from both pings"
+        );
+    }
+
+    // This test checks that all events are accumulated in order of calls
+    #[motsu::test]
+    fn all_events_accumulate_in_order(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Address,
+        bob: Address,
+    ) {
+        // Initial state: no events on ping contract
+        assert!(
+            ping.all_events().is_empty(),
+            "Ping contract should have no events initially"
+        );
+
+        // ---- First call to ping by Alice ----
+        let value_alice = TEN;
+        ping.sender(alice).ping(pong.address(), value_alice).motsu_unwrap();
+
+        let events_after_alice = ping.all_events();
+        assert_eq!(
+            events_after_alice.len(),
+            1,
+            "Ping contract should have 1 event after Alice's call"
+        );
+
+        // Verify Alice's event
+        let expected_event_alice = Pinged { from: alice, value: value_alice };
+        let decoded_event_alice =
+            Pinged::decode_log_data(&events_after_alice[0], true)
+                .expect("Failed to decode Alice's Pinged event");
+        assert_eq!(
+            decoded_event_alice, expected_event_alice,
+            "Alice's event data mismatch"
+        );
+
+        // ---- Second call to ping by Bob ----
+        let value_bob = TEN + ONE;
+        ping.sender(bob).ping(pong.address(), value_bob).motsu_unwrap();
+
+        let all_events_now = ping.all_events();
+        assert_eq!(
+            all_events_now.len(),
+            2,
+            "Ping contract should have 2 events after Bob's call"
+        );
+
+        // Verify Alice's event is still the first one
+        let re_decoded_event_alice =
+            Pinged::decode_log_data(&all_events_now[0], true)
+                .expect("Failed to re-decode Alice's Pinged event");
+        assert_eq!(
+            re_decoded_event_alice, expected_event_alice,
+            "Alice's event data mismatch after Bob's call"
+        );
+
+        // Verify Bob's event is the second one
+        let expected_event_bob = Pinged { from: bob, value: value_bob };
+        let decoded_event_bob =
+            Pinged::decode_log_data(&all_events_now[1], true)
+                .expect("Failed to decode Bob's Pinged event");
+        assert_eq!(
+            decoded_event_bob, expected_event_bob,
+            "Bob's event data mismatch"
+        );
     }
 }
 
