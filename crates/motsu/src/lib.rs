@@ -311,6 +311,10 @@ mod ping_pong_tests {
         assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
         assert_eq!(addr, pong1.sender(alice).contract_address.get());
 
+        // Check that events were emitted
+        let all_events = pong1.all_events();
+        assert_eq!(all_events.len(), 1, "PongContract should have one event");
+
         // Drop first contract
         drop(pong1);
 
@@ -321,6 +325,10 @@ mod ping_pong_tests {
         assert_eq!(Address::ZERO, pong2.sender(alice).ponged_from.get());
         assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
         assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
+
+        // Check that the second contract has no events
+        let all_events = pong2.all_events();
+        assert!(all_events.is_empty(), "PongContract should have no events");
     }
 
     #[motsu::test]
@@ -641,6 +649,82 @@ mod ping_pong_tests {
         assert_eq!(
             decoded_event_bob, expected_event_bob,
             "Bob's event data mismatch"
+        );
+    }
+
+    #[motsu::test]
+    fn all_events_consistent_on_multiple_calls(
+        ping: Contract<PingContract>,
+        pong: Contract<PongContract>,
+        alice: Address,
+    ) {
+        // Initial state: no events
+        let initial_events = ping.all_events();
+        assert!(initial_events.is_empty());
+        // Repeated call to all_events should return the same empty state
+        let initial_events_again = ping.all_events();
+        assert_eq!(initial_events, initial_events_again,);
+
+        // Emit one event
+        let value1 = TEN;
+        ping.sender(alice).ping(pong.address(), value1).motsu_unwrap();
+
+        // First call to all_events after one event
+        let events_after_one_call = ping.all_events();
+        assert_eq!(events_after_one_call.len(), 1, "Should be 1 event");
+
+        // Second call to all_events immediately after
+        let events_after_one_call_again = ping.all_events();
+        assert_eq!(
+            events_after_one_call, events_after_one_call_again,
+            "Repeated calls after one event should be consistent"
+        );
+
+        // Check content of the event
+        let decoded_event1 =
+            Pinged::decode_log_data(&events_after_one_call[0], true).unwrap();
+        let expected_event1 = Pinged { from: alice, value: value1 };
+        assert_eq!(decoded_event1, expected_event1);
+
+        // Emit another event
+        let value2 = TEN + ONE;
+        ping.sender(alice).ping(pong.address(), value2).motsu_unwrap();
+
+        // First call to all_events after two events
+        let events_after_two_calls = ping.all_events();
+        assert_eq!(events_after_two_calls.len(), 2, "Should be 2 events");
+
+        // Second call to all_events immediately after
+        let events_after_two_calls_again = ping.all_events();
+        assert_eq!(
+            events_after_two_calls, events_after_two_calls_again,
+            "Repeated calls after two events should be consistent"
+        );
+
+        // Check content of the two events
+        let decoded_event1_from_two =
+            Pinged::decode_log_data(&events_after_two_calls[0], true).unwrap();
+        assert_eq!(
+            decoded_event1_from_two, expected_event1,
+            "First event should remain the same"
+        );
+
+        let decoded_event2_from_two =
+            Pinged::decode_log_data(&events_after_two_calls[1], true).unwrap();
+        let expected_event2 = Pinged { from: alice, value: value2 };
+        assert_eq!(
+            decoded_event2_from_two, expected_event2,
+            "Second event should be correct"
+        );
+
+        // Perform a read-only operation that doesn't emit events
+        let _pings_count = ping.sender(alice).pings_count.get();
+
+        // Third call to all_events after a read operation
+        let events_after_read_op = ping.all_events();
+        assert_eq!(
+            events_after_two_calls, events_after_read_op,
+            "all_events should be consistent after a read-only operation"
         );
     }
 }
