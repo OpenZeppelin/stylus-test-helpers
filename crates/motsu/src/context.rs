@@ -557,7 +557,7 @@ impl VM {
     /// Get all events emitted by the contract at `address`.
     /// Returns a vector of `LogData` objects representing the events emitted by
     /// the contract.
-    pub(crate) fn all_events_for(&self, address: &Address) -> Vec<LogData> {
+    pub(crate) fn all_events_for(self, address: &Address) -> Vec<LogData> {
         self.storage()
             .persistent
             .contracts
