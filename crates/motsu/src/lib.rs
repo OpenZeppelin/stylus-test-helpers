@@ -311,7 +311,7 @@ mod ping_pong_tests {
         assert_eq!(ONE, pong1.sender(alice).pongs_count.get());
         assert_eq!(addr, pong1.sender(alice).contract_address.get());
 
-        // Check that events were emitted
+        // Check that events were emitted.
         let all_events = pong1.all_events();
         assert_eq!(all_events.len(), 1, "PongContract should have one event");
 
@@ -326,7 +326,7 @@ mod ping_pong_tests {
         assert_eq!(U256::ZERO, pong2.sender(alice).pongs_count.get());
         assert_eq!(Address::ZERO, pong2.sender(alice).contract_address.get());
 
-        // Check that the second contract has no events
+        // Check that the second contract has no events.
         let all_events = pong2.all_events();
         assert!(all_events.is_empty(), "PongContract should have no events");
     }
@@ -394,7 +394,7 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Address,
     ) {
-        // Check initial state
+        // Check initial state.
         let ping_events_initial = ping.all_events();
         let pong_events_initial = pong.all_events();
         assert!(
@@ -406,18 +406,18 @@ mod ping_pong_tests {
             "Pong should have no events initially"
         );
 
-        // Emit events
+        // Emit events.
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
         ping.sender(alice).ping(pong.address(), TEN + ONE).motsu_unwrap();
 
-        // Check both events
+        // Check both events.
         let ping_events = ping.all_events();
         let pong_events = pong.all_events();
 
         assert_eq!(ping_events.len(), 2);
         assert_eq!(pong_events.len(), 2);
 
-        // Check event data
+        // Check event data.
         let ping_event_1 =
             Pinged::decode_log_data(&ping_events[0], true).unwrap();
 
@@ -451,7 +451,7 @@ mod ping_pong_tests {
     ) {
         let value_revert = MAGIC_ERROR_VALUE;
 
-        // Check initial state
+        // Check initial state.
         let ping_events_initial = ping.all_events();
         let pong_events_initial = pong.all_events();
         assert!(
@@ -463,7 +463,7 @@ mod ping_pong_tests {
             "Pong should have no events initially"
         );
 
-        // Make a call that will revert
+        // Make a call that will revert.
         let _err = ping
             .sender(alice)
             .ping(pong.address(), value_revert)
@@ -481,23 +481,23 @@ mod ping_pong_tests {
             "Pong should have no events after revert"
         );
 
-        // make successful call
+        // Make a successful call.
         ping.sender(alice).ping(pong.address(), TEN).motsu_unwrap();
 
-        // Check both events
+        // Check both events.
         let ping_events = ping.all_events();
         let pong_events = pong.all_events();
 
         assert_eq!(ping_events.len(), 1);
         assert_eq!(pong_events.len(), 1);
 
-        // Make another call that will revert
+        // Make another call that will revert.
         let _err = ping
             .sender(alice)
             .ping(pong.address(), value_revert)
             .motsu_unwrap_err();
 
-        // Check that events are still the same
+        // Check that events are still the same.
         let ping_events_after_second_revert = ping.all_events();
         let pong_events_after_second_revert = pong.all_events();
 
@@ -506,7 +506,7 @@ mod ping_pong_tests {
     }
 
     // This test checks that all events are correctly accumulated across
-    // multiple instances of the same contract type
+    // multiple instances of the same contract type.
     #[motsu::test]
     fn all_events_multiple_instances_same_type(
         ping1: Contract<PingContract>,
@@ -515,7 +515,7 @@ mod ping_pong_tests {
         alice: Address,
         bob: Address,
     ) {
-        // Initial state: no events
+        // Initial state: no events.
         assert!(
             ping1.all_events().is_empty(),
             "Ping1 should have no events initially"
@@ -525,11 +525,11 @@ mod ping_pong_tests {
             "Ping2 should have no events initially"
         );
 
-        // Alice pings through ping1
+        // Alice pings through `ping1`.
         let value1 = TEN;
         ping1.sender(alice).ping(pong.address(), value1).motsu_unwrap();
 
-        // Check events for ping1
+        // Check events for `ping1`.
         let ping1_events = ping1.all_events();
         assert_eq!(ping1_events.len(), 1, "Ping1 should have one event");
         let event1_decoded =
@@ -537,17 +537,17 @@ mod ping_pong_tests {
         assert_eq!(event1_decoded.from, alice);
         assert_eq!(event1_decoded.value, value1);
 
-        // Ping2 should still have no events
+        // `ping2` should still have no events.
         assert!(
             ping2.all_events().is_empty(),
             "Ping2 should still have no events after ping1 interaction"
         );
 
-        // Bob pings through ping2
+        // Bob pings through `ping2`.
         let value2 = TEN + ONE;
         ping2.sender(bob).ping(pong.address(), value2).motsu_unwrap();
 
-        // Check events for ping2
+        // Check events for `ping2`.
         let ping2_events = ping2.all_events();
         assert_eq!(ping2_events.len(), 1, "Ping2 should have one event");
         let event2_decoded =
@@ -555,7 +555,7 @@ mod ping_pong_tests {
         assert_eq!(event2_decoded.from, bob);
         assert_eq!(event2_decoded.value, value2);
 
-        // Ping1 events should remain unchanged
+        // Ping1 events should remain unchanged.
         let ping1_events_after_ping2 = ping1.all_events();
         assert_eq!(
             ping1_events_after_ping2.len(),
@@ -568,7 +568,7 @@ mod ping_pong_tests {
         assert_eq!(event1_recheck_decoded.from, alice);
         assert_eq!(event1_recheck_decoded.value, value1);
 
-        // Check that pong contract also has its events
+        // Check that `pong` contract also has its events.
         let pong_events = pong.all_events();
         assert_eq!(
             pong_events.len(),
@@ -577,7 +577,7 @@ mod ping_pong_tests {
         );
     }
 
-    // This test checks that all events are accumulated in order of calls
+    // This test checks that all events are accumulated in order of calls.
     #[motsu::test]
     fn all_events_accumulate_in_order(
         ping: Contract<PingContract>,
@@ -585,7 +585,7 @@ mod ping_pong_tests {
         alice: Address,
         bob: Address,
     ) {
-        // Initial state: no events on ping contract
+        // Initial state: no events on `ping` contract.
         assert!(
             ping.all_events().is_empty(),
             "Ping contract should have no events initially"
@@ -602,7 +602,7 @@ mod ping_pong_tests {
             "Ping contract should have 1 event after Alice's call"
         );
 
-        // Verify Alice's event
+        // Verify Alice's event.
         let expected_event_alice = Pinged { from: alice, value: value_alice };
         let decoded_event_alice =
             Pinged::decode_log_data(&events_after_alice[0], true)
@@ -623,7 +623,7 @@ mod ping_pong_tests {
             "Ping contract should have 2 events after Bob's call"
         );
 
-        // Verify Alice's event is still the first one
+        // Verify Alice's event is still the first one.
         let re_decoded_event_alice =
             Pinged::decode_log_data(&all_events_now[0], true)
                 .expect("Failed to re-decode Alice's Pinged event");
@@ -632,7 +632,7 @@ mod ping_pong_tests {
             "Alice's event data mismatch after Bob's call"
         );
 
-        // Verify Bob's event is the second one
+        // Verify Bob's event is the second one.
         let expected_event_bob = Pinged { from: bob, value: value_bob };
         let decoded_event_bob =
             Pinged::decode_log_data(&all_events_now[1], true)
@@ -649,50 +649,50 @@ mod ping_pong_tests {
         pong: Contract<PongContract>,
         alice: Address,
     ) {
-        // Initial state: no events
+        // Initial state: no events.
         let initial_events = ping.all_events();
         assert!(initial_events.is_empty());
-        // Repeated call to all_events should return the same empty state
+        // Repeated call to all_events should return the same empty state.
         let initial_events_again = ping.all_events();
         assert_eq!(initial_events, initial_events_again,);
 
-        // Emit one event
+        // Emit one event.
         let value1 = TEN;
         ping.sender(alice).ping(pong.address(), value1).motsu_unwrap();
 
-        // First call to all_events after one event
+        // First call to `all_events` after one event.
         let events_after_one_call = ping.all_events();
         assert_eq!(events_after_one_call.len(), 1, "Should be 1 event");
 
-        // Second call to all_events immediately after
+        // Second call to `all_events` immediately after.
         let events_after_one_call_again = ping.all_events();
         assert_eq!(
             events_after_one_call, events_after_one_call_again,
             "Repeated calls after one event should be consistent"
         );
 
-        // Check content of the event
+        // Check content of the event.
         let decoded_event1 =
             Pinged::decode_log_data(&events_after_one_call[0], true).unwrap();
         let expected_event1 = Pinged { from: alice, value: value1 };
         assert_eq!(decoded_event1, expected_event1);
 
-        // Emit another event
+        // Emit another event.
         let value2 = TEN + ONE;
         ping.sender(alice).ping(pong.address(), value2).motsu_unwrap();
 
-        // First call to all_events after two events
+        // First call to `all_events` after two events.
         let events_after_two_calls = ping.all_events();
         assert_eq!(events_after_two_calls.len(), 2, "Should be 2 events");
 
-        // Second call to all_events immediately after
+        // Second call to `all_events` immediately after.
         let events_after_two_calls_again = ping.all_events();
         assert_eq!(
             events_after_two_calls, events_after_two_calls_again,
             "Repeated calls after two events should be consistent"
         );
 
-        // Check content of the two events
+        // Check content of the two events.
         let decoded_event1_from_two =
             Pinged::decode_log_data(&events_after_two_calls[0], true).unwrap();
         assert_eq!(
@@ -708,10 +708,10 @@ mod ping_pong_tests {
             "Second event should be correct"
         );
 
-        // Perform a read-only operation that doesn't emit events
+        // Perform a read-only operation that does not emit events.
         let _pings_count = ping.sender(alice).pings_count.get();
 
-        // Third call to all_events after a read operation
+        // Third call to `all_events` after a read operation.
         let events_after_read_op = ping.all_events();
         assert_eq!(
             events_after_two_calls, events_after_read_op,
