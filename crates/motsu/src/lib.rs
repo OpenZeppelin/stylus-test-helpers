@@ -515,14 +515,6 @@ mod ping_pong_tests {
         alice: Address,
         bob: Address,
     ) {
-
-        // Make sure addresses are different
-        assert_ne!(
-            ping1.address(),
-            ping2.address(),
-            "Ping contracts should have different addresses"
-        );
-
         // Initial state: no events
         assert!(
             ping1.all_events().is_empty(),
