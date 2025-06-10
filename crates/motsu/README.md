@@ -153,6 +153,8 @@ It is possible to check emitted events by specific contract with
 And assert with [`Contract::assert_emitted`][contract_assert_emitted] that will print all matching
 events in case of failed assertion.
 
+To get all emitted contract events use [`Contract::all_events`][contract_all_events] method.
+
 ### Transaction Revert
 
 To revert a transaction in case of `Result::Err`, you should call one of
@@ -246,6 +248,8 @@ Refer to our [Security Policy] for more details.
 [contract_emitted]: crate::prelude::Contract::emitted
 
 [contract_assert_emitted]: crate::prelude::Contract::assert_emitted
+
+[contract_all_events]: crate::prelude::Contract::all_events
 
 [result_motsu_unwrap]: crate::prelude::ResultExt::motsu_unwrap
 
