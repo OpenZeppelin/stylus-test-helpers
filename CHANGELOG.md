@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Changed
 
+## [0.9.1] - 2025-06-11
+
+### Added
+
+- Added `Contract::all_events` method to retrieve all events emitted by the contract. #95
+
 ## [0.9.0] - 2025-05-21
 
 ### Changed (Breaking)
@@ -29,7 +35,6 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 - Support `fallback` and `receive` functions. #88
 - Derived `PartialEq`, `Eq` and `Debug` for `Account`. #81
 - Enabled additional conversions between `PrivateKeySigner`, `Address` and `Account`. #84
-- Added `Contract::all_events` method to retrieve all events emitted by the contract. #95
 
 ### Changed (Breaking)
 
