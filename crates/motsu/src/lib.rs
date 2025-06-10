@@ -509,13 +509,12 @@ mod ping_pong_tests {
     // multiple instances of the same contract type
     #[motsu::test]
     fn all_events_multiple_instances_same_type(
+        ping1: Contract<PingContract>,
+        ping2: Contract<PingContract>,
         pong: Contract<PongContract>,
         alice: Address,
         bob: Address,
     ) {
-        // Create two PingContract instances at different addresses
-        let ping1 = Contract::<PingContract>::new();
-        let ping2 = Contract::<PingContract>::new();
 
         // Make sure addresses are different
         assert_ne!(
