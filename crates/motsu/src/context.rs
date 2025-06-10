@@ -555,8 +555,8 @@ impl VM {
     }
 
     /// Get all events emitted by the contract at `address`.
-    /// Returns a vector of [`LogData`] objects representing the events emitted by
-    /// the contract.
+    /// Returns a vector of [`LogData`] objects representing the events emitted
+    /// by the contract.
     pub(crate) fn all_events_for(self, address: &Address) -> Vec<LogData> {
         self.storage()
             .persistent
@@ -920,8 +920,8 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
     }
 
     /// Get all events emitted by the contract `self`.
-    /// Returns a vector of [`LogData`] objects representing the events emitted by
-    /// the contract.
+    /// Returns a vector of [`LogData`] objects representing the events emitted
+    /// by the contract.
     #[must_use]
     pub fn all_events(&self) -> Vec<LogData> {
         VM::context().all_events_for(&self.address)
