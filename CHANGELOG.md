@@ -9,13 +9,11 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ## [Unreleased]
 
-### Removed
-
 ### Added
 
 ### Changed (Breaking)
 
-- Remove `context::init` helper. #102
+- Remove `Context::init` helper function. #102
 
 ### Changed
 
