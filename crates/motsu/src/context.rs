@@ -836,16 +836,6 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
         Self { phantom: ::core::marker::PhantomData, address }
     }
 
-    /// Initialize the contract with an `initializer` function, and on behalf of
-    /// the given `account`.
-    pub fn init<A: Into<Address>, Output>(
-        &self,
-        sender: A,
-        initializer: impl FnOnce(&mut ST) -> Output,
-    ) -> Output {
-        initializer(&mut self.sender(sender.into()))
-    }
-
     /// Create a new contract with default storage on the random address.
     #[must_use]
     pub fn random() -> Self {
