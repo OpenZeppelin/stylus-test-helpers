@@ -10,11 +10,12 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 ## [Unreleased]
 
 ### Removed
-- `Context::init` helper (replaced by contract constructors – see issue #101)
 
 ### Added
 
 ### Changed (Breaking)
+
+- Remove `context::init` helper. #102
 
 ### Changed
 
