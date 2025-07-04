@@ -890,9 +890,9 @@ mod fallback_receive_tests {
 #[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
-    use alloy_sol_types::sol;
+    use alloy_sol_types::{sol, SolCall, SolValue};
     use stylus_sdk::{
-        call::{Call, MethodError},
+        call::{delegate_call, Call, MethodError},
         contract, msg,
         prelude::*,
         storage::{StorageAddress, StorageU256},
@@ -914,9 +914,7 @@ mod proxies_tests {
             #[allow(missing_docs)]
             function callProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
-            function delegateCall() external returns (bool);
-            #[allow(missing_docs)]
-            function delegateCallReceive(address original_msg_sender) external returns (bool);
+            function delegateCallGetMsgSenderOnProxy() external returns (address);
             #[allow(missing_docs)]
             function tryCallProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
@@ -927,6 +925,13 @@ mod proxies_tests {
             function passProxyWithFixedValue(uint256 pass_value) external payable;
             #[allow(missing_docs)]
             function payProxyWithHalfBalance() external payable;
+        }
+    }
+
+    sol! {
+        interface IProxyEncodable {
+            #[allow(missing_docs)]
+            function getMsgSender() external view returns (address);
         }
     }
 
@@ -979,19 +984,23 @@ mod proxies_tests {
             }
         }
 
-        fn delegate_call(&mut self) -> bool {
-            let proxy = IProxy::new(self.next_proxy.get());
-            let call = Call::new_in(self);
-            proxy
-                .delegate_call_receive(call, msg::sender())
-                .expect("should delegate call proxy")
+        fn delegate_call_get_msg_sender_on_proxy(&mut self) -> Address {
+            let to = self.next_proxy.get();
+            let call = IProxyEncodable::getMsgSenderCall {};
+            let calldata = call.abi_encode();
+
+            unsafe {
+                Address::abi_decode(
+                    &delegate_call(Call::new_in(self), to, &calldata)
+                        .expect("should delegate call proxy"),
+                    true,
+                )
+                .expect("should decode address")
+            }
         }
 
-        fn delegate_call_receive(
-            &mut self,
-            original_msg_sender: Address,
-        ) -> bool {
-            msg::sender() == original_msg_sender
+        fn get_msg_sender(&self) -> Address {
+            msg::sender()
         }
 
         #[payable]
@@ -1195,9 +1204,10 @@ mod proxies_tests {
         proxy1.sender(alice).constructor(proxy2.address());
         proxy2.sender(alice).constructor(Address::ZERO);
 
-        let result = proxy1.sender(alice).delegate_call();
+        let nested_msg_sender =
+            proxy1.sender(alice).delegate_call_get_msg_sender_on_proxy();
 
-        assert!(result);
+        assert_eq!(nested_msg_sender, alice);
     }
 
     #[motsu::test]
