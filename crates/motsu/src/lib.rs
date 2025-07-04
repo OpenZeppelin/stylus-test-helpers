@@ -914,8 +914,6 @@ mod proxies_tests {
             #[allow(missing_docs)]
             function callProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
-            function delegateCallGetMsgSenderOnProxy() external returns (address);
-            #[allow(missing_docs)]
             function tryCallProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
             function payProxy() external payable;
@@ -931,7 +929,7 @@ mod proxies_tests {
     sol! {
         interface IProxyEncodable {
             #[allow(missing_docs)]
-            function getMsgSender() external view returns (address);
+            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address);
         }
     }
 
@@ -984,9 +982,18 @@ mod proxies_tests {
             }
         }
 
-        fn delegate_call_get_msg_sender_on_proxy(&mut self) -> Address {
+        fn delegate_call_get_msg_sender_on_proxy(
+            &mut self,
+            depth: u8,
+        ) -> Address {
+            if depth == 0 {
+                return msg::sender();
+            }
+
             let to = self.next_proxy.get();
-            let call = IProxyEncodable::getMsgSenderCall {};
+            let call = IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
+                depth: depth - 1,
+            };
             let calldata = call.abi_encode();
 
             unsafe {
@@ -997,10 +1004,6 @@ mod proxies_tests {
                 )
                 .expect("should decode address")
             }
-        }
-
-        fn get_msg_sender(&self) -> Address {
-            msg::sender()
         }
 
         #[payable]
@@ -1199,15 +1202,19 @@ mod proxies_tests {
     fn delegate_call_maintains_msg_sender(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
         alice: Address,
     ) {
         proxy1.sender(alice).constructor(proxy2.address());
-        proxy2.sender(alice).constructor(Address::ZERO);
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
-        let nested_msg_sender =
-            proxy1.sender(alice).delegate_call_get_msg_sender_on_proxy();
-
-        assert_eq!(nested_msg_sender, alice);
+        for depth in 0..3 {
+            let nested_msg_sender = proxy1
+                .sender(alice)
+                .delegate_call_get_msg_sender_on_proxy(depth);
+            assert_eq!(nested_msg_sender, alice);
+        }
     }
 
     #[motsu::test]
