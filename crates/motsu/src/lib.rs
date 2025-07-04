@@ -1564,6 +1564,7 @@ mod call_tests {
         proxy3: Contract<Proxy>,
         alice: Address,
     ) {
+        alice.fund(U256::from(100));
         proxy1.sender(alice).constructor(proxy2.address());
         proxy2.sender(alice).constructor(proxy3.address());
         proxy3.sender(alice).constructor(Address::ZERO);
@@ -1575,6 +1576,23 @@ mod call_tests {
             assert_eq!(nested_msg_sender, alice);
             assert_eq!(nested_msg_value, U256::ZERO);
         }
+
+        // Test with value - only the first call should have the value, while the rest should have zero.
+
+        let value = U256::from(10);
+        let (_, msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(0);
+        assert_eq!(msg_value, value);
+
+        let (_, nested_msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(1);
+        assert_eq!(nested_msg_value, U256::ZERO);
+        let (_, nested_msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(2);
+        assert_eq!(nested_msg_value, U256::ZERO);
     }
 
     #[motsu::test]
