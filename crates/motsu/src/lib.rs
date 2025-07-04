@@ -1433,7 +1433,10 @@ mod proxies_tests {
 
 #[cfg(test)]
 mod call_tests {
-    use stylus_sdk::{alloy_primitives::Address, prelude::*};
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        prelude::*,
+    };
 
     use crate as motsu;
     use crate::prelude::*;
@@ -1447,7 +1450,7 @@ mod call_tests {
     sol! {
         interface IProxyEncodable {
             #[allow(missing_docs)]
-            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address);
+            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address, uint256);
         }
     }
 
@@ -1468,9 +1471,9 @@ mod call_tests {
         fn delegate_call_get_msg_sender_on_proxy(
             &mut self,
             depth: u8,
-        ) -> Address {
+        ) -> (Address, U256) {
             if depth == 0 {
-                return msg::sender();
+                return (msg::sender(), msg::value());
             }
 
             let to = self.next_proxy.get();
@@ -1479,8 +1482,9 @@ mod call_tests {
             };
             let calldata = call.abi_encode();
 
+            type Res = (Address, U256);
             unsafe {
-                Address::abi_decode(
+                Res::abi_decode(
                     &delegate_call(Call::new_in(self), to, &calldata)
                         .expect("should delegate call proxy"),
                     true,
@@ -1491,7 +1495,7 @@ mod call_tests {
     }
 
     #[motsu::test]
-    fn delegate_call_maintains_msg_sender(
+    fn delegate_call_maintains_msg_sender_and_value(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -1502,10 +1506,11 @@ mod call_tests {
         proxy3.sender(alice).constructor(Address::ZERO);
 
         for depth in 0..3 {
-            let nested_msg_sender = proxy1
+            let (nested_msg_sender, nested_msg_value) = proxy1
                 .sender(alice)
                 .delegate_call_get_msg_sender_on_proxy(depth);
             assert_eq!(nested_msg_sender, alice);
+            assert_eq!(nested_msg_value, U256::ZERO);
         }
     }
 }
