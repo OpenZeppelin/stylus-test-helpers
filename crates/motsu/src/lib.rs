@@ -890,9 +890,9 @@ mod fallback_receive_tests {
 #[cfg(test)]
 mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
-    use alloy_sol_types::{sol, SolCall, SolValue};
+    use alloy_sol_types::sol;
     use stylus_sdk::{
-        call::{delegate_call, Call, MethodError},
+        call::{Call, MethodError},
         contract, msg,
         prelude::*,
         storage::{StorageAddress, StorageU256},
@@ -979,30 +979,6 @@ mod proxies_tests {
                 let proxy = IProxy::new(next_proxy);
                 let call = Call::new_in(self);
                 proxy.call_proxy(call, value).expect("should call proxy")
-            }
-        }
-
-        fn delegate_call_get_msg_sender_on_proxy(
-            &mut self,
-            depth: u8,
-        ) -> Address {
-            if depth == 0 {
-                return msg::sender();
-            }
-
-            let to = self.next_proxy.get();
-            let call = IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
-                depth: depth - 1,
-            };
-            let calldata = call.abi_encode();
-
-            unsafe {
-                Address::abi_decode(
-                    &delegate_call(Call::new_in(self), to, &calldata)
-                        .expect("should delegate call proxy"),
-                    true,
-                )
-                .expect("should decode address")
             }
         }
 
@@ -1196,25 +1172,6 @@ mod proxies_tests {
 
         // Reentrant call should stop with limit.
         assert_eq!(result, CALL_PROXY_LIMIT);
-    }
-
-    #[motsu::test]
-    fn delegate_call_maintains_msg_sender(
-        proxy1: Contract<Proxy>,
-        proxy2: Contract<Proxy>,
-        proxy3: Contract<Proxy>,
-        alice: Address,
-    ) {
-        proxy1.sender(alice).constructor(proxy2.address());
-        proxy2.sender(alice).constructor(proxy3.address());
-        proxy3.sender(alice).constructor(Address::ZERO);
-
-        for depth in 0..3 {
-            let nested_msg_sender = proxy1
-                .sender(alice)
-                .delegate_call_get_msg_sender_on_proxy(depth);
-            assert_eq!(nested_msg_sender, alice);
-        }
     }
 
     #[motsu::test]
@@ -1471,6 +1428,85 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TEN + THREE);
         // and call to the fourth proxy should revert.
         assert_eq!(proxy4.balance(), TEN);
+    }
+}
+
+#[cfg(test)]
+mod call_tests {
+    use stylus_sdk::{alloy_primitives::Address, prelude::*};
+
+    use crate as motsu;
+    use crate::prelude::*;
+    use alloy_sol_types::{sol, SolCall, SolValue};
+    use stylus_sdk::{
+        call::{delegate_call, Call},
+        msg,
+        storage::StorageAddress,
+    };
+
+    sol! {
+        interface IProxyEncodable {
+            #[allow(missing_docs)]
+            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address);
+        }
+    }
+
+    #[storage]
+    struct Proxy {
+        next_proxy: StorageAddress,
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[public]
+    impl Proxy {
+        #[constructor]
+        fn constructor(&mut self, next_proxy: Address) {
+            self.next_proxy.set(next_proxy);
+        }
+
+        fn delegate_call_get_msg_sender_on_proxy(
+            &mut self,
+            depth: u8,
+        ) -> Address {
+            if depth == 0 {
+                return msg::sender();
+            }
+
+            let to = self.next_proxy.get();
+            let call = IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
+                depth: depth - 1,
+            };
+            let calldata = call.abi_encode();
+
+            unsafe {
+                Address::abi_decode(
+                    &delegate_call(Call::new_in(self), to, &calldata)
+                        .expect("should delegate call proxy"),
+                    true,
+                )
+                .expect("should decode address")
+            }
+        }
+    }
+
+    #[motsu::test]
+    fn delegate_call_maintains_msg_sender(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
+
+        for depth in 0..3 {
+            let nested_msg_sender = proxy1
+                .sender(alice)
+                .delegate_call_get_msg_sender_on_proxy(depth);
+            assert_eq!(nested_msg_sender, alice);
+        }
     }
 }
 
