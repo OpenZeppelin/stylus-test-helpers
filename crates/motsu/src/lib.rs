@@ -1444,7 +1444,7 @@ mod call_tests {
     use stylus_sdk::{
         call::{self, Call},
         msg,
-        storage::StorageAddress,
+        storage::{StorageAddress, StorageU256},
     };
 
     sol! {
@@ -1455,12 +1455,24 @@ mod call_tests {
             function getMsgSender() external view returns (address);
             #[allow(missing_docs)]
             function getNestedMsgSenderAndOwnMsgSenderUsingRegularCall() external returns (address, address);
+            #[allow(missing_docs)]
+            function incrementCounter() external returns (uint256);
+            #[allow(missing_docs)]
+            function getCounter() external view returns (uint256);
+            #[allow(missing_docs)]
+            function setValue(uint256 value) external;
+            #[allow(missing_docs)]
+            function getValue() external view returns (uint256);
+            #[allow(missing_docs)]
+            function revertWithValue(uint256 value) external;
         }
     }
 
     #[storage]
     struct Proxy {
         next_proxy: StorageAddress,
+        counter: StorageU256,
+        value: StorageU256,
     }
 
     unsafe impl TopLevelStorage for Proxy {}
@@ -1555,6 +1567,116 @@ mod call_tests {
 
             (nested_msg_sender, msg::sender())
         }
+
+        /// Increments the counter and returns the new value.
+        fn increment_counter(&mut self) -> U256 {
+            let current = self.counter.get();
+            let new_value = current + U256::from(1);
+            self.counter.set(new_value);
+            new_value
+        }
+
+        /// Returns the current counter value.
+        fn get_counter(&self) -> U256 {
+            self.counter.get()
+        }
+
+        /// Sets the value storage.
+        fn set_value(&mut self, value: U256) {
+            self.value.set(value);
+        }
+
+        /// Returns the current value.
+        fn get_value(&self) -> U256 {
+            self.value.get()
+        }
+
+        /// Reverts with a specific value for testing error handling.
+        fn revert_with_value(&mut self, value: U256) -> Result<(), Vec<u8>> {
+            Err(value.to_be_bytes_vec())
+        }
+
+        /// Makes a regular call to increment counter on the next proxy.
+        fn call_increment_counter(&mut self) -> Result<U256, Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata =
+                IProxyEncodable::incrementCounterCall {}.abi_encode();
+            let context = Call::new_in(self);
+
+            let result = call::call(context, to, &calldata)?;
+            U256::abi_decode(&result, true)
+                .map_err(|e| e.to_string().into_bytes())
+        }
+
+        /// Makes a static call to get counter from the next proxy.
+        fn static_call_get_counter(&self) -> Result<U256, Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata = IProxyEncodable::getCounterCall {}.abi_encode();
+            let context = Call::new_in(self);
+
+            let result = call::static_call(context, to, &calldata)?;
+            U256::abi_decode(&result, true)
+                .map_err(|e| e.to_string().into_bytes())
+        }
+
+        /// Makes a regular call to set value on the next proxy.
+        fn call_set_value(&mut self, value: U256) -> Result<(), Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata = IProxyEncodable::setValueCall { value }.abi_encode();
+            let context = Call::new_in(self);
+
+            call::call(context, to, &calldata)
+        }
+
+        /// Makes a static call to get value from the next proxy.
+        fn static_call_get_value(&self) -> Result<U256, Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata = IProxyEncodable::getValueCall {}.abi_encode();
+            let context = Call::new_in(self);
+
+            let result = call::static_call(context, to, &calldata)?;
+            U256::abi_decode(&result, true)
+                .map_err(|e| e.to_string().into_bytes())
+        }
+
+        /// Makes a regular call that will revert with a specific value.
+        fn call_revert_with_value(
+            &mut self,
+            value: U256,
+        ) -> Result<(), Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata =
+                IProxyEncodable::revertWithValueCall { value }.abi_encode();
+            let context = Call::new_in(self);
+
+            call::call(context, to, &calldata)
+        }
+
+        /// Makes a static call that will revert with a specific value.
+        fn static_call_revert_with_value(
+            &self,
+            value: U256,
+        ) -> Result<(), Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata =
+                IProxyEncodable::revertWithValueCall { value }.abi_encode();
+            let context = Call::new_in(self);
+
+            call::static_call(context, to, &calldata)
+        }
+
+        /// Makes a regular call with value transfer.
+        #[payable]
+        fn call_with_value(&mut self, value: U256) -> Result<U256, Vec<u8>> {
+            let to = self.next_proxy.get();
+            let calldata =
+                IProxyEncodable::incrementCounterCall {}.abi_encode();
+            let context = Call::new_in(self).value(msg::value());
+
+            let result = call::call(context, to, &calldata)?;
+            U256::abi_decode(&result, true)
+                .map_err(|e| e.to_string().into_bytes())
+        }
     }
 
     #[motsu::test]
@@ -1614,6 +1736,265 @@ mod call_tests {
         assert_eq!(proxy1_msg_sender, alice);
         assert_eq!(proxy2_msg_sender, alice);
         assert_eq!(proxy3_msg_sender, proxy2.address());
+    }
+
+    #[motsu::test]
+    fn regular_call_increments_counter(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        // Initial state
+        assert_eq!(proxy2.sender(alice).get_counter(), U256::ZERO);
+
+        // Make a regular call to increment counter
+        let result =
+            proxy1.sender(alice).call_increment_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(1));
+
+        // Verify the counter was incremented on proxy2
+        assert_eq!(proxy2.sender(alice).get_counter(), U256::from(1));
+
+        // Make another call
+        let result =
+            proxy1.sender(alice).call_increment_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(2));
+
+        // Verify the counter was incremented again
+        assert_eq!(proxy2.sender(alice).get_counter(), U256::from(2));
+    }
+
+    #[motsu::test]
+    fn static_call_reads_counter_without_modifying_state(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        // Set up some state on proxy2
+        proxy2.sender(alice).increment_counter();
+        proxy2.sender(alice).increment_counter();
+        assert_eq!(proxy2.sender(alice).get_counter(), U256::from(2));
+
+        // Make a static call to read the counter
+        let result =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(2));
+
+        // Verify the counter value hasn't changed (static call doesn't modify state)
+        assert_eq!(proxy2.sender(alice).get_counter(), U256::from(2));
+
+        // Make another static call
+        let result =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(2));
+    }
+
+    #[motsu::test]
+    fn regular_call_modifies_state_static_call_reads_state(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        // Initial state
+        assert_eq!(proxy2.sender(alice).get_value(), U256::ZERO);
+
+        // Set a value using regular call
+        proxy1.sender(alice).call_set_value(U256::from(42)).motsu_unwrap();
+
+        // Verify the value was set
+        assert_eq!(proxy2.sender(alice).get_value(), U256::from(42));
+
+        // Read the value using static call
+        let result =
+            proxy1.sender(alice).static_call_get_value().motsu_unwrap();
+        assert_eq!(result, U256::from(42));
+
+        // Change the value again
+        proxy1.sender(alice).call_set_value(U256::from(100)).motsu_unwrap();
+
+        // Read the updated value using static call
+        let result =
+            proxy1.sender(alice).static_call_get_value().motsu_unwrap();
+        assert_eq!(result, U256::from(100));
+    }
+
+    #[motsu::test]
+    fn regular_call_with_value_transfer(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        // Fund alice and proxy1
+        alice.fund(U256::from(100));
+        proxy1.fund(U256::from(50));
+
+        let initial_alice_balance = alice.balance();
+        let initial_proxy1_balance = proxy1.balance();
+        let initial_proxy2_balance = proxy2.balance();
+
+        // Make a call with value transfer
+        let call_value = U256::from(10);
+        let result = proxy1
+            .sender_and_value(alice, call_value)
+            .call_with_value(U256::from(5))
+            .motsu_unwrap();
+
+        assert_eq!(result, U256::from(1)); // Counter was incremented
+
+        // Verify balances changed correctly
+        assert_eq!(alice.balance(), initial_alice_balance - call_value);
+        assert_eq!(proxy1.balance(), initial_proxy1_balance - call_value);
+        assert_eq!(proxy2.balance(), initial_proxy2_balance + call_value);
+    }
+
+    #[motsu::test]
+    fn regular_call_reverts_propagates_error(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        let revert_value = U256::from(42);
+        let err = proxy1
+            .sender(alice)
+            .call_revert_with_value(revert_value)
+            .motsu_unwrap_err();
+
+        // The error should contain the revert value
+        assert_eq!(err, revert_value.to_be_bytes_vec());
+    }
+
+    #[motsu::test]
+    fn static_call_reverts_propagates_error(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        let revert_value = U256::from(123);
+        let err = proxy1
+            .sender(alice)
+            .static_call_revert_with_value(revert_value)
+            .motsu_unwrap_err();
+
+        // The error should contain the revert value
+        assert_eq!(err, revert_value.to_be_bytes_vec());
+    }
+
+    #[motsu::test]
+    fn call_chain_with_mixed_call_types(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
+
+        // Set up initial state on proxy3
+        proxy3.sender(alice).set_value(U256::from(100));
+        proxy3.sender(alice).increment_counter();
+
+        // Proxy1 makes a regular call to proxy2 to set value on proxy3
+        proxy1.sender(alice).call_set_value(U256::from(200)).motsu_unwrap();
+
+        // Verify proxy3's value was updated
+        assert_eq!(proxy3.sender(alice).get_value(), U256::from(200));
+
+        // Proxy1 makes a static call to proxy2 to read value from proxy3
+        let result =
+            proxy1.sender(alice).static_call_get_value().motsu_unwrap();
+        assert_eq!(result, U256::from(200));
+
+        // Proxy1 makes a regular call to proxy2 to increment counter on proxy3
+        let result =
+            proxy1.sender(alice).call_increment_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(2)); // Was 1, now 2
+
+        // Proxy1 makes a static call to proxy2 to read counter from proxy3
+        let result =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap();
+        assert_eq!(result, U256::from(2));
+    }
+
+    #[motsu::test]
+    fn static_call_cannot_modify_state(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        // Set initial state
+        proxy2.sender(alice).set_value(U256::from(50));
+        proxy2.sender(alice).increment_counter();
+
+        let initial_value = proxy2.sender(alice).get_value();
+        let initial_counter = proxy2.sender(alice).get_counter();
+
+        // Make static calls (these should not modify state)
+        let value_result =
+            proxy1.sender(alice).static_call_get_value().motsu_unwrap();
+        let counter_result =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap();
+
+        assert_eq!(value_result, U256::from(50));
+        assert_eq!(counter_result, U256::from(1));
+
+        // Verify state hasn't changed
+        assert_eq!(proxy2.sender(alice).get_value(), initial_value);
+        assert_eq!(proxy2.sender(alice).get_counter(), initial_counter);
+    }
+
+    #[motsu::test]
+    fn call_to_nonexistent_contract_reverts(
+        proxy1: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(Address::random()); // Random address with no code
+
+        // Regular call to nonexistent contract should revert
+        let err =
+            proxy1.sender(alice).call_increment_counter().motsu_unwrap_err();
+        assert!(!err.is_empty());
+
+        // Static call to nonexistent contract should revert
+        let err =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap_err();
+        assert!(!err.is_empty());
+    }
+
+    #[motsu::test]
+    fn call_with_zero_address_reverts(proxy1: Contract<Proxy>, alice: Address) {
+        proxy1.sender(alice).constructor(Address::ZERO);
+
+        // Regular call to zero address should revert
+        let err =
+            proxy1.sender(alice).call_increment_counter().motsu_unwrap_err();
+        assert!(!err.is_empty());
+
+        // Static call to zero address should revert
+        let err =
+            proxy1.sender(alice).static_call_get_counter().motsu_unwrap_err();
+        assert!(!err.is_empty());
     }
 }
 
