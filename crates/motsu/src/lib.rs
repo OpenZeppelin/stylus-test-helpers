@@ -914,6 +914,10 @@ mod proxies_tests {
             #[allow(missing_docs)]
             function callProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
+            function delegateCall() external returns (bool);
+            #[allow(missing_docs)]
+            function delegateCallReceive(address original_msg_sender) external returns (bool);
+            #[allow(missing_docs)]
             function tryCallProxy(uint256 value) external returns (uint256);
             #[allow(missing_docs)]
             function payProxy() external payable;
@@ -973,6 +977,21 @@ mod proxies_tests {
                 let call = Call::new_in(self);
                 proxy.call_proxy(call, value).expect("should call proxy")
             }
+        }
+
+        fn delegate_call(&mut self) -> bool {
+            let proxy = IProxy::new(self.next_proxy.get());
+            let call = Call::new_in(self);
+            proxy
+                .delegate_call_receive(call, msg::sender())
+                .expect("should delegate call proxy")
+        }
+
+        fn delegate_call_receive(
+            &mut self,
+            original_msg_sender: Address,
+        ) -> bool {
+            msg::sender() == original_msg_sender
         }
 
         #[payable]
@@ -1165,6 +1184,20 @@ mod proxies_tests {
 
         // Reentrant call should stop with limit.
         assert_eq!(result, CALL_PROXY_LIMIT);
+    }
+
+    #[motsu::test]
+    fn delegate_call_maintains_msg_sender(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(Address::ZERO);
+
+        let result = proxy1.sender(alice).delegate_call();
+
+        assert!(result);
     }
 
     #[motsu::test]
