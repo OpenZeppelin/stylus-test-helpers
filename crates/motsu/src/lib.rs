@@ -950,6 +950,11 @@ mod proxies_tests {
 
     #[public]
     impl Proxy {
+        #[constructor]
+        fn constructor(&mut self, next_proxy: Address) {
+            self.next_proxy.set(next_proxy);
+        }
+
         fn call_proxy(&mut self, value: U256) -> U256 {
             if value == CALL_PROXY_LIMIT {
                 return value;
@@ -1120,12 +1125,6 @@ mod proxies_tests {
         }
     }
 
-    impl Proxy {
-        fn init(&mut self, next_proxy: Address) {
-            self.next_proxy.set(next_proxy);
-        }
-    }
-
     unsafe impl TopLevelStorage for Proxy {}
 
     #[motsu::test]
@@ -1137,9 +1136,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Call the first proxy.
         let result = proxy1.sender(alice).call_proxy(TEN);
@@ -1157,9 +1156,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy1 -> ..
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy1.address());
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy1.address());
 
         // Call the first proxy.
         let result = proxy1.sender(alice).call_proxy(ONE);
@@ -1177,9 +1176,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund accounts.
         alice.fund(TEN);
@@ -1206,9 +1205,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund alice, proxies have no funds.
         alice.fund(EIGHT);
@@ -1236,9 +1235,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund alice, proxies have no funds.
         alice.fund(EIGHT);
@@ -1269,9 +1268,9 @@ mod proxies_tests {
 
             // Set up a chain of three proxies.
             // With the given call chain: proxy1 -> proxy2 -> proxy3.
-            proxy1.sender(alice).init(proxy2.address());
-            proxy2.sender(alice).init(proxy3.address());
-            proxy3.sender(alice).init(Address::ZERO);
+            proxy1.sender(alice).constructor(proxy2.address());
+            proxy2.sender(alice).constructor(proxy3.address());
+            proxy3.sender(alice).constructor(Address::ZERO);
 
             // Call the first proxy.
             let result = proxy1.sender(alice).call_proxy(TEN);
@@ -1291,10 +1290,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // Try to replace received value and process result with `motsu_res()`
         _ = proxy1.sender(alice).replace_received_value(ONE).motsu_res();
@@ -1337,10 +1336,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // If the argument is `FOUR`, the call should revert fully.
         let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
@@ -1388,10 +1387,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // Fund all accounts.
         alice.fund(TEN);
