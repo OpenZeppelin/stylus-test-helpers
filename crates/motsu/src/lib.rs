@@ -1442,7 +1442,7 @@ mod call_tests {
     use crate::prelude::*;
     use alloy_sol_types::{sol, SolCall, SolValue};
     use stylus_sdk::{
-        call::{delegate_call, Call},
+        call::{self, Call},
         msg,
         storage::StorageAddress,
     };
@@ -1451,6 +1451,10 @@ mod call_tests {
         interface IProxyEncodable {
             #[allow(missing_docs)]
             function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address, uint256);
+            #[allow(missing_docs)]
+            function getMsgSender() external view returns (address);
+            #[allow(missing_docs)]
+            function regularCallUpdatesMsgSender() external returns (address, address);
         }
     }
 
@@ -1468,6 +1472,12 @@ mod call_tests {
             self.next_proxy.set(next_proxy);
         }
 
+        fn get_msg_sender(&self) -> Address {
+            msg::sender()
+        }
+
+        /// Delegate calls into the next proxy, and returns the msg sender and
+        /// value of the next proxy.
         fn delegate_call_get_msg_sender_on_proxy(
             &mut self,
             depth: u8,
@@ -1477,25 +1487,76 @@ mod call_tests {
             }
 
             let to = self.next_proxy.get();
-            let call = IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
-                depth: depth - 1,
+            let context: IProxyEncodable::delegateCallGetMsgSenderOnProxyCall =
+                IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
+                    depth: depth - 1,
+                };
+            let calldata = context.abi_encode();
+
+            let result = unsafe {
+                call::delegate_call(Call::new_in(self), to, &calldata)
+                    .expect("should delegate call proxy")
             };
-            let calldata = call.abi_encode();
 
             type Res = (Address, U256);
-            unsafe {
-                Res::abi_decode(
-                    &delegate_call(Call::new_in(self), to, &calldata)
-                        .expect("should delegate call proxy"),
-                    true,
-                )
-                .expect("should decode address")
-            }
+
+            Res::abi_decode(&result, true).expect("should decode address")
+        }
+
+        /// Delegate calls into the next proxy and returns the message senders from the call chain.
+        ///
+        /// # Returns
+        ///
+        /// A tuple containing:
+        /// - `(Address, Address)`: The message senders from the nested proxy call chain
+        ///   - First `Address`: The message sender from the next proxy's proxy
+        ///   - Second `Address`: The message sender from the next proxy
+        /// - `Address`: The current proxy's message sender
+        fn delegate_call_into_regular_call_updates_msg_sender(
+            &mut self,
+        ) -> ((Address, Address), Address) {
+            let calldata = IProxyEncodable::regularCallUpdatesMsgSenderCall {}
+                .abi_encode();
+            let to = self.next_proxy.get();
+            let context = Call::new_in(self);
+
+            let result = unsafe {
+                call::delegate_call(context, to, &calldata)
+                    .expect("should delegate call proxy")
+            };
+
+            type Res = (Address, Address);
+
+            let nested_msg_senders =
+                Res::abi_decode(&result, true).expect("should decode address");
+
+            (nested_msg_senders, msg::sender())
+        }
+
+        /// Regular calls into the next proxy and returns the message senders from the call chain.
+        ///
+        /// # Returns
+        ///
+        /// A tuple containing:
+        /// - `Address`: The message sender from the next proxy
+        /// - `Address`: The current proxy's message sender
+        fn regular_call_updates_msg_sender(&mut self) -> (Address, Address) {
+            let to = self.next_proxy.get();
+            let calldata = IProxyEncodable::getMsgSenderCall {}.abi_encode();
+            let context = Call::new_in(self);
+
+            let result =
+                call::call(context, to, &calldata).expect("should call proxy");
+
+            let nested_msg_sender = Address::abi_decode(&result, true)
+                .expect("should decode address");
+
+            (nested_msg_sender, msg::sender())
         }
     }
 
     #[motsu::test]
-    fn delegate_call_maintains_msg_sender_and_value(
+    fn delegate_call_get_msg_sender_on_proxy_maintains_msg_sender_and_value(
         proxy1: Contract<Proxy>,
         proxy2: Contract<Proxy>,
         proxy3: Contract<Proxy>,
@@ -1512,6 +1573,26 @@ mod call_tests {
             assert_eq!(nested_msg_sender, alice);
             assert_eq!(nested_msg_value, U256::ZERO);
         }
+    }
+
+    #[motsu::test]
+    fn delegate_call_into_regular_call_updates_msg_sender(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
+
+        let ((proxy3_msg_sender, proxy2_msg_sender), proxy1_msg_sender) =
+            proxy1
+                .sender(alice)
+                .delegate_call_into_regular_call_updates_msg_sender();
+        assert_eq!(proxy1_msg_sender, alice);
+        assert_eq!(proxy2_msg_sender, alice);
+        assert_eq!(proxy3_msg_sender, proxy2.address());
     }
 }
 
