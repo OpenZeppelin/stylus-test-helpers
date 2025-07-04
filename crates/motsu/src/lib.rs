@@ -1454,7 +1454,7 @@ mod call_tests {
             #[allow(missing_docs)]
             function getMsgSender() external view returns (address);
             #[allow(missing_docs)]
-            function regularCallUpdatesMsgSender() external returns (address, address);
+            function getNestedMsgSenderAndOwnMsgSenderUsingRegularCall() external returns (address, address);
         }
     }
 
@@ -1512,10 +1512,10 @@ mod call_tests {
         ///   - First `Address`: The message sender from the next proxy's proxy
         ///   - Second `Address`: The message sender from the next proxy
         /// - `Address`: The current proxy's message sender
-        fn delegate_call_into_regular_call_updates_msg_sender(
+        fn get_nested_msg_senders_and_own_msg_sender_using_delegate_call(
             &mut self,
         ) -> ((Address, Address), Address) {
-            let calldata = IProxyEncodable::regularCallUpdatesMsgSenderCall {}
+            let calldata = IProxyEncodable::getNestedMsgSenderAndOwnMsgSenderUsingRegularCallCall {}
                 .abi_encode();
             let to = self.next_proxy.get();
             let context = Call::new_in(self);
@@ -1540,7 +1540,9 @@ mod call_tests {
         /// A tuple containing:
         /// - `Address`: The message sender from the next proxy
         /// - `Address`: The current proxy's message sender
-        fn regular_call_updates_msg_sender(&mut self) -> (Address, Address) {
+        fn get_nested_msg_sender_and_own_msg_sender_using_regular_call(
+            &mut self,
+        ) -> (Address, Address) {
             let to = self.next_proxy.get();
             let calldata = IProxyEncodable::getMsgSenderCall {}.abi_encode();
             let context = Call::new_in(self);
@@ -1589,7 +1591,8 @@ mod call_tests {
         let ((proxy3_msg_sender, proxy2_msg_sender), proxy1_msg_sender) =
             proxy1
                 .sender(alice)
-                .delegate_call_into_regular_call_updates_msg_sender();
+                .get_nested_msg_senders_and_own_msg_sender_using_delegate_call(
+                );
         assert_eq!(proxy1_msg_sender, alice);
         assert_eq!(proxy2_msg_sender, alice);
         assert_eq!(proxy3_msg_sender, proxy2.address());
