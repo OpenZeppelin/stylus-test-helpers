@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Added
 
+- Delegate call support. #105
+
 ### Changed (Breaking)
 
 ### Changed
