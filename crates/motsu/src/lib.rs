@@ -1433,19 +1433,17 @@ mod proxies_tests {
 
 #[cfg(test)]
 mod call_tests {
+    use alloy_sol_types::{sol, SolCall, SolValue};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
+        call::{self, Call},
+        msg,
         prelude::*,
+        storage::StorageAddress,
     };
 
     use crate as motsu;
     use crate::prelude::*;
-    use alloy_sol_types::{sol, SolCall, SolValue};
-    use stylus_sdk::{
-        call::{self, Call},
-        msg,
-        storage::StorageAddress,
-    };
 
     sol! {
         interface IProxyEncodable {
@@ -1503,12 +1501,14 @@ mod call_tests {
             Res::abi_decode(&result, true).expect("should decode address")
         }
 
-        /// Delegate calls into the next proxy and returns the message senders from the call chain.
+        /// Delegate calls into the next proxy and returns the message senders
+        /// from the call chain.
         ///
         /// # Returns
         ///
         /// A tuple containing:
-        /// - `(Address, Address)`: The message senders from the nested proxy call chain
+        /// - `(Address, Address)`: The message senders from the nested proxy
+        ///   call chain
         ///   - First `Address`: The message sender from the next proxy's proxy
         ///   - Second `Address`: The message sender from the next proxy
         /// - `Address`: The current proxy's message sender
@@ -1533,7 +1533,8 @@ mod call_tests {
             (nested_msg_senders, msg::sender())
         }
 
-        /// Regular calls into the next proxy and returns the message senders from the call chain.
+        /// Regular calls into the next proxy and returns the message senders
+        /// from the call chain.
         ///
         /// # Returns
         ///
@@ -1577,7 +1578,8 @@ mod call_tests {
             assert_eq!(nested_msg_value, U256::ZERO);
         }
 
-        // Test with value - only the first call should have the value, while the rest should have zero.
+        // Test with value - only the first call should have the value, while
+        // the rest should have zero.
 
         let value = U256::from(10);
         let (_, msg_value) = proxy1
