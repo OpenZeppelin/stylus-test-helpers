@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Changed (Breaking)
 
+- Remove `Context::init` helper function. #102
+
 ### Changed
 
 ## [0.9.1] - 2025-06-11
