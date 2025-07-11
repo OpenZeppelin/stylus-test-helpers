@@ -258,6 +258,7 @@ unsafe extern "C" fn call_contract(
         calldata_len,
         value,
         return_data_len,
+        false,
     )
 }
 
@@ -291,6 +292,7 @@ unsafe extern "C" fn static_call_contract(
         calldata_len,
         ZERO_RAW,
         return_data_len,
+        false,
     )
 }
 
@@ -322,6 +324,7 @@ unsafe extern "C" fn delegate_call_contract(
         calldata_len,
         ZERO_RAW,
         return_data_len,
+        true,
     )
 }
 

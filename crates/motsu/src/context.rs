@@ -193,12 +193,29 @@ impl VM {
         calldata_len: usize,
         value: *const u8,
         return_data_size: *mut usize,
+        is_delegate_call: bool,
     ) -> u8 {
         let address = read_address(address);
         let value = read_u256(value);
         let calldata = slice::from_raw_parts(calldata, calldata_len);
 
-        let result = self.call_contract(address, calldata, Some(value));
+        let previous_contract_address = self
+            .replace_contract_address(address)
+            .expect("contract_address should be set");
+        let previous_msg_sender = if is_delegate_call {
+            self.storage().msg_sender.expect("msg_sender should be set")
+        } else {
+            self.replace_msg_sender(previous_contract_address)
+                .expect("msg_sender should be set")
+        };
+
+        let result = self.call_contract(
+            previous_contract_address,
+            previous_msg_sender,
+            address,
+            calldata,
+            Some(value),
+        );
         self.process_arb_result_raw(result, return_data_size)
     }
 
@@ -227,19 +244,12 @@ impl VM {
     /// `contract_address`. Pass `input` and optional `value` to it.
     fn call_contract(
         self,
+        previous_contract_address: Address,
+        previous_msg_sender: Address,
         contract_address: Address,
         calldata: &[u8],
         value: Option<U256>,
     ) -> ArbResult {
-        // Set the caller contract as message sender and callee contract as
-        // a receiver (`contract_address`).
-        let previous_contract_address = self
-            .replace_contract_address(contract_address)
-            .expect("contract_address should be set");
-        let previous_msg_sender = self
-            .replace_msg_sender(previous_contract_address)
-            .expect("msg_sender should be set");
-
         // Set new msg_value, and store the previous one.
         let previous_msg_value = self.replace_optional_msg_value(value);
 
@@ -612,7 +622,7 @@ fn decode_selector(calldata: &[u8]) -> u32 {
 
 /// Main storage for Motsu test VM.
 struct VMStorage {
-    /// Address of the message sender.
+    /// Address of the current message sender.
     msg_sender: Option<Address>,
     /// The ETH value in wei sent to the program.
     msg_value: Option<U256>,
