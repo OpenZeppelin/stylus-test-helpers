@@ -199,8 +199,6 @@ impl VM {
         let value = read_u256(value);
         let calldata = slice::from_raw_parts(calldata, calldata_len);
 
-        // Set the caller contract as message sender and callee contract as
-        // a receiver (`contract_address`).
         let previous_contract_address = self
             .replace_contract_address(address)
             .expect("contract_address should be set");
