@@ -18,7 +18,7 @@ pub(crate) trait AccessStorage {
     fn access_storage(
         &self,
         key: &Self::Key,
-    ) -> RefMut<Self::Key, Self::Value> {
+    ) -> RefMut<'_, Self::Key, Self::Value> {
         self.access_storage_with_backoff(key, 10)
     }
 
@@ -33,7 +33,7 @@ pub(crate) trait AccessStorage {
         &self,
         key: &Self::Key,
         backoff: u32,
-    ) -> RefMut<Self::Key, Self::Value>;
+    ) -> RefMut<'_, Self::Key, Self::Value>;
 }
 
 impl<K: Hash + Eq, V> AccessStorage for DashMap<K, V> {
@@ -44,7 +44,7 @@ impl<K: Hash + Eq, V> AccessStorage for DashMap<K, V> {
         &self,
         key: &Self::Key,
         backoff: u32,
-    ) -> RefMut<Self::Key, Self::Value> {
+    ) -> RefMut<'_, Self::Key, Self::Value> {
         {
             match self.try_get_mut(key) {
                 TryResult::Present(router) => router,

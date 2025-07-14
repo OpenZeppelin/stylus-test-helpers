@@ -850,7 +850,7 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
 
     /// Call contract `self` with `account` as a sender.
     #[must_use]
-    pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<ST> {
+    pub fn sender<A: Into<Address>>(&self, account: A) -> ContractCall<'_, ST> {
         ContractCall {
             storage: Cell::new(create_default_storage_type()),
             msg_sender: account.into(),
@@ -865,7 +865,7 @@ impl<ST: StorageType + Router + 'static> Contract<ST> {
         &self,
         sender: A,
         value: V,
-    ) -> ContractCall<ST> {
+    ) -> ContractCall<'_, ST> {
         let caller_address = sender.into();
         let value = value.into();
 
