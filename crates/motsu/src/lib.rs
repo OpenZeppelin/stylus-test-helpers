@@ -1507,11 +1507,11 @@ mod call_tests {
         /// # Returns
         ///
         /// A tuple containing:
-        /// - `(Address, Address)`: The message senders from the nested proxy
+        /// * `(Address, Address)`: The message senders from the nested proxy
         ///   call chain
-        ///   - First `Address`: The message sender from the next proxy's proxy
-        ///   - Second `Address`: The message sender from the next proxy
-        /// - `Address`: The current proxy's message sender
+        ///   * First `Address`: The message sender from the next proxy's proxy
+        ///   * Second `Address`: The message sender from the next proxy
+        /// * `Address`: The current proxy's message sender
         fn get_nested_msg_senders_and_own_msg_sender_using_delegate_call(
             &mut self,
         ) -> ((Address, Address), Address) {
