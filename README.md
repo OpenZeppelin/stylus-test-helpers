@@ -26,7 +26,7 @@ Add motsu to your project's dependencies:
 
 ```toml
 [dev-dependencies]
-motsu = "0.9.1"
+motsu = "=0.10.0"
 
 [dependencies]
 stylus-sdk = "=0.9.0"
