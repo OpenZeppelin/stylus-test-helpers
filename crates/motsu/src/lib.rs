@@ -926,6 +926,13 @@ mod proxies_tests {
         }
     }
 
+    sol! {
+        interface IProxyEncodable {
+            #[allow(missing_docs)]
+            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address);
+        }
+    }
+
     #[storage]
     struct Proxy {
         next_proxy: StorageAddress,
@@ -950,6 +957,11 @@ mod proxies_tests {
 
     #[public]
     impl Proxy {
+        #[constructor]
+        fn constructor(&mut self, next_proxy: Address) {
+            self.next_proxy.set(next_proxy);
+        }
+
         fn call_proxy(&mut self, value: U256) -> U256 {
             if value == CALL_PROXY_LIMIT {
                 return value;
@@ -1120,12 +1132,6 @@ mod proxies_tests {
         }
     }
 
-    impl Proxy {
-        fn init(&mut self, next_proxy: Address) {
-            self.next_proxy.set(next_proxy);
-        }
-    }
-
     unsafe impl TopLevelStorage for Proxy {}
 
     #[motsu::test]
@@ -1137,9 +1143,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Call the first proxy.
         let result = proxy1.sender(alice).call_proxy(TEN);
@@ -1157,9 +1163,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy1 -> ..
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy1.address());
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy1.address());
 
         // Call the first proxy.
         let result = proxy1.sender(alice).call_proxy(ONE);
@@ -1177,9 +1183,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund accounts.
         alice.fund(TEN);
@@ -1206,9 +1212,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund alice, proxies have no funds.
         alice.fund(EIGHT);
@@ -1236,9 +1242,9 @@ mod proxies_tests {
     ) {
         // Set up a chain of three proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
 
         // Fund alice, proxies have no funds.
         alice.fund(EIGHT);
@@ -1269,9 +1275,9 @@ mod proxies_tests {
 
             // Set up a chain of three proxies.
             // With the given call chain: proxy1 -> proxy2 -> proxy3.
-            proxy1.sender(alice).init(proxy2.address());
-            proxy2.sender(alice).init(proxy3.address());
-            proxy3.sender(alice).init(Address::ZERO);
+            proxy1.sender(alice).constructor(proxy2.address());
+            proxy2.sender(alice).constructor(proxy3.address());
+            proxy3.sender(alice).constructor(Address::ZERO);
 
             // Call the first proxy.
             let result = proxy1.sender(alice).call_proxy(TEN);
@@ -1291,10 +1297,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // Try to replace received value and process result with `motsu_res()`
         _ = proxy1.sender(alice).replace_received_value(ONE).motsu_res();
@@ -1337,10 +1343,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // If the argument is `FOUR`, the call should revert fully.
         let err = proxy1.sender(alice).try_call_proxy(FOUR).motsu_unwrap_err();
@@ -1388,10 +1394,10 @@ mod proxies_tests {
     ) {
         // Set up a chain of four proxies.
         // With the given call chain: proxy1 -> proxy2 -> proxy3 -> proxy4.
-        proxy1.sender(alice).init(proxy2.address());
-        proxy2.sender(alice).init(proxy3.address());
-        proxy3.sender(alice).init(proxy4.address());
-        proxy4.sender(alice).init(Address::ZERO);
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(proxy4.address());
+        proxy4.sender(alice).constructor(Address::ZERO);
 
         // Fund all accounts.
         alice.fund(TEN);
@@ -1422,6 +1428,194 @@ mod proxies_tests {
         assert_eq!(proxy3.balance(), TEN + THREE);
         // and call to the fourth proxy should revert.
         assert_eq!(proxy4.balance(), TEN);
+    }
+}
+
+#[cfg(test)]
+mod call_tests {
+    use alloy_sol_types::{sol, SolCall, SolValue};
+    use stylus_sdk::{
+        alloy_primitives::{Address, U256},
+        call::{self, Call},
+        msg,
+        prelude::*,
+        storage::StorageAddress,
+    };
+
+    use crate as motsu;
+    use crate::prelude::*;
+
+    sol! {
+        interface IProxyEncodable {
+            #[allow(missing_docs)]
+            function delegateCallGetMsgSenderOnProxy(uint8 depth) external returns (address, uint256);
+            #[allow(missing_docs)]
+            function getMsgSender() external view returns (address);
+            #[allow(missing_docs)]
+            function getNestedMsgSenderAndOwnMsgSenderUsingRegularCall() external returns (address, address);
+        }
+    }
+
+    #[storage]
+    struct Proxy {
+        next_proxy: StorageAddress,
+    }
+
+    unsafe impl TopLevelStorage for Proxy {}
+
+    #[public]
+    impl Proxy {
+        #[constructor]
+        fn constructor(&mut self, next_proxy: Address) {
+            self.next_proxy.set(next_proxy);
+        }
+
+        fn get_msg_sender(&self) -> Address {
+            msg::sender()
+        }
+
+        /// Delegate calls into the next proxy, and returns the msg sender and
+        /// value of the next proxy.
+        fn delegate_call_get_msg_sender_on_proxy(
+            &mut self,
+            depth: u8,
+        ) -> (Address, U256) {
+            if depth == 0 {
+                return (msg::sender(), msg::value());
+            }
+
+            let to = self.next_proxy.get();
+            let context: IProxyEncodable::delegateCallGetMsgSenderOnProxyCall =
+                IProxyEncodable::delegateCallGetMsgSenderOnProxyCall {
+                    depth: depth - 1,
+                };
+            let calldata = context.abi_encode();
+
+            let result = unsafe {
+                call::delegate_call(Call::new_in(self), to, &calldata)
+                    .expect("should delegate call proxy")
+            };
+
+            type Res = (Address, U256);
+
+            Res::abi_decode(&result, true).expect("should decode address")
+        }
+
+        /// Delegate calls into the next proxy and returns the message senders
+        /// from the call chain.
+        ///
+        /// # Returns
+        ///
+        /// A tuple containing:
+        /// * `(Address, Address)`: The message senders from the nested proxy
+        ///   call chain
+        ///   * First `Address`: The message sender from the next proxy's proxy
+        ///   * Second `Address`: The message sender from the next proxy
+        /// * `Address`: The current proxy's message sender
+        fn get_nested_msg_senders_and_own_msg_sender_using_delegate_call(
+            &mut self,
+        ) -> ((Address, Address), Address) {
+            let calldata = IProxyEncodable::getNestedMsgSenderAndOwnMsgSenderUsingRegularCallCall {}
+                .abi_encode();
+            let to = self.next_proxy.get();
+            let context = Call::new_in(self);
+
+            let result = unsafe {
+                call::delegate_call(context, to, &calldata)
+                    .expect("should delegate call proxy")
+            };
+
+            type Res = (Address, Address);
+
+            let nested_msg_senders =
+                Res::abi_decode(&result, true).expect("should decode address");
+
+            (nested_msg_senders, msg::sender())
+        }
+
+        /// Regular calls into the next proxy and returns the message senders
+        /// from the call chain.
+        ///
+        /// # Returns
+        ///
+        /// A tuple containing:
+        /// - `Address`: The message sender from the next proxy
+        /// - `Address`: The current proxy's message sender
+        fn get_nested_msg_sender_and_own_msg_sender_using_regular_call(
+            &mut self,
+        ) -> (Address, Address) {
+            let to = self.next_proxy.get();
+            let calldata = IProxyEncodable::getMsgSenderCall {}.abi_encode();
+            let context = Call::new_in(self);
+
+            let result =
+                call::call(context, to, &calldata).expect("should call proxy");
+
+            let nested_msg_sender = Address::abi_decode(&result, true)
+                .expect("should decode address");
+
+            (nested_msg_sender, msg::sender())
+        }
+    }
+
+    #[motsu::test]
+    fn delegate_call_get_msg_sender_on_proxy_maintains_msg_sender_and_value(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Address,
+    ) {
+        alice.fund(U256::from(100));
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
+
+        for depth in 0..3 {
+            let (nested_msg_sender, nested_msg_value) = proxy1
+                .sender(alice)
+                .delegate_call_get_msg_sender_on_proxy(depth);
+            assert_eq!(nested_msg_sender, alice);
+            assert_eq!(nested_msg_value, U256::ZERO);
+        }
+
+        // Test with value - only the first call should have the value, while
+        // the rest should have zero.
+
+        let value = U256::from(10);
+        let (_, msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(0);
+        assert_eq!(msg_value, value);
+
+        let (_, nested_msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(1);
+        assert_eq!(nested_msg_value, U256::ZERO);
+        let (_, nested_msg_value) = proxy1
+            .sender_and_value(alice, value)
+            .delegate_call_get_msg_sender_on_proxy(2);
+        assert_eq!(nested_msg_value, U256::ZERO);
+    }
+
+    #[motsu::test]
+    fn delegate_call_into_regular_call_updates_msg_sender(
+        proxy1: Contract<Proxy>,
+        proxy2: Contract<Proxy>,
+        proxy3: Contract<Proxy>,
+        alice: Address,
+    ) {
+        proxy1.sender(alice).constructor(proxy2.address());
+        proxy2.sender(alice).constructor(proxy3.address());
+        proxy3.sender(alice).constructor(Address::ZERO);
+
+        let ((proxy3_msg_sender, proxy2_msg_sender), proxy1_msg_sender) =
+            proxy1
+                .sender(alice)
+                .get_nested_msg_senders_and_own_msg_sender_using_delegate_call(
+                );
+        assert_eq!(proxy1_msg_sender, alice);
+        assert_eq!(proxy2_msg_sender, alice);
+        assert_eq!(proxy3_msg_sender, proxy2.address());
     }
 }
 
