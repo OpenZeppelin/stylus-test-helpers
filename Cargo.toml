@@ -44,7 +44,8 @@ revm-precompile = "16.2.0"
 
 # members
 motsu = { path = "crates/motsu" }
-motsu-proc = { path = "crates/motsu-proc", version = "=0.9.0" }
+motsu-proc = { path = "crates/motsu-proc", version = ">=0.9.0, <=0.10.0" }
+
 [profile.release]
 codegen-units = 1
 panic = "abort"

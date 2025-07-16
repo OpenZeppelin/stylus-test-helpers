@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "motsu-proc"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
