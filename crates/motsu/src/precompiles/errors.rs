@@ -1,6 +1,7 @@
 //! Stylus-compatible error wrappers for [`PrecompileErrors`].
-use revm_precompile::PrecompileErrors;
-use stylus_sdk::{alloy_sol_types::sol, call::MethodError, prelude::*};
+use revm_precompile::PrecompileError;
+use stylus_sdk::prelude::errors::*;
+use stylus_sdk::{alloy_sol_types::sol, prelude::*};
 
 sol! {
     /// Out of gas is the main error. Others are here just for completeness.
@@ -79,65 +80,60 @@ pub enum Error {
     Fatal(PrecompileFatal),
 }
 
-impl core::convert::From<PrecompileErrors> for Error {
-    fn from(value: PrecompileErrors) -> Self {
+impl core::convert::From<PrecompileError> for Error {
+    fn from(value: PrecompileError) -> Self {
         match value {
-            PrecompileErrors::Error(nested) => match nested {
-                revm_precompile::Error::OutOfGas => {
-                    Error::OutOfGas(PrecompileOutOfGas {})
-                }
-                revm_precompile::Error::Blake2WrongLength => {
-                    Error::Blake2WrongLength(PrecompileBlake2WrongLength {})
-                }
-                revm_precompile::Error::Blake2WrongFinalIndicatorFlag => {
-                    Error::Blake2WrongFinalIndicatorFlag(
-                        PrecompileBlake2WrongFinalIndicatorFlag {},
-                    )
-                }
-                revm_precompile::Error::ModexpExpOverflow => {
-                    Error::ModexpExpOverflow(PrecompileModexpExpOverflow {})
-                }
-                revm_precompile::Error::ModexpBaseOverflow => {
-                    Error::ModexpBaseOverflow(PrecompileModexpBaseOverflow {})
-                }
-                revm_precompile::Error::ModexpModOverflow => {
-                    Error::ModexpModOverflow(PrecompileModexpModOverflow {})
-                }
-                revm_precompile::Error::Bn128FieldPointNotAMember => {
-                    Error::Bn128FieldPointNotAMember(
-                        PrecompileBn128FieldPointNotAMember {},
-                    )
-                }
-                revm_precompile::Error::Bn128AffineGFailedToCreate => {
-                    Error::Bn128AffineGFailedToCreate(
-                        PrecompileBn128AffineGFailedToCreate {},
-                    )
-                }
-                revm_precompile::Error::Bn128PairLength => {
-                    Error::Bn128PairLength(PrecompileBn128PairLength {})
-                }
-                revm_precompile::Error::BlobInvalidInputLength => {
-                    Error::BlobInvalidInputLength(
-                        PrecompileBlobInvalidInputLength {},
-                    )
-                }
-                revm_precompile::Error::BlobMismatchedVersion => {
-                    Error::BlobMismatchedVersion(
-                        PrecompileBlobMismatchedVersion {},
-                    )
-                }
-                revm_precompile::Error::BlobVerifyKzgProofFailed => {
-                    Error::BlobVerifyKzgProofFailed(
-                        PrecompileBlobVerifyKzgProofFailed {},
-                    )
-                }
-                revm_precompile::Error::Other(msg) => {
-                    Error::Other(PrecompileOther { _0: msg })
-                }
-            },
-            PrecompileErrors::Fatal { msg } => {
+            PrecompileError::OutOfGas => Error::OutOfGas(PrecompileOutOfGas {}),
+            PrecompileError::Blake2WrongLength => {
+                Error::Blake2WrongLength(PrecompileBlake2WrongLength {})
+            }
+            PrecompileError::Blake2WrongFinalIndicatorFlag => {
+                Error::Blake2WrongFinalIndicatorFlag(
+                    PrecompileBlake2WrongFinalIndicatorFlag {},
+                )
+            }
+            PrecompileError::ModexpExpOverflow => {
+                Error::ModexpExpOverflow(PrecompileModexpExpOverflow {})
+            }
+            PrecompileError::ModexpBaseOverflow => {
+                Error::ModexpBaseOverflow(PrecompileModexpBaseOverflow {})
+            }
+            PrecompileError::ModexpModOverflow => {
+                Error::ModexpModOverflow(PrecompileModexpModOverflow {})
+            }
+            PrecompileError::ModexpEip7823LimitSize => {
+                Error::ModexpModOverflow(PrecompileModexpModOverflow {})
+            }
+            PrecompileError::Bn254FieldPointNotAMember => {
+                Error::Bn128FieldPointNotAMember(
+                    PrecompileBn128FieldPointNotAMember {},
+                )
+            }
+            PrecompileError::Bn254AffineGFailedToCreate => {
+                Error::Bn128AffineGFailedToCreate(
+                    PrecompileBn128AffineGFailedToCreate {},
+                )
+            }
+            PrecompileError::Bn254PairLength => {
+                Error::Bn128PairLength(PrecompileBn128PairLength {})
+            }
+            PrecompileError::BlobInvalidInputLength => {
+                Error::BlobInvalidInputLength(
+                    PrecompileBlobInvalidInputLength {},
+                )
+            }
+            PrecompileError::BlobMismatchedVersion => {
+                Error::BlobMismatchedVersion(PrecompileBlobMismatchedVersion {})
+            }
+            PrecompileError::BlobVerifyKzgProofFailed => {
+                Error::BlobVerifyKzgProofFailed(
+                    PrecompileBlobVerifyKzgProofFailed {},
+                )
+            }
+            PrecompileError::Fatal(msg) => {
                 Error::Fatal(PrecompileFatal { msg })
             }
+            PrecompileError::Other(msg) => Error::Other(PrecompileOther(msg)),
         }
     }
 }

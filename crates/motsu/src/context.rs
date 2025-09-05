@@ -15,9 +15,7 @@ use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
-use stylus_sdk::{
-    keccak_const::Keccak256, prelude::StorageType, types::AddressVM, ArbResult,
-};
+use stylus_sdk::{keccak_const::Keccak256, prelude::StorageType, ArbResult};
 
 use crate::{
     router::{Router, VMRouter},
@@ -360,7 +358,7 @@ impl VM {
                 contract
                     .events
                     .iter()
-                    .filter_map(|log| E::decode_log_data(log, true).ok())
+                    .filter_map(|log| E::decode_log_data(log).ok())
                     .collect()
             })
             .unwrap_or_default()
@@ -1070,13 +1068,13 @@ pub trait Balance {
 
 impl Balance for Account {
     fn balance(&self) -> U256 {
-        self.address().balance()
+        VM::context().balance(self.address())
     }
 }
 
 impl<ST: StorageType + Router + 'static> Balance for Contract<ST> {
     fn balance(&self) -> U256 {
-        self.address().balance()
+        VM::context().balance(self.address())
     }
 }
 
