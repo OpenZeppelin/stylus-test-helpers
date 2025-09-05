@@ -1066,13 +1066,19 @@ pub trait Balance {
 
 impl Balance for Account {
     fn balance(&self) -> U256 {
-        VM::context().balance(self.address())
+        self.balance()
     }
 }
 
 impl<ST: StorageType + Router + 'static> Balance for Contract<ST> {
     fn balance(&self) -> U256 {
         VM::context().balance(self.address())
+    }
+}
+
+impl Balance for Address {
+    fn balance(&self) -> U256 {
+        VM::context().balance(*self)
     }
 }
 

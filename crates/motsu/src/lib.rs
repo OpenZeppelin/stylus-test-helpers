@@ -712,13 +712,11 @@ mod ping_pong_tests {
     }
 }
 
-/*
 #[cfg(test)]
 mod fallback_receive_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::{call, Call},
-        msg,
+        call::call,
         prelude::*,
         storage::{StorageAddress, StorageU256},
     };
@@ -761,15 +759,21 @@ mod fallback_receive_tests {
         #[payable]
         fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
-            call(Call::new().value(msg::value()), to, &[]).map_err(|e| e.into())
+            call(self.vm(), Call::new().value(self.vm().msg_value()), to, &[])
+                .map_err(|e| e.into())
         }
 
         #[payable]
         #[fallback]
         fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
-            call(Call::new().value(msg::value()), to, calldata)
-                .map_err(|e| e.into())
+            call(
+                self.vm(),
+                Call::new().value(self.vm().msg_value()),
+                to,
+                calldata,
+            )
+            .map_err(|e| e.into())
         }
     }
 
@@ -795,7 +799,11 @@ mod fallback_receive_tests {
         ) -> Result<(), Vec<u8>> {
             let i_proxy = IProxy::new(proxy);
             i_proxy
-                .set_value(Call::new().value(msg::value()), value)
+                .set_value(
+                    self.vm(),
+                    Call::new().value(self.vm().msg_value()),
+                    value,
+                )
                 .map_err(|e| e.into())
         }
 
@@ -806,7 +814,10 @@ mod fallback_receive_tests {
         ) -> Result<(), Vec<u8>> {
             let i_proxy = IProxy::new(implementation);
             i_proxy
-                .pass_msg_value(Call::new().value(msg::value()))
+                .pass_msg_value(
+                    self.vm(),
+                    Call::new().value(self.vm().msg_value()),
+                )
                 .map_err(|e| e.into())
         }
     }
@@ -882,17 +893,15 @@ mod fallback_receive_tests {
 
 #[cfg(test)]
 mod proxies_tests {
+    use crate as motsu;
+    use crate::prelude::*;
     use alloy_primitives::{uint, Address, U256};
     use alloy_sol_types::sol;
+    use stylus_sdk::prelude::errors::MethodError;
     use stylus_sdk::{
-        call::{Call, MethodError},
-        contract, msg,
         prelude::*,
         storage::{StorageAddress, StorageU256},
     };
-
-    use crate as motsu;
-    use crate::prelude::*;
 
     const ONE: U256 = uint!(1_U256);
     const TWO: U256 = uint!(2_U256);
@@ -970,8 +979,10 @@ mod proxies_tests {
             } else {
                 // Otherwise, call the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self);
-                proxy.call_proxy(call, value).expect("should call proxy")
+                let call = Call::new_mutating(self);
+                proxy
+                    .call_proxy(self.vm(), call, value)
+                    .expect("should call proxy")
             }
         }
 
@@ -982,12 +993,12 @@ mod proxies_tests {
             // If there is a next proxy.
             if !next_proxy.is_zero() {
                 // Add one to the message value.
-                let value = msg::value() + ONE;
+                let value = self.vm().msg_value() + ONE;
 
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(value);
-                proxy.pay_proxy(call).expect("should pay proxy");
+                let call = Call::new_mutating(self).value(value);
+                proxy.pay_proxy(self.vm(), call).expect("should pay proxy");
             }
         }
 
@@ -1003,6 +1014,7 @@ mod proxies_tests {
                 let value_for_next_next_proxy = this_value / TWO;
                 proxy
                     .pass_proxy_with_fixed_value(
+                        self.vm(),
                         call,
                         value_for_next_next_proxy,
                     )
@@ -1016,12 +1028,13 @@ mod proxies_tests {
 
             // If there is a next proxy.
             if !next_proxy.is_zero() {
-                let half_balance = contract::balance() / TWO;
+                let half_balance =
+                    self.vm().balance(self.vm().contract_address()) / TWO;
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(half_balance);
+                let call = Call::new_mutating(self).value(half_balance);
                 proxy
-                    .pay_proxy_with_half_balance(call)
+                    .pay_proxy_with_half_balance(self.vm(), call)
                     .expect("should pass half the value to the next proxy");
             }
         }
@@ -1047,9 +1060,12 @@ mod proxies_tests {
 
             let value = value + ONE;
 
-            let result = match IProxy::new(next_proxy)
-                .try_call_proxy(Call::new_in(self), value)
-            {
+            let call = Call::new_mutating(self);
+            let result = match IProxy::new(next_proxy).try_call_proxy(
+                self.vm(),
+                call,
+                value,
+            ) {
                 Ok(value) => Ok(value),
                 Err(err) => {
                     // Handle `ProxyError` and return `Ok` with the value.
@@ -1086,24 +1102,24 @@ mod proxies_tests {
                 return Err(Error::ProxyError(ProxyError {}));
             }
 
-            let value = msg::value() + ONE;
+            let value = self.vm().msg_value() + ONE;
 
-            let result = match IProxy::new(next_proxy)
-                .try_pay_proxy(Call::new_in(self).value(value))
-            {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    // Handle `ProxyError` and return `Ok`.
-                    let expected_err = ProxyError {};
-                    if err.encode() == expected_err.clone().encode() {
-                        Ok(())
-                    } else {
-                        Err(Error::UnknownError(UnknownError {}))
+            let call = Call::new_mutating(self).value(value);
+            let result =
+                match IProxy::new(next_proxy).try_pay_proxy(self.vm(), call) {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        // Handle `ProxyError` and return `Ok`.
+                        let expected_err = ProxyError {};
+                        if err.encode() == expected_err.clone().encode() {
+                            Ok(())
+                        } else {
+                            Err(Error::UnknownError(UnknownError {}))
+                        }
                     }
-                }
-            };
+                };
 
-            if msg::value() == FOUR {
+            if self.vm().msg_value() == FOUR {
                 return Err(Error::ProxyError(ProxyError {}));
             }
 
@@ -1429,8 +1445,7 @@ mod call_tests {
     use alloy_sol_types::{sol, SolCall, SolValue};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::{self, Call},
-        msg,
+        call,
         prelude::*,
         storage::StorageAddress,
     };
@@ -1464,7 +1479,7 @@ mod call_tests {
         }
 
         fn get_msg_sender(&self) -> Address {
-            msg::sender()
+            self.vm().msg_sender()
         }
 
         /// Delegate calls into the next proxy, and returns the msg sender and
@@ -1474,7 +1489,7 @@ mod call_tests {
             depth: u8,
         ) -> (Address, U256) {
             if depth == 0 {
-                return (msg::sender(), msg::value());
+                return (self.vm().msg_sender(), self.vm().msg_value());
             }
 
             let to = self.next_proxy.get();
@@ -1485,13 +1500,14 @@ mod call_tests {
             let calldata = context.abi_encode();
 
             let result = unsafe {
-                call::delegate_call(Call::new_in(self), to, &calldata)
+                let call = Call::new_mutating(self);
+                call::delegate_call(self.vm(), call, to, &calldata)
                     .expect("should delegate call proxy")
             };
 
             type Res = (Address, U256);
 
-            Res::abi_decode(&result, true).expect("should decode address")
+            Res::abi_decode(&result).expect("should decode address")
         }
 
         /// Delegate calls into the next proxy and returns the message senders
@@ -1511,19 +1527,19 @@ mod call_tests {
             let calldata = IProxyEncodable::getNestedMsgSenderAndOwnMsgSenderUsingRegularCallCall {}
                 .abi_encode();
             let to = self.next_proxy.get();
-            let context = Call::new_in(self);
+            let context = Call::new_mutating(self);
 
             let result = unsafe {
-                call::delegate_call(context, to, &calldata)
+                call::delegate_call(self.vm(), context, to, &calldata)
                     .expect("should delegate call proxy")
             };
 
             type Res = (Address, Address);
 
             let nested_msg_senders =
-                Res::abi_decode(&result, true).expect("should decode address");
+                Res::abi_decode(&result).expect("should decode address");
 
-            (nested_msg_senders, msg::sender())
+            (nested_msg_senders, self.vm().msg_sender())
         }
 
         /// Regular calls into the next proxy and returns the message senders
@@ -1539,15 +1555,15 @@ mod call_tests {
         ) -> (Address, Address) {
             let to = self.next_proxy.get();
             let calldata = IProxyEncodable::getMsgSenderCall {}.abi_encode();
-            let context = Call::new_in(self);
+            let context = Call::new_mutating(self);
 
-            let result =
-                call::call(context, to, &calldata).expect("should call proxy");
+            let result = call::call(self.vm(), context, to, &calldata)
+                .expect("should call proxy");
 
-            let nested_msg_sender = Address::abi_decode(&result, true)
-                .expect("should decode address");
+            let nested_msg_sender =
+                Address::abi_decode(&result).expect("should decode address");
 
-            (nested_msg_sender, msg::sender())
+            (nested_msg_sender, self.vm().msg_sender())
         }
     }
 
@@ -1614,7 +1630,7 @@ mod call_tests {
 
 #[cfg(test)]
 mod vm_tests {
-    use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
+    use stylus_sdk::{alloy_primitives::Address, prelude::*};
 
     use crate as motsu;
     use crate::{context::DEFAULT_CHAIN_ID, prelude::*};
@@ -1628,7 +1644,7 @@ mod vm_tests {
     #[public]
     impl ChainChecker {
         fn get_chain_id(&self) -> u64 {
-            block::chainid()
+            self.vm().chain_id()
         }
     }
 
@@ -1639,21 +1655,16 @@ mod vm_tests {
         // Default chain ID is Arbitrum One
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, DEFAULT_CHAIN_ID);
-        // Verify the correct chain ID is returned within tests too
-        assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
 
         VM::context().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
-        assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
 
         // Verify that even custom chain ID can be set
         VM::context().set_chain_id(CUSTOM_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);
-        assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
     }
 }
-*/
