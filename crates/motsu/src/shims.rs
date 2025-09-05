@@ -35,6 +35,9 @@ const EOA_CODEHASH: &[u8; 66] =
 const CA_CODEHASH: &[u8; 66] =
     b"0x1111111111111111111111111111111111111111111111111111111111111111";
 
+/// Default account code size.
+const ACCOUNT_CODE_SIZE: usize = 42;
+
 /// How much ink is in 1 unit of gas.
 /// See: <https://docs.arbitrum.io/stylus/concepts/gas-metering#the-ink-price>
 const GAS_TO_INK_RATE: u64 = 10_000;
@@ -349,12 +352,16 @@ unsafe extern "C" fn block_timestamp() -> u64 {
 /// [`EXT_CODE_COPY`]: https://www.evm.codes/#3C
 #[no_mangle]
 unsafe extern "C" fn account_code(
-    _address: *const u8,
+    address: *const u8,
     _offset: usize,
     _size: usize,
     _dest: *mut u8,
 ) -> usize {
-    0
+    if VM::context().has_code_raw(address) {
+        ACCOUNT_CODE_SIZE
+    } else {
+        0
+    }
 }
 
 /// Gets the size of the code in bytes at the given address. The semantics are
@@ -362,8 +369,12 @@ unsafe extern "C" fn account_code(
 ///
 /// [`EXT_CODESIZE`]: https://www.evm.codes/#3B
 #[no_mangle]
-unsafe extern "C" fn account_code_size(_address: *const u8) -> usize {
-    0
+unsafe extern "C" fn account_code_size(address: *const u8) -> usize {
+    if VM::context().has_code_raw(address) {
+        ACCOUNT_CODE_SIZE
+    } else {
+        0
+    }
 }
 
 /// Gets the basefee of the current block. The semantics are equivalent to that
