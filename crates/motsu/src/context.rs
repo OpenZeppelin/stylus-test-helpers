@@ -564,6 +564,11 @@ impl VM {
         storage.chain_id = chain_id;
     }
 
+    /// Set the block timestamp for the current test thread
+    pub fn set_block_timestamp(self, timestamp: u64) {
+        crate::shims::BLOCK_TIMESTAMP.set(timestamp);
+    }
+
     /// Get all events emitted by the contract at `address`.
     /// Returns a vector of [`LogData`] objects representing the events emitted
     /// by the contract.

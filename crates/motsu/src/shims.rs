@@ -18,7 +18,7 @@
 //! ```
 #![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
-use std::slice;
+use std::{cell::Cell, slice};
 
 use tiny_keccak::{Hasher, Keccak};
 
@@ -38,6 +38,13 @@ const CA_CODEHASH: &[u8; 66] =
 /// How much ink is in 1 unit of gas.
 /// See: <https://docs.arbitrum.io/stylus/concepts/gas-metering#the-ink-price>
 const GAS_TO_INK_RATE: u64 = 10_000;
+
+// Epoch timestamp: 1st January 2025 00::00::00
+pub(crate) const DEFAULT_BLOCK_TIMESTAMP: u64 = 1_735_689_600;
+
+thread_local! {
+    pub(crate) static BLOCK_TIMESTAMP: Cell<u64> = const { Cell::new(DEFAULT_BLOCK_TIMESTAMP) }
+}
 
 /// Efficiently computes the [`keccak256`] hash of the given preimage.
 /// The semantics are equivalent to that of the EVM's [`SHA3`] opcode.
@@ -335,8 +342,7 @@ unsafe extern "C" fn delegate_call_contract(
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 #[no_mangle]
 unsafe extern "C" fn block_timestamp() -> u64 {
-    // Epoch timestamp: 1st January 2025 00::00::00
-    1_735_689_600
+    BLOCK_TIMESTAMP.get()
 }
 
 /// Gets a subset of the code from the account at the given address. The

@@ -1624,7 +1624,9 @@ mod vm_tests {
     use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
 
     use crate as motsu;
-    use crate::{context::DEFAULT_CHAIN_ID, prelude::*};
+    use crate::{
+        context::DEFAULT_CHAIN_ID, prelude::*, shims::DEFAULT_BLOCK_TIMESTAMP,
+    };
 
     const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
     const CUSTOM_CHAIN_ID: u64 = 12345678987654321;
@@ -1636,6 +1638,10 @@ mod vm_tests {
     impl ChainChecker {
         fn get_chain_id(&self) -> u64 {
             block::chainid()
+        }
+
+        fn get_block_timestamp(&self) -> u64 {
+            block::timestamp()
         }
     }
 
@@ -1661,5 +1667,18 @@ mod vm_tests {
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);
         assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
+    }
+
+    #[motsu::test]
+    fn block_timestamp(contract: Contract<ChainChecker>, alice: Address) {
+        let block_timestamp = contract.sender(alice).get_block_timestamp();
+        assert_eq!(block_timestamp, DEFAULT_BLOCK_TIMESTAMP);
+        assert_eq!(block::timestamp(), DEFAULT_BLOCK_TIMESTAMP);
+
+        VM::context().set_block_timestamp(0);
+
+        let block_timestamp = contract.sender(alice).get_block_timestamp();
+        assert_eq!(block_timestamp, 0);
+        assert_eq!(block::timestamp(), 0);
     }
 }
