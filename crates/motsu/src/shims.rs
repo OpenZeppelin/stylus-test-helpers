@@ -338,8 +338,7 @@ unsafe extern "C" fn delegate_call_contract(
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 #[no_mangle]
 unsafe extern "C" fn block_timestamp() -> u64 {
-    // Epoch timestamp: 1st January 2025 00::00::00
-    1_735_689_600
+    VM::context().block_timestamp()
 }
 
 /// Gets a subset of the code from the account at the given address. The

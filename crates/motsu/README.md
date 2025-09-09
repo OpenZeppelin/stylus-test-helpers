@@ -76,6 +76,28 @@ fn test_with_custom_chain_id(
 }
 ```
 
+#### Block Timestamp
+
+You can set the block's timestamp in tests using the [`VM`][vm] API:
+
+```rust
+use motsu::prelude::*;
+
+#[motsu::test]
+fn test_with_custom_timestamp(
+    contract: Contract<MyContract>,
+    alice: Address,
+) {
+    // Default timestamp is 1735689600 (1st January 2025 00::00::00)
+
+    // Set timestamp to Mon Sep 08 2025 14:17:55 GMT+0000
+    VM::context().set_block_timestamp(1757341075);
+
+    // Now any contract code that depends on `block::timestamp()`
+    // will use the new value
+}
+```
+
 ### Sender and Value
 
 Function [`Contract::sender()`][contract_sender] is necessary to trigger call to a contract, and

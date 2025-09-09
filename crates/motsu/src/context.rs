@@ -42,6 +42,9 @@ static MOTSU_VM: LazyLock<DashMap<VM, VMStorage>> = LazyLock::new(DashMap::new);
 /// [chain info]: https://docs.arbitrum.io/for-devs/dev-tools-and-resources/chain-info
 pub(crate) const DEFAULT_CHAIN_ID: u64 = 42161;
 
+/// Epoch timestamp: 1st January 2025 `00::00::00`
+pub(crate) const DEFAULT_BLOCK_TIMESTAMP: u64 = 1_735_689_600;
+
 /// Context of Motsu test VM associated with the current test thread.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
@@ -562,6 +565,17 @@ impl VM {
         storage.chain_id = chain_id;
     }
 
+    /// Get the current block timestamp.
+    pub(crate) fn block_timestamp(self) -> u64 {
+        self.storage().block_timestamp
+    }
+
+    /// Set the block timestamp in UNIX epoch seconds.
+    pub fn set_block_timestamp(self, block_timestamp: u64) {
+        let mut storage = self.storage();
+        storage.block_timestamp = block_timestamp;
+    }
+
     /// Get all events emitted by the contract at `address`.
     /// Returns a vector of [`LogData`] objects representing the events emitted
     /// by the contract.
@@ -634,6 +648,8 @@ struct VMStorage {
     tags: HashMap<Address, String>,
     /// Chain ID of the current network.
     chain_id: u64,
+    /// Block timestamp of the current block.
+    block_timestamp: u64,
 }
 
 impl Default for VMStorage {
@@ -647,6 +663,7 @@ impl Default for VMStorage {
             persistent: Backuped::default(),
             tags: HashMap::default(),
             chain_id: DEFAULT_CHAIN_ID,
+            block_timestamp: DEFAULT_BLOCK_TIMESTAMP,
         }
     }
 }

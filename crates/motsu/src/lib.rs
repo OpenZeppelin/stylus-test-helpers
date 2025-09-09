@@ -1633,25 +1633,33 @@ mod vm_tests {
     use stylus_sdk::{alloy_primitives::Address, prelude::*};
 
     use crate as motsu;
-    use crate::{context::DEFAULT_CHAIN_ID, prelude::*};
+    use crate::{
+        context::{DEFAULT_BLOCK_TIMESTAMP, DEFAULT_CHAIN_ID},
+        prelude::*,
+    };
 
     const ETHEREUM_SEPOLIA_CHAIN_ID: u64 = 11155111;
     const CUSTOM_CHAIN_ID: u64 = 12345678987654321;
+    const CUSTOM_BLOCK_TIMESTAMP: u64 = 1_735_689_601;
 
     #[storage]
-    struct ChainChecker;
+    struct ChainDataChecker;
 
     #[public]
-    impl ChainChecker {
+    impl ChainDataChecker {
         fn get_chain_id(&self) -> u64 {
             self.vm().chain_id()
         }
+
+        fn get_block_timestamp(&self) -> u64 {
+            block::timestamp()
+        }
     }
 
-    unsafe impl TopLevelStorage for ChainChecker {}
+    unsafe impl TopLevelStorage for ChainDataChecker {}
 
     #[motsu::test]
-    fn chain_id(contract: Contract<ChainChecker>, alice: Address) {
+    fn chain_id(contract: Contract<ChainDataChecker>, alice: Address) {
         // Default chain ID is Arbitrum One
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, DEFAULT_CHAIN_ID);
@@ -1666,5 +1674,19 @@ mod vm_tests {
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);
+    }
+
+    #[motsu::test]
+    fn test_block_timestamp(
+        contract: Contract<ChainDataChecker>,
+        alice: Address,
+    ) {
+        let timestamp = contract.sender(alice).get_block_timestamp();
+        assert_eq!(timestamp, DEFAULT_BLOCK_TIMESTAMP);
+
+        VM::context().set_block_timestamp(CUSTOM_BLOCK_TIMESTAMP);
+
+        let timestamp = contract.sender(alice).get_block_timestamp();
+        assert_eq!(timestamp, CUSTOM_BLOCK_TIMESTAMP);
     }
 }
