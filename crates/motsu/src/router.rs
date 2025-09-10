@@ -141,9 +141,6 @@ where
         + ValueDenier,
 {
     fn route(&mut self, calldata: Vec<u8>) -> ArbResult {
-        router_entrypoint::<Self, Self>(
-            calldata,
-            VM { host: Box::new(WasmVM {}) },
-        )
+        router_entrypoint::<Self, Self>(calldata, VM(WasmVM {}))
     }
 }

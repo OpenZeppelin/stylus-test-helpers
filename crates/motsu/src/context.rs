@@ -15,9 +15,7 @@ use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{SolEvent, Word};
 use dashmap::{mapref::one::RefMut, DashMap};
 use k256::ecdsa::SigningKey;
-use stylus_sdk::{
-    keccak_const::Keccak256, prelude::StorageType, types::AddressVM, ArbResult,
-};
+use stylus_sdk::{keccak_const::Keccak256, prelude::StorageType, ArbResult};
 
 use crate::{
     router::{Router, VMRouter},
@@ -149,7 +147,7 @@ impl VM {
         self.storage().contract_address
     }
 
-    /// Initialise contract's storage for the current test thread and
+    /// Initialize contract's storage for the current test thread and
     /// `contract_address`.
     fn init_storage<ST: StorageType + Router + 'static>(
         self,
@@ -363,7 +361,7 @@ impl VM {
                 contract
                     .events
                     .iter()
-                    .filter_map(|log| E::decode_log_data(log, true).ok())
+                    .filter_map(|log| E::decode_log_data(log).ok())
                     .collect()
             })
             .unwrap_or_default()
@@ -629,9 +627,7 @@ pub(crate) unsafe fn write_u256(ptr: *mut u8, value: U256) {
 
 /// Decode the selector as [`u32`] from the raw pointer to the calldata.
 fn decode_selector(calldata: &[u8]) -> u32 {
-    let selector =
-        u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap());
-    selector
+    u32::from_be_bytes(TryInto::try_into(&calldata[..4]).unwrap())
 }
 
 /// Main storage for Motsu test VM.
@@ -952,9 +948,7 @@ pub(crate) fn create_default_storage_type<ST: StorageType>() -> ST {
         ST::new(
             U256::ZERO,
             0,
-            stylus_sdk::host::VM {
-                host: Box::new(stylus_sdk::host::WasmVM {}),
-            },
+            stylus_sdk::host::VM(stylus_sdk::host::WasmVM {}),
         )
     }
 }
@@ -1093,7 +1087,13 @@ impl Balance for Account {
 
 impl<ST: StorageType + Router + 'static> Balance for Contract<ST> {
     fn balance(&self) -> U256 {
-        self.address().balance()
+        VM::context().balance(self.address())
+    }
+}
+
+impl Balance for Address {
+    fn balance(&self) -> U256 {
+        VM::context().balance(*self)
     }
 }
 
@@ -1111,7 +1111,7 @@ pub trait FromTag {
 impl FromTag for Account {
     /// Creates an account derived from the tag string.
     ///
-    /// Also registers the tag in the test context for debugging purposes.
+    /// Also register the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         let account = Account::from_seed(tag);
         VM::context().set_tag(account.address(), tag.to_string());
@@ -1122,7 +1122,7 @@ impl FromTag for Account {
 impl FromTag for Address {
     /// Creates an Ethereum address derived from the tag string.
     ///
-    /// Also registers the tag in the test context for debugging purposes.
+    /// Also register the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         let hash = Keccak256::new().update(tag.as_bytes()).finalize();
         let address = Address::from_slice(&hash[..20]);
@@ -1135,7 +1135,7 @@ impl<ST: StorageType + Router + 'static> FromTag for Contract<ST> {
     /// Creates a contract at an address derived from the tag string.
     ///
     /// This allows deploying contracts to deterministic addresses for testing.
-    /// Also registers the tag in the test context for debugging purposes.
+    /// Also register the tag in the test context for debugging purposes.
     fn from_tag(tag: &str) -> Self {
         Contract::new_at(Address::from_tag(tag))
     }

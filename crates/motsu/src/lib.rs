@@ -19,9 +19,8 @@ mod ping_pong_tests {
     use alloy_sol_types::{sol, SolEvent};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::{Call, MethodError},
-        contract, evm, msg,
-        prelude::*,
+        evm,
+        prelude::{errors::*, *},
         storage::{StorageAddress, StorageU256},
     };
 
@@ -74,36 +73,37 @@ mod ping_pong_tests {
             to: Address,
             value: U256,
         ) -> Result<U256, PingError> {
-            evm::log(Pinged { from: msg::sender(), value });
+            evm::log(self.vm(), Pinged { from: self.vm().msg_sender(), value });
 
             let receiver = IPongContract::new(to);
-            let call = Call::new_in(self);
-            let value = receiver.pong(call, value).map_err(|err| {
-                let expected = MagicError { value };
-                if expected.clone().encode() == err.encode() {
-                    PingError::MagicError(expected)
-                } else {
-                    PingError::UnknownError(UnknownError {})
-                }
-            })?;
+            let call = Call::new_mutating(self);
+            let value =
+                receiver.pong(self.vm(), call, value).map_err(|err| {
+                    let expected = MagicError { value };
+                    if expected.clone().encode() == err.encode() {
+                        PingError::MagicError(expected)
+                    } else {
+                        PingError::UnknownError(UnknownError {})
+                    }
+                })?;
 
             let pings_count = self.pings_count.get();
             self.pings_count.set(pings_count + ONE);
 
-            self.pinged_from.set(msg::sender());
-            self.contract_address.set(contract::address());
+            self.pinged_from.set(self.vm().msg_sender());
+            self.contract_address.set(self.vm().contract_address());
 
             Ok(value)
         }
 
         fn can_ping(&mut self, to: Address) -> Result<bool, Vec<u8>> {
             let receiver = IPongContract::new(to);
-            let call = Call::new_in(self);
-            Ok(receiver.can_pong(call)?)
+            let call = Call::new();
+            Ok(receiver.can_pong(self.vm(), call)?)
         }
 
         fn has_pong(&self, to: Address) -> bool {
-            to.has_code()
+            self.vm().code_size(to) != 0
         }
     }
 
@@ -147,7 +147,7 @@ mod ping_pong_tests {
     #[public]
     impl PongContract {
         fn pong(&mut self, value: U256) -> Result<U256, PongError> {
-            evm::log(Ponged { from: msg::sender(), value });
+            evm::log(self.vm(), Ponged { from: self.vm().msg_sender(), value });
 
             if value == MAGIC_ERROR_VALUE {
                 return Err(PongError::MagicError(MagicError { value }));
@@ -156,8 +156,8 @@ mod ping_pong_tests {
             let pongs_count = self.pongs_count.get();
             self.pongs_count.set(pongs_count + ONE);
 
-            self.ponged_from.set(msg::sender());
-            self.contract_address.set(contract::address());
+            self.ponged_from.set(self.vm().msg_sender());
+            self.contract_address.set(self.vm().contract_address());
 
             Ok(value + ONE)
         }
@@ -418,26 +418,22 @@ mod ping_pong_tests {
         assert_eq!(pong_events.len(), 2);
 
         // Check event data.
-        let ping_event_1 =
-            Pinged::decode_log_data(&ping_events[0], true).unwrap();
+        let ping_event_1 = Pinged::decode_log_data(&ping_events[0]).unwrap();
 
         assert_eq!(ping_event_1.from, alice);
         assert_eq!(ping_event_1.value, TEN);
 
-        let ping_event_2 =
-            Pinged::decode_log_data(&ping_events[1], true).unwrap();
+        let ping_event_2 = Pinged::decode_log_data(&ping_events[1]).unwrap();
 
         assert_eq!(ping_event_2.from, alice);
         assert_eq!(ping_event_2.value, TEN + ONE);
 
-        let pong_event_1 =
-            Ponged::decode_log_data(&pong_events[0], true).unwrap();
+        let pong_event_1 = Ponged::decode_log_data(&pong_events[0]).unwrap();
 
         assert_eq!(pong_event_1.from, ping.address());
         assert_eq!(pong_event_1.value, TEN);
 
-        let pong_event_2 =
-            Ponged::decode_log_data(&pong_events[1], true).unwrap();
+        let pong_event_2 = Ponged::decode_log_data(&pong_events[1]).unwrap();
 
         assert_eq!(pong_event_2.from, ping.address());
         assert_eq!(pong_event_2.value, TEN + ONE);
@@ -532,8 +528,7 @@ mod ping_pong_tests {
         // Check events for `ping1`.
         let ping1_events = ping1.all_events();
         assert_eq!(ping1_events.len(), 1, "Ping1 should have one event");
-        let event1_decoded =
-            Pinged::decode_log_data(&ping1_events[0], true).unwrap();
+        let event1_decoded = Pinged::decode_log_data(&ping1_events[0]).unwrap();
         assert_eq!(event1_decoded.from, alice);
         assert_eq!(event1_decoded.value, value1);
 
@@ -550,8 +545,7 @@ mod ping_pong_tests {
         // Check events for `ping2`.
         let ping2_events = ping2.all_events();
         assert_eq!(ping2_events.len(), 1, "Ping2 should have one event");
-        let event2_decoded =
-            Pinged::decode_log_data(&ping2_events[0], true).unwrap();
+        let event2_decoded = Pinged::decode_log_data(&ping2_events[0]).unwrap();
         assert_eq!(event2_decoded.from, bob);
         assert_eq!(event2_decoded.value, value2);
 
@@ -563,8 +557,7 @@ mod ping_pong_tests {
             "Ping1 events should not change after ping2 interaction"
         );
         let event1_recheck_decoded =
-            Pinged::decode_log_data(&ping1_events_after_ping2[0], true)
-                .unwrap();
+            Pinged::decode_log_data(&ping1_events_after_ping2[0]).unwrap();
         assert_eq!(event1_recheck_decoded.from, alice);
         assert_eq!(event1_recheck_decoded.value, value1);
 
@@ -605,7 +598,7 @@ mod ping_pong_tests {
         // Verify Alice's event.
         let expected_event_alice = Pinged { from: alice, value: value_alice };
         let decoded_event_alice =
-            Pinged::decode_log_data(&events_after_alice[0], true)
+            Pinged::decode_log_data(&events_after_alice[0])
                 .expect("Failed to decode Alice's Pinged event");
         assert_eq!(
             decoded_event_alice, expected_event_alice,
@@ -625,7 +618,7 @@ mod ping_pong_tests {
 
         // Verify Alice's event is still the first one.
         let re_decoded_event_alice =
-            Pinged::decode_log_data(&all_events_now[0], true)
+            Pinged::decode_log_data(&all_events_now[0])
                 .expect("Failed to re-decode Alice's Pinged event");
         assert_eq!(
             re_decoded_event_alice, expected_event_alice,
@@ -634,9 +627,8 @@ mod ping_pong_tests {
 
         // Verify Bob's event is the second one.
         let expected_event_bob = Pinged { from: bob, value: value_bob };
-        let decoded_event_bob =
-            Pinged::decode_log_data(&all_events_now[1], true)
-                .expect("Failed to decode Bob's Pinged event");
+        let decoded_event_bob = Pinged::decode_log_data(&all_events_now[1])
+            .expect("Failed to decode Bob's Pinged event");
         assert_eq!(
             decoded_event_bob, expected_event_bob,
             "Bob's event data mismatch"
@@ -673,7 +665,7 @@ mod ping_pong_tests {
 
         // Check content of the event.
         let decoded_event1 =
-            Pinged::decode_log_data(&events_after_one_call[0], true).unwrap();
+            Pinged::decode_log_data(&events_after_one_call[0]).unwrap();
         let expected_event1 = Pinged { from: alice, value: value1 };
         assert_eq!(decoded_event1, expected_event1);
 
@@ -694,14 +686,14 @@ mod ping_pong_tests {
 
         // Check content of the two events.
         let decoded_event1_from_two =
-            Pinged::decode_log_data(&events_after_two_calls[0], true).unwrap();
+            Pinged::decode_log_data(&events_after_two_calls[0]).unwrap();
         assert_eq!(
             decoded_event1_from_two, expected_event1,
             "First event should remain the same"
         );
 
         let decoded_event2_from_two =
-            Pinged::decode_log_data(&events_after_two_calls[1], true).unwrap();
+            Pinged::decode_log_data(&events_after_two_calls[1]).unwrap();
         let expected_event2 = Pinged { from: alice, value: value2 };
         assert_eq!(
             decoded_event2_from_two, expected_event2,
@@ -724,8 +716,7 @@ mod ping_pong_tests {
 mod fallback_receive_tests {
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::{call, Call},
-        msg,
+        call::call,
         prelude::*,
         storage::{StorageAddress, StorageU256},
     };
@@ -768,15 +759,21 @@ mod fallback_receive_tests {
         #[payable]
         fn pass_msg_value(&self) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
-            call(Call::new().value(msg::value()), to, &[]).map_err(|e| e.into())
+            call(self.vm(), Call::new().value(self.vm().msg_value()), to, &[])
+                .map_err(|e| e.into())
         }
 
         #[payable]
         #[fallback]
         fn fallback(&mut self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
             let to = self.implementation.get();
-            call(Call::new().value(msg::value()), to, calldata)
-                .map_err(|e| e.into())
+            call(
+                self.vm(),
+                Call::new().value(self.vm().msg_value()),
+                to,
+                calldata,
+            )
+            .map_err(|e| e.into())
         }
     }
 
@@ -802,7 +799,11 @@ mod fallback_receive_tests {
         ) -> Result<(), Vec<u8>> {
             let i_proxy = IProxy::new(proxy);
             i_proxy
-                .set_value(Call::new().value(msg::value()), value)
+                .set_value(
+                    self.vm(),
+                    Call::new().value(self.vm().msg_value()),
+                    value,
+                )
                 .map_err(|e| e.into())
         }
 
@@ -813,7 +814,10 @@ mod fallback_receive_tests {
         ) -> Result<(), Vec<u8>> {
             let i_proxy = IProxy::new(implementation);
             i_proxy
-                .pass_msg_value(Call::new().value(msg::value()))
+                .pass_msg_value(
+                    self.vm(),
+                    Call::new().value(self.vm().msg_value()),
+                )
                 .map_err(|e| e.into())
         }
     }
@@ -892,9 +896,7 @@ mod proxies_tests {
     use alloy_primitives::{uint, Address, U256};
     use alloy_sol_types::sol;
     use stylus_sdk::{
-        call::{Call, MethodError},
-        contract, msg,
-        prelude::*,
+        prelude::{errors::MethodError, *},
         storage::{StorageAddress, StorageU256},
     };
 
@@ -977,8 +979,10 @@ mod proxies_tests {
             } else {
                 // Otherwise, call the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self);
-                proxy.call_proxy(call, value).expect("should call proxy")
+                let call = Call::new_mutating(self);
+                proxy
+                    .call_proxy(self.vm(), call, value)
+                    .expect("should call proxy")
             }
         }
 
@@ -989,12 +993,12 @@ mod proxies_tests {
             // If there is a next proxy.
             if !next_proxy.is_zero() {
                 // Add one to the message value.
-                let value = msg::value() + ONE;
+                let value = self.vm().msg_value() + ONE;
 
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(value);
-                proxy.pay_proxy(call).expect("should pay proxy");
+                let call = Call::new_mutating(self).value(value);
+                proxy.pay_proxy(self.vm(), call).expect("should pay proxy");
             }
         }
 
@@ -1010,6 +1014,7 @@ mod proxies_tests {
                 let value_for_next_next_proxy = this_value / TWO;
                 proxy
                     .pass_proxy_with_fixed_value(
+                        self.vm(),
                         call,
                         value_for_next_next_proxy,
                     )
@@ -1023,12 +1028,13 @@ mod proxies_tests {
 
             // If there is a next proxy.
             if !next_proxy.is_zero() {
-                let half_balance = contract::balance() / TWO;
+                let half_balance =
+                    self.vm().balance(self.vm().contract_address()) / TWO;
                 // Pay the next proxy.
                 let proxy = IProxy::new(next_proxy);
-                let call = Call::new_in(self).value(half_balance);
+                let call = Call::new_mutating(self).value(half_balance);
                 proxy
-                    .pay_proxy_with_half_balance(call)
+                    .pay_proxy_with_half_balance(self.vm(), call)
                     .expect("should pass half the value to the next proxy");
             }
         }
@@ -1054,9 +1060,12 @@ mod proxies_tests {
 
             let value = value + ONE;
 
-            let result = match IProxy::new(next_proxy)
-                .try_call_proxy(Call::new_in(self), value)
-            {
+            let call = Call::new_mutating(self);
+            let result = match IProxy::new(next_proxy).try_call_proxy(
+                self.vm(),
+                call,
+                value,
+            ) {
                 Ok(value) => Ok(value),
                 Err(err) => {
                     // Handle `ProxyError` and return `Ok` with the value.
@@ -1093,24 +1102,24 @@ mod proxies_tests {
                 return Err(Error::ProxyError(ProxyError {}));
             }
 
-            let value = msg::value() + ONE;
+            let value = self.vm().msg_value() + ONE;
 
-            let result = match IProxy::new(next_proxy)
-                .try_pay_proxy(Call::new_in(self).value(value))
-            {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    // Handle `ProxyError` and return `Ok`.
-                    let expected_err = ProxyError {};
-                    if err.encode() == expected_err.clone().encode() {
-                        Ok(())
-                    } else {
-                        Err(Error::UnknownError(UnknownError {}))
+            let call = Call::new_mutating(self).value(value);
+            let result =
+                match IProxy::new(next_proxy).try_pay_proxy(self.vm(), call) {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        // Handle `ProxyError` and return `Ok`.
+                        let expected_err = ProxyError {};
+                        if err.encode() == expected_err.clone().encode() {
+                            Ok(())
+                        } else {
+                            Err(Error::UnknownError(UnknownError {}))
+                        }
                     }
-                }
-            };
+                };
 
-            if msg::value() == FOUR {
+            if self.vm().msg_value() == FOUR {
                 return Err(Error::ProxyError(ProxyError {}));
             }
 
@@ -1436,8 +1445,7 @@ mod call_tests {
     use alloy_sol_types::{sol, SolCall, SolValue};
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
-        call::{self, Call},
-        msg,
+        call,
         prelude::*,
         storage::StorageAddress,
     };
@@ -1471,7 +1479,7 @@ mod call_tests {
         }
 
         fn get_msg_sender(&self) -> Address {
-            msg::sender()
+            self.vm().msg_sender()
         }
 
         /// Delegate calls into the next proxy, and returns the msg sender and
@@ -1481,7 +1489,7 @@ mod call_tests {
             depth: u8,
         ) -> (Address, U256) {
             if depth == 0 {
-                return (msg::sender(), msg::value());
+                return (self.vm().msg_sender(), self.vm().msg_value());
             }
 
             let to = self.next_proxy.get();
@@ -1492,13 +1500,14 @@ mod call_tests {
             let calldata = context.abi_encode();
 
             let result = unsafe {
-                call::delegate_call(Call::new_in(self), to, &calldata)
+                let call = Call::new_mutating(self);
+                call::delegate_call(self.vm(), call, to, &calldata)
                     .expect("should delegate call proxy")
             };
 
             type Res = (Address, U256);
 
-            Res::abi_decode(&result, true).expect("should decode address")
+            Res::abi_decode(&result).expect("should decode address")
         }
 
         /// Delegate calls into the next proxy and returns the message senders
@@ -1518,19 +1527,19 @@ mod call_tests {
             let calldata = IProxyEncodable::getNestedMsgSenderAndOwnMsgSenderUsingRegularCallCall {}
                 .abi_encode();
             let to = self.next_proxy.get();
-            let context = Call::new_in(self);
+            let context = Call::new_mutating(self);
 
             let result = unsafe {
-                call::delegate_call(context, to, &calldata)
+                call::delegate_call(self.vm(), context, to, &calldata)
                     .expect("should delegate call proxy")
             };
 
             type Res = (Address, Address);
 
             let nested_msg_senders =
-                Res::abi_decode(&result, true).expect("should decode address");
+                Res::abi_decode(&result).expect("should decode address");
 
-            (nested_msg_senders, msg::sender())
+            (nested_msg_senders, self.vm().msg_sender())
         }
 
         /// Regular calls into the next proxy and returns the message senders
@@ -1546,15 +1555,15 @@ mod call_tests {
         ) -> (Address, Address) {
             let to = self.next_proxy.get();
             let calldata = IProxyEncodable::getMsgSenderCall {}.abi_encode();
-            let context = Call::new_in(self);
+            let context = Call::new_mutating(self);
 
-            let result =
-                call::call(context, to, &calldata).expect("should call proxy");
+            let result = call::call(self.vm(), context, to, &calldata)
+                .expect("should call proxy");
 
-            let nested_msg_sender = Address::abi_decode(&result, true)
-                .expect("should decode address");
+            let nested_msg_sender =
+                Address::abi_decode(&result).expect("should decode address");
 
-            (nested_msg_sender, msg::sender())
+            (nested_msg_sender, self.vm().msg_sender())
         }
     }
 
@@ -1621,7 +1630,7 @@ mod call_tests {
 
 #[cfg(test)]
 mod vm_tests {
-    use stylus_sdk::{alloy_primitives::Address, block, prelude::*};
+    use stylus_sdk::{alloy_primitives::Address, prelude::*};
 
     use crate as motsu;
     use crate::{
@@ -1639,7 +1648,7 @@ mod vm_tests {
     #[public]
     impl ChainDataChecker {
         fn get_chain_id(&self) -> u64 {
-            block::chainid()
+            self.vm().chain_id()
         }
 
         fn get_block_timestamp(&self) -> u64 {
@@ -1654,21 +1663,17 @@ mod vm_tests {
         // Default chain ID is Arbitrum One
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, DEFAULT_CHAIN_ID);
-        // Verify the correct chain ID is returned within tests too
-        assert_eq!(block::chainid(), DEFAULT_CHAIN_ID);
 
         VM::context().set_chain_id(ETHEREUM_SEPOLIA_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, ETHEREUM_SEPOLIA_CHAIN_ID);
-        assert_eq!(block::chainid(), ETHEREUM_SEPOLIA_CHAIN_ID);
 
         // Verify that even custom chain ID can be set
         VM::context().set_chain_id(CUSTOM_CHAIN_ID);
 
         let chain_id = contract.sender(alice).get_chain_id();
         assert_eq!(chain_id, CUSTOM_CHAIN_ID);
-        assert_eq!(block::chainid(), CUSTOM_CHAIN_ID);
     }
 
     #[motsu::test]
