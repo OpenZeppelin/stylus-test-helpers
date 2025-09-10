@@ -24,15 +24,18 @@ sol! {
     /// Modexp mod overflow.
     #[derive(Debug)]
     error PrecompileModexpModOverflow();
-    /// Bn128 field point not a member.
+    /// Modexp limit all input sizes.
     #[derive(Debug)]
-    error PrecompileBn128FieldPointNotAMember();
-    /// Bn128 affine G failed to create.
+    error PrecompileModexpEip7823LimitSize();
+    /// Bn254 errors.
     #[derive(Debug)]
-    error PrecompileBn128AffineGFailedToCreate();
-    /// Bn128 pair length error.
+    error PrecompileBn254FieldPointNotAMember();
+    /// Bn254 affine g failed to create.
     #[derive(Debug)]
-    error PrecompileBn128PairLength();
+    error PrecompileBn254AffineGFailedToCreate();
+    /// Bn254 pair length.
+    #[derive(Debug)]
+    error PrecompileBn254PairLength();
     /// The blob input length is not exactly 192 bytes.
     #[derive(Debug)]
     error PrecompileBlobInvalidInputLength();
@@ -64,12 +67,14 @@ pub enum Error {
     ModexpBaseOverflow(PrecompileModexpBaseOverflow),
     /// Modexp mod overflow.
     ModexpModOverflow(PrecompileModexpModOverflow),
-    /// Bn128 field point not a member.
-    Bn128FieldPointNotAMember(PrecompileBn128FieldPointNotAMember),
-    /// Bn128 affine G failed to create.
-    Bn128AffineGFailedToCreate(PrecompileBn128AffineGFailedToCreate),
-    /// Bn128 pair length error.
-    Bn128PairLength(PrecompileBn128PairLength),
+    /// Modexp limit all input sizes.
+    ModexpEip7823LimitSize(PrecompileModexpEip7823LimitSize),
+    /// Bn254 errors.
+    Bn254FieldPointNotAMember(PrecompileBn254FieldPointNotAMember),
+    /// Bn254 affine g failed to create.
+    Bn254AffineGFailedToCreate(PrecompileBn254AffineGFailedToCreate),
+    /// Bn254 pair length.
+    Bn254PairLength(PrecompileBn254PairLength),
     /// The blob input length is not exactly 192 bytes.
     BlobInvalidInputLength(PrecompileBlobInvalidInputLength),
     /// The blob commitment does not match the versioned hash.
@@ -104,20 +109,22 @@ impl core::convert::From<PrecompileError> for Error {
                 Error::ModexpModOverflow(PrecompileModexpModOverflow {})
             }
             PrecompileError::ModexpEip7823LimitSize => {
-                Error::ModexpModOverflow(PrecompileModexpModOverflow {})
+                Error::ModexpEip7823LimitSize(
+                    PrecompileModexpEip7823LimitSize {},
+                )
             }
             PrecompileError::Bn254FieldPointNotAMember => {
-                Error::Bn128FieldPointNotAMember(
-                    PrecompileBn128FieldPointNotAMember {},
+                Error::Bn254FieldPointNotAMember(
+                    PrecompileBn254FieldPointNotAMember {},
                 )
             }
             PrecompileError::Bn254AffineGFailedToCreate => {
-                Error::Bn128AffineGFailedToCreate(
-                    PrecompileBn128AffineGFailedToCreate {},
+                Error::Bn254AffineGFailedToCreate(
+                    PrecompileBn254AffineGFailedToCreate {},
                 )
             }
             PrecompileError::Bn254PairLength => {
-                Error::Bn128PairLength(PrecompileBn128PairLength {})
+                Error::Bn254PairLength(PrecompileBn254PairLength {})
             }
             PrecompileError::BlobInvalidInputLength => {
                 Error::BlobInvalidInputLength(
