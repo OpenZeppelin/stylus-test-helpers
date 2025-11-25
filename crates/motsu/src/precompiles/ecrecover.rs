@@ -1,11 +1,9 @@
 //! Contract simulating the precompiled `ecrecover` contract on-chain.
 use alloy_primitives::Bytes;
-use revm_precompile::secp256k1::{ec_recover_run, ECRECOVER};
-use stylus_sdk::{alloy_primitives::Address, evm, prelude::*};
+use revm_precompile::secp256k1::ec_recover_run;
+use stylus_sdk::prelude::*;
 
 use super::errors::Error;
-
-pub(crate) const ADDRESS: Address = ECRECOVER.0;
 
 /// State of an [`EcRecover`] contract.
 #[storage]
@@ -22,10 +20,13 @@ impl EcRecover {
     #[allow(clippy::unused_self)]
     #[fallback]
     fn fallback(&self, calldata: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
-        ec_recover_run(&Bytes::copy_from_slice(calldata), evm::gas_left())
-            .map(|out| output_to_left_padded_vec(&out.bytes))
-            .map_err(Into::<Error>::into)
-            .map_err(Into::into)
+        ec_recover_run(
+            &Bytes::copy_from_slice(calldata),
+            self.vm().evm_gas_left(),
+        )
+        .map(|out| output_to_left_padded_vec(&out.bytes))
+        .map_err(Into::<Error>::into)
+        .map_err(Into::into)
     }
 }
 
@@ -51,13 +52,14 @@ fn output_to_left_padded_vec(bytes: &Bytes) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use alloy_signer::SignerSync;
-    use motsu::precompiles::ecrecover;
+    use revm_precompile::secp256k1::ECRECOVER;
     use stylus_sdk::{
         alloy_primitives::{Address, B256},
         alloy_sol_types::{sol, SolValue},
-        call::{self, Call},
+        call,
         keccak_const::Keccak256,
         prelude::*,
+        stylus_core,
     };
 
     use crate as motsu;
@@ -96,11 +98,15 @@ mod tests {
             v: u8,
             r: B256,
             s: B256,
-        ) -> Result<Address, stylus_sdk::call::Error> {
+        ) -> Result<Address, stylus_core::errors::Error> {
             let calldata = encode_calldata(message, v, r, s);
 
-            let recovered =
-                call::static_call(Call::new(), ecrecover::ADDRESS, &calldata)?;
+            let recovered = call::static_call(
+                self.vm(),
+                Call::new(),
+                *ECRECOVER.address(),
+                &calldata,
+            )?;
 
             Ok(Address::from_slice(&recovered[12..]))
         }

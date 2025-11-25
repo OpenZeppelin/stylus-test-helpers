@@ -1,4 +1,6 @@
 //! Ethereum Precompiles
+
+use revm_precompile::secp256k1::ECRECOVER;
 use stylus_sdk::storage::StorageType;
 
 use crate::context::Contract;
@@ -15,5 +17,5 @@ mod errors;
 /// See: <https://ethereum.github.io/yellowpaper/paper.pdf>
 #[must_use]
 pub fn deploy_precompiles() -> Vec<Contract<impl StorageType>> {
-    vec![Contract::<ecrecover::EcRecover>::new_at(ecrecover::ADDRESS)]
+    vec![Contract::<ecrecover::EcRecover>::new_at(*ECRECOVER.address())]
 }
