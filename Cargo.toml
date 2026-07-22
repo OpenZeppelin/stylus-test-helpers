@@ -32,7 +32,7 @@ stylus-sdk = { version = "=0.9.0", default-features = false, features = [
   "stylus-test",
 ] }
 dashmap = "6.1.0"
-syn = { version = "2.0.58", features = ["full"] }
+syn = { version = "3.0.3", features = ["full"] }
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
 alloy-primitives = { version = "=0.8.20", default-features = false }
