@@ -40,7 +40,7 @@ alloy-sol-types = { version = "=0.8.20", default-features = false }
 alloy-signer-local = { version = "=0.11.1", default-features = false }
 alloy-signer = { version = "=0.11.1", default-features = false }
 k256 = { version = "=0.13.4", default-features = false }
-revm-precompile = "16.2.0"
+revm-precompile = "17.0.0"
 
 # members
 motsu = { path = "crates/motsu" }
